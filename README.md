@@ -38,7 +38,7 @@
    docker compose up --build
    ```
 4. Откройте: `http://0.0.0.0:8000/`
-5. Админка: `http://0.0.0.0:8000/admin/login` (введите `ADMIN_KEY`, после входа выставляется signed session cookie).
+5. Админка: `http://0.0.0.0:8000/admin/login` (введите `ADMIN_KEY`, после входа выставляется signed cookie `admin_session`).
 
 ## План следующих итераций
 - **Итерация 3:** ручная жеребьевка с drag/drop и замены игроков в группах.
@@ -84,6 +84,6 @@ docker compose up -d --build
 ## Безопасный доступ к админке
 1. В `.env` задайте сложные значения `ADMIN_KEY` и `SECRET_KEY` (не оставляйте `change_me`).
 2. Перейдите на `/admin/login` и отправьте `ADMIN_KEY` через POST-форму.
-3. При успешной проверке приложение создаст signed session cookie (FastAPI `SessionMiddleware`).
+3. При успешной проверке приложение создаст signed cookie `admin_session` (подпись на базе `SECRET_KEY`).
 4. Все `/admin/*` endpoints доступны только при активной сессии; `admin_key` больше не передается в query/form.
-5. Для завершения сессии используйте `POST /admin/logout`.
+5. Для завершения сессии используйте `/admin/logout` (доступны GET и POST).

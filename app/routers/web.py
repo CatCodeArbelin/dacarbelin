@@ -8,6 +8,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.admin_session import ADMIN_SESSION_COOKIE, create_admin_session_cookie, is_admin_session
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.chat import ChatMessage
@@ -314,7 +315,7 @@ async def archive_page(request: Request, db: AsyncSession = Depends(get_db)):
 
 @router.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
-    if request.session.get("is_admin"):
+    if is_admin_session(request.cookies.get(ADMIN_SESSION_COOKIE)):
         return RedirectResponse(url="/admin", status_code=303)
     return templates.TemplateResponse("admin_login.html", template_context(request))
 
@@ -323,14 +324,23 @@ async def admin_login_page(request: Request):
 async def admin_login(request: Request, admin_key: str = Form(...)):
     if admin_key != settings.admin_key:
         return redirect_with_msg("/admin/login", "msg_admin_login_failed")
-    request.session["is_admin"] = True
-    return RedirectResponse(url="/admin", status_code=303)
+    response = RedirectResponse(url="/admin", status_code=303)
+    response.set_cookie(
+        ADMIN_SESSION_COOKIE,
+        create_admin_session_cookie(),
+        httponly=True,
+        samesite="lax",
+        max_age=60 * 60 * 12,
+    )
+    return response
 
 
+@router.get("/admin/logout")
 @router.post("/admin/logout")
-async def admin_logout(request: Request):
-    request.session.clear()
-    return RedirectResponse(url="/admin/login", status_code=303)
+async def admin_logout():
+    response = RedirectResponse(url="/admin/login", status_code=303)
+    response.delete_cookie(ADMIN_SESSION_COOKIE)
+    return response
 
 
 @router.get("/admin", response_class=HTMLResponse)
