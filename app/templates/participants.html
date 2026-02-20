@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Participants</h2>
+<h2>{{ tr('participants_title') }}</h2>
 <div class="mb-3 d-flex flex-wrap gap-2">
 {% for b in ['queen_top','queen','queen_reserve','king','king_reserve','rook','rook_reserve','bishop','bishop_reserve','low_rank','low_rank_reserve','invited'] %}
 <a class="btn btn-sm {% if basket == b %}btn-danger{% else %}btn-outline-light{% endif %}" href="/participants?basket={{ b }}">{{ b }}</a>
@@ -8,10 +8,10 @@
 </div>
 {% if users %}
 <table class="table table-dark table-striped">
-<tr><th>Nick</th><th>Steam ID</th><th>Game</th><th>Current</th><th>Highest</th><th>Telegram</th><th>Discord</th></tr>
+<tr><th>{{ tr('participants_nick') }}</th><th>{{ tr('participants_steam_id') }}</th><th>{{ tr('participants_game') }}</th><th>{{ tr('participants_current') }}</th><th>{{ tr('participants_highest') }}</th><th>{{ tr('participants_telegram') }}</th><th>{{ tr('participants_discord') }}</th></tr>
 {% for u in users %}
 <tr><td>{{u.nickname}}</td><td>{{u.steam_id}}</td><td>{{u.game_nickname}}</td><td>{{u.current_rank}}</td><td>{{u.highest_rank}}</td><td>{{u.telegram or ''}}</td><td>{{u.discord or ''}}</td></tr>
 {% endfor %}
 </table>
-{% else %}<div class="alert alert-secondary">В данной корзине нет участников</div>{% endif %}
+{% else %}<div class="alert alert-secondary">{{ tr('participants_empty') }}</div>{% endif %}
 {% endblock %}

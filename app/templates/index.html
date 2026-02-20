@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-{% if request.query_params.get('msg') %}<div class="alert alert-info">{{ request.query_params.get('msg') }}</div>{% endif %}
+{% if request.query_params.get('msg') %}<div class="alert alert-info">{{ tr(request.query_params.get('msg')) }}</div>{% endif %}
 <div class="row g-4">
   <div class="col-lg-8">
     <div class="card bg-black neon-border-red">
@@ -8,18 +8,18 @@
         <h2>{{ tr('register') }}</h2>
         {% if not registration_open %}<div class="alert alert-warning">{{ tr('registration_closed') }}</div>{% endif %}
         <form id="registration-form" action="/register" method="post">
-          <input class="form-control mb-2" name="nickname" placeholder="Ник" required {% if not registration_open %}disabled{% endif %}>
+          <input class="form-control mb-2" name="nickname" placeholder="{{ tr('index_nickname') }}" required {% if not registration_open %}disabled{% endif %}>
           <div class="input-group mb-2">
-            <input id="steam-input" class="form-control" name="steam_input" placeholder="Steam ID / URL" required {% if not registration_open %}disabled{% endif %}>
-            <button id="steam-preview-btn" class="btn btn-outline-info" type="button" {% if not registration_open %}disabled{% endif %}>Проверить Steam</button>
+            <input id="steam-input" class="form-control" name="steam_input" placeholder="{{ tr('index_steam_id_or_url') }}" required {% if not registration_open %}disabled{% endif %}>
+            <button id="steam-preview-btn" class="btn btn-outline-info" type="button" {% if not registration_open %}disabled{% endif %}>{{ tr('index_check_steam') }}</button>
           </div>
-          <input id="preview-steam-id" class="form-control mb-2" placeholder="Steam ID" readonly>
-          <input id="preview-game-nickname" class="form-control mb-2" placeholder="Game nickname" readonly>
-          <input id="preview-current-rank" class="form-control mb-2" placeholder="Current rank" readonly>
-          <input id="preview-highest-rank" class="form-control mb-2" placeholder="Highest rank" readonly>
+          <input id="preview-steam-id" class="form-control mb-2" placeholder="{{ tr('index_steam_id') }}" readonly>
+          <input id="preview-game-nickname" class="form-control mb-2" placeholder="{{ tr('index_game_nickname') }}" readonly>
+          <input id="preview-current-rank" class="form-control mb-2" placeholder="{{ tr('index_current_rank') }}" readonly>
+          <input id="preview-highest-rank" class="form-control mb-2" placeholder="{{ tr('index_highest_rank') }}" readonly>
           <div id="steam-preview-message" class="small mb-2"></div>
-          <input class="form-control mb-2" name="telegram" placeholder="Telegram" {% if not registration_open %}disabled{% endif %}>
-          <input class="form-control mb-2" name="discord" placeholder="Discord" {% if not registration_open %}disabled{% endif %}>
+          <input class="form-control mb-2" name="telegram" placeholder="{{ tr('participants_telegram') }}" {% if not registration_open %}disabled{% endif %}>
+          <input class="form-control mb-2" name="discord" placeholder="{{ tr('participants_discord') }}" {% if not registration_open %}disabled{% endif %}>
           <button id="register-submit" class="btn btn-danger" disabled>{{ tr('submit') }}</button>
         </form>
       </div>
@@ -27,13 +27,13 @@
 
     <div id="chat" class="card bg-black neon-border-blue mt-4">
       <div class="card-body">
-        <h3>Chat</h3>
+        <h3>{{ tr('index_chat') }}</h3>
         <form action="/chat/send" method="post" class="mb-3">
-          {% if not chat_settings.is_enabled %}<div class="alert alert-warning">Chat is disabled by admin.</div>{% endif %}
-          <input class="form-control mb-2" name="temp_nick" placeholder="Temporary nickname" required>
-          <textarea class="form-control mb-2" name="message" maxlength="{{ chat_settings.max_length }}" placeholder="Message" required {% if not chat_settings.is_enabled %}disabled{% endif %}></textarea>
-          <button class="btn btn-primary" {% if not chat_settings.is_enabled %}disabled{% endif %}>Connect & Send</button>
-          <div class="small text-secondary">Cooldown: {{ chat_settings.cooldown_seconds }} sec · Max length: {{ chat_settings.max_length }}</div>
+          {% if not chat_settings.is_enabled %}<div class="alert alert-warning">{{ tr('msg_chat_disabled_admin') }}</div>{% endif %}
+          <input class="form-control mb-2" name="temp_nick" placeholder="{{ tr('index_temp_nick') }}" required>
+          <textarea class="form-control mb-2" name="message" maxlength="{{ chat_settings.max_length }}" placeholder="{{ tr('index_message') }}" required {% if not chat_settings.is_enabled %}disabled{% endif %}></textarea>
+          <button class="btn btn-primary" {% if not chat_settings.is_enabled %}disabled{% endif %}>{{ tr('index_connect_send') }}</button>
+          <div class="small text-secondary">{{ tr('index_cooldown') }}: {{ chat_settings.cooldown_seconds }} sec · {{ tr('index_max_length') }}: {{ chat_settings.max_length }}</div>
         </form>
         <div class="chat-box">
           {% for msg in chat_messages %}
@@ -46,11 +46,11 @@
   <div class="col-lg-4">
     <div class="card bg-black neon-border-blue">
       <div class="card-body">
-        <h3>Stages</h3>
+        <h3>{{ tr('index_stages') }}</h3>
         {% for stage in stages %}
-          <div class="mb-2">{{ stage.title_en if lang == 'en' else stage.title_ru }} — {{ stage.date_text }} — {% if stage.is_active %}active{% else %}done{% endif %}</div>
+          <div class="mb-2">{{ stage.title_en if lang == 'en' else stage.title_ru }} — {{ stage.date_text }} — {% if stage.is_active %}{{ tr('index_active') }}{% else %}{{ tr('index_done') }}{% endif %}</div>
         {% else %}
-          <div>TBD</div>
+          <div>{{ tr('index_tbd') }}</div>
         {% endfor %}
       </div>
     </div>
@@ -95,12 +95,12 @@
     const rawValue = steamInput?.value?.trim();
     if (!rawValue) {
       resetPreview();
-      setMessage("Введите Steam ID или ссылку.", true);
+      setMessage("{{ tr('js_enter_steam') }}", true);
       return;
     }
 
     previewBtn.disabled = true;
-    setMessage("Проверяем Steam...");
+    setMessage("{{ tr('js_checking_steam') }}");
 
     try {
       const payload = new URLSearchParams();
@@ -114,16 +114,16 @@
 
       if (!response.ok || !data.ok) {
         resetPreview();
-        setMessage(data.error || "Не удалось получить данные Steam.", true);
+        setMessage(data.error || "{{ tr('js_steam_data_failed') }}", true);
         return;
       }
 
       setPreview(data);
-      setMessage("Steam проверен, можно отправлять форму.");
+      setMessage("{{ tr('js_steam_ok') }}");
       submitBtn.disabled = false;
     } catch (err) {
       resetPreview();
-      setMessage("Ошибка сети при проверке Steam.", true);
+      setMessage("{{ tr('js_steam_network_error') }}", true);
     } finally {
       previewBtn.disabled = false;
     }
