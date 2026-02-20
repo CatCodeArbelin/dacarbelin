@@ -129,6 +129,41 @@
         <button class="btn btn-outline-warning">{{ tr('admin_generate_playoff') }}</button>
       </form>
 
+      <h5 class="mt-3">Playoff / Override</h5>
+      <form action="/admin/playoff/start" method="post" class="row g-2 mb-2">
+        <div class="col-md-4"><input class="form-control" type="number" name="stage_id" placeholder="Stage ID" required></div>
+        <div class="col-md-8"><button class="btn btn-outline-success w-100">Старт стадии</button></div>
+      </form>
+      <form action="/admin/playoff/promote" method="post" class="row g-2 mb-2">
+        <div class="col-md-4"><input class="form-control" type="number" name="stage_id" placeholder="From stage ID" required></div>
+        <div class="col-md-4"><input class="form-control" type="number" name="top_n" placeholder="Top N" value="4" required></div>
+        <div class="col-md-4"><button class="btn btn-outline-info w-100">Продвинуть (override)</button></div>
+      </form>
+      <form action="/admin/playoff/move" method="post" class="row g-2 mb-2">
+        <div class="col-md-3"><input class="form-control" type="number" name="from_stage_id" placeholder="From stage" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="to_stage_id" placeholder="To stage" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="user_id" placeholder="User ID" required></div>
+        <div class="col-md-3"><button class="btn btn-outline-warning w-100">Ручной перенос</button></div>
+      </form>
+      <form action="/admin/playoff/replace" method="post" class="row g-2 mb-2">
+        <div class="col-md-3"><input class="form-control" type="number" name="stage_id" placeholder="Stage ID" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="from_user_id" placeholder="From user" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="to_user_id" placeholder="To user" required></div>
+        <div class="col-md-3"><button class="btn btn-outline-danger w-100">Замена участника</button></div>
+      </form>
+      <form action="/admin/playoff/points" method="post" class="row g-2 mb-2">
+        <div class="col-md-3"><input class="form-control" type="number" name="stage_id" placeholder="Stage ID" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="user_id" placeholder="User ID" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="points_delta" placeholder="+/- points" required></div>
+        <div class="col-md-3"><button class="btn btn-outline-secondary w-100">Коррекция очков</button></div>
+      </form>
+      <form action="/admin/playoff/score" method="post" class="row g-2 mb-3">
+        <div class="col-md-2"><input class="form-control" type="number" name="stage_id" placeholder="Stage" required></div>
+        <div class="col-md-2"><input class="form-control" type="number" name="group_number" placeholder="Group" value="1"></div>
+        <div class="col-md-6"><input class="form-control" name="placements" placeholder="8,5,12,..."></div>
+        <div class="col-md-2"><button class="btn btn-success w-100">Сохранить playoff-игру</button></div>
+      </form>
+
       {% for group in groups %}
       <div class="border rounded p-3 mb-3">
         <div class="d-flex justify-content-between align-items-center">

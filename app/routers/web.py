@@ -262,7 +262,7 @@ async def participants(request: Request, basket: str = Query(Basket.QUEEN.value)
 
 @router.get("/tournament", response_class=HTMLResponse)
 async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
-    # Отдаем турнирную таблицу с текущими группами.
+    # Отдаем турнирную таблицу с текущими группами и playoff-расписанием.
     groups = list(
         (
             await db.scalars(
@@ -287,13 +287,26 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
         for group in groups
     }
     playoff_stages = await get_playoff_stages_with_data(db)
+    current_stage_label = "Group Stage"
+    active_playoff = next((stage for stage in playoff_stages if stage.is_started), None)
+    if active_playoff:
+        current_stage_label = active_playoff.title
+    elif playoff_stages:
+        current_stage_label = playoff_stages[0].title
     playoff_standings = {
         stage.id: sorted(stage.participants, key=lambda p: (p.points, p.wins, p.top4_finishes, -p.last_place, -p.user_id), reverse=True)
         for stage in playoff_stages
     }
     return templates.TemplateResponse(
         "tournament.html",
-        template_context(request, groups=groups, standings=standings, playoff_stages=playoff_stages, playoff_standings=playoff_standings),
+        template_context(
+            request,
+            groups=groups,
+            standings=standings,
+            playoff_stages=playoff_stages,
+            playoff_standings=playoff_standings,
+            current_stage_label=current_stage_label,
+        ),
     )
 
 
@@ -704,12 +717,13 @@ async def admin_adjust_playoff_points(
 @router.post("/admin/playoff/score")
 async def admin_playoff_score(
     stage_id: int = Form(...),
+    group_number: int = Form(default=1),
     placements: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
     try:
         ordered_user_ids = [int(part.strip()) for part in placements.split(",") if part.strip()]
-        await apply_playoff_match_results(db, stage_id, ordered_user_ids)
+        await apply_playoff_match_results(db, stage_id, ordered_user_ids, group_number=group_number)
         return redirect_with_admin_msg("msg_playoff_game_saved")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
