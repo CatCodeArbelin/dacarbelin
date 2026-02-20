@@ -15,6 +15,8 @@ class TournamentGroup(Base):
     stage: Mapped[str] = mapped_column(String(50), default="group_stage", index=True)
     name: Mapped[str] = mapped_column(String(50), index=True)
     lobby_password: Mapped[str] = mapped_column(String(4), default="0000")
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    schedule_text: Mapped[str] = mapped_column(String(120), default="TBD")
     current_game: Mapped[int] = mapped_column(Integer, default=1)
     is_started: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -119,6 +121,8 @@ class PlayoffMatch(Base):
     group_number: Mapped[int] = mapped_column(Integer, default=1, index=True)
     game_number: Mapped[int] = mapped_column(Integer, default=1)
     lobby_password: Mapped[str] = mapped_column(String(4), default="0000")
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    schedule_text: Mapped[str] = mapped_column(String(120), default="TBD")
     state: Mapped[str] = mapped_column(String(20), default="pending")
     winner_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 

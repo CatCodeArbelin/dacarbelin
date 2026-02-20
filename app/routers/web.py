@@ -535,6 +535,30 @@ async def admin_group_password(
     return redirect_with_admin_msg("msg_lobby_password_updated")
 
 
+@router.post("/admin/group/schedule")
+async def admin_group_schedule(
+    group_id: int = Form(...),
+    schedule_text: str = Form(default=""),
+    scheduled_at: str = Form(default=""),
+    db: AsyncSession = Depends(get_db),
+):
+    group = await db.scalar(select(TournamentGroup).where(TournamentGroup.id == group_id))
+    if not group:
+        return redirect_with_admin_msg("msg_group_not_found")
+
+    parsed_scheduled_at = None
+    if scheduled_at.strip():
+        try:
+            parsed_scheduled_at = datetime.fromisoformat(scheduled_at.strip())
+        except ValueError:
+            parsed_scheduled_at = None
+
+    group.scheduled_at = parsed_scheduled_at
+    group.schedule_text = schedule_text.strip() or "TBD"
+    await db.commit()
+    return redirect_with_admin_msg("msg_status_ok")
+
+
 @router.post("/admin/group/create")
 async def admin_group_create(
     name: str = Form(...),
