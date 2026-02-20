@@ -103,65 +103,65 @@
       </form>
       <p class="small text-secondary">{{ score_hint }}</p>
 
-      <h5 class="mt-3">Ручное управление группами</h5>
+      <h5 class="mt-3">{{ tr('admin_group_manual_controls') }}</h5>
       <form action="/admin/group/create" method="post" class="row g-2 mb-3">
-        <div class="col-md-6"><input class="form-control" name="name" placeholder="Название группы" required></div>
-        <div class="col-md-3"><input class="form-control" name="lobby_password" placeholder="Пароль" value="0000"></div>
-        <div class="col-md-3"><button class="btn btn-outline-info w-100">Создать группу</button></div>
+        <div class="col-md-6"><input class="form-control" name="name" placeholder="{{ tr('admin_group_name_placeholder') }}" required></div>
+        <div class="col-md-3"><input class="form-control" name="lobby_password" placeholder="{{ tr('admin_password_placeholder') }}" value="0000"></div>
+        <div class="col-md-3"><button class="btn btn-outline-info w-100">{{ tr('admin_create_group') }}</button></div>
       </form>
 
       <form action="/admin/group/member/move" method="post" class="row g-2 mb-2">
-        <div class="col-md-3"><input class="form-control" type="number" name="from_group_id" placeholder="ID группы от" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="to_group_id" placeholder="ID группы в" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="user_id" placeholder="ID участника" required></div>
-        <div class="col-md-3"><button class="btn btn-outline-warning w-100">Переместить</button></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="from_group_id" placeholder="{{ tr('admin_group_id_from') }}" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="to_group_id" placeholder="{{ tr('admin_group_id_to') }}" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="user_id" placeholder="{{ tr('admin_user_id_placeholder') }}" required></div>
+        <div class="col-md-3"><button class="btn btn-outline-warning w-100">{{ tr('admin_move') }}</button></div>
       </form>
 
       <form action="/admin/group/member/swap" method="post" class="row g-2 mb-3">
-        <div class="col-md-3"><input class="form-control" type="number" name="first_group_id" placeholder="Группа 1" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="first_user_id" placeholder="User 1" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="second_group_id" placeholder="Группа 2" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="second_user_id" placeholder="User 2" required></div>
-        <div class="col-12"><button class="btn btn-outline-light">Поменять местами участников</button></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="first_group_id" placeholder="{{ tr('admin_group_1') }}" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="first_user_id" placeholder="{{ tr('admin_user_1') }}" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="second_group_id" placeholder="{{ tr('admin_group_2') }}" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="second_user_id" placeholder="{{ tr('admin_user_2') }}" required></div>
+        <div class="col-12"><button class="btn btn-outline-light">{{ tr('admin_swap_participants') }}</button></div>
       </form>
 
       <form action="/admin/playoff/generate" method="post" class="mb-3">
         <button class="btn btn-outline-warning">{{ tr('admin_generate_playoff') }}</button>
       </form>
 
-      <h5 class="mt-3">Playoff / Override</h5>
+      <h5 class="mt-3">{{ tr('admin_playoff_override') }}</h5>
       <form action="/admin/playoff/start" method="post" class="row g-2 mb-2">
-        <div class="col-md-4"><input class="form-control" type="number" name="stage_id" placeholder="Stage ID" required></div>
-        <div class="col-md-8"><button class="btn btn-outline-success w-100">Старт стадии</button></div>
+        <div class="col-md-4"><input class="form-control" type="number" name="stage_id" placeholder="{{ tr('admin_stage_id') }}" required></div>
+        <div class="col-md-8"><button class="btn btn-outline-success w-100">{{ tr('admin_start_stage') }}</button></div>
       </form>
       <form action="/admin/playoff/promote" method="post" class="row g-2 mb-2">
-        <div class="col-md-4"><input class="form-control" type="number" name="stage_id" placeholder="From stage ID" required></div>
-        <div class="col-md-4"><input class="form-control" type="number" name="top_n" placeholder="Top N" value="4" required></div>
-        <div class="col-md-4"><button class="btn btn-outline-info w-100">Продвинуть (override)</button></div>
+        <div class="col-md-4"><input class="form-control" type="number" name="stage_id" placeholder="{{ tr('admin_from_stage_id') }}" required></div>
+        <div class="col-md-4"><input class="form-control" type="number" name="top_n" placeholder="{{ tr('admin_top_n') }}" value="4" required></div>
+        <div class="col-md-4"><button class="btn btn-outline-info w-100">{{ tr('admin_promote_override') }}</button></div>
       </form>
       <form action="/admin/playoff/move" method="post" class="row g-2 mb-2">
-        <div class="col-md-3"><input class="form-control" type="number" name="from_stage_id" placeholder="From stage" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="to_stage_id" placeholder="To stage" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="user_id" placeholder="User ID" required></div>
-        <div class="col-md-3"><button class="btn btn-outline-warning w-100">Ручной перенос</button></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="from_stage_id" placeholder="{{ tr('admin_from_stage') }}" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="to_stage_id" placeholder="{{ tr('admin_to_stage') }}" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="user_id" placeholder="{{ tr('admin_user_id_en') }}" required></div>
+        <div class="col-md-3"><button class="btn btn-outline-warning w-100">{{ tr('admin_manual_transfer') }}</button></div>
       </form>
       <form action="/admin/playoff/replace" method="post" class="row g-2 mb-2">
-        <div class="col-md-3"><input class="form-control" type="number" name="stage_id" placeholder="Stage ID" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="from_user_id" placeholder="From user" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="to_user_id" placeholder="To user" required></div>
-        <div class="col-md-3"><button class="btn btn-outline-danger w-100">Замена участника</button></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="stage_id" placeholder="{{ tr('admin_stage_id') }}" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="from_user_id" placeholder="{{ tr('admin_from_user') }}" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="to_user_id" placeholder="{{ tr('admin_to_user') }}" required></div>
+        <div class="col-md-3"><button class="btn btn-outline-danger w-100">{{ tr('admin_replace_participant') }}</button></div>
       </form>
       <form action="/admin/playoff/points" method="post" class="row g-2 mb-2">
-        <div class="col-md-3"><input class="form-control" type="number" name="stage_id" placeholder="Stage ID" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="user_id" placeholder="User ID" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="points_delta" placeholder="+/- points" required></div>
-        <div class="col-md-3"><button class="btn btn-outline-secondary w-100">Коррекция очков</button></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="stage_id" placeholder="{{ tr('admin_stage_id') }}" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="user_id" placeholder="{{ tr('admin_user_id_en') }}" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="points_delta" placeholder="{{ tr('admin_points_delta') }}" required></div>
+        <div class="col-md-3"><button class="btn btn-outline-secondary w-100">{{ tr('admin_adjust_points') }}</button></div>
       </form>
       <form action="/admin/playoff/score" method="post" class="row g-2 mb-3">
-        <div class="col-md-2"><input class="form-control" type="number" name="stage_id" placeholder="Stage" required></div>
-        <div class="col-md-2"><input class="form-control" type="number" name="group_number" placeholder="Group" value="1"></div>
+        <div class="col-md-2"><input class="form-control" type="number" name="stage_id" placeholder="{{ tr('admin_stage') }}" required></div>
+        <div class="col-md-2"><input class="form-control" type="number" name="group_number" placeholder="{{ tr('admin_group') }}" value="1"></div>
         <div class="col-md-6"><input class="form-control" name="placements" placeholder="8,5,12,..."></div>
-        <div class="col-md-2"><button class="btn btn-success w-100">Сохранить playoff-игру</button></div>
+        <div class="col-md-2"><button class="btn btn-success w-100">{{ tr('admin_save_playoff_game') }}</button></div>
       </form>
 
       {% for group in groups %}
@@ -177,22 +177,22 @@
         <form action="/admin/group/schedule" method="post" class="row g-2 mt-2 mb-2">
           <input type="hidden" name="group_id" value="{{ group.id }}">
           <div class="col-md-4"><input class="form-control form-control-sm" type="datetime-local" name="scheduled_at" value="{{ group.scheduled_at.strftime('%Y-%m-%dT%H:%M') if group.scheduled_at else '' }}"></div>
-          <div class="col-md-6"><input class="form-control form-control-sm" name="schedule_text" value="{{ group.schedule_text or 'TBD' }}" placeholder="TBD"></div>
-          <div class="col-md-2"><button class="btn btn-sm btn-outline-light w-100">Сохранить время</button></div>
+          <div class="col-md-6"><input class="form-control form-control-sm" name="schedule_text" value="{{ group.schedule_text or tr('tournament_tbd') }}" placeholder="{{ tr('tournament_tbd') }}"></div>
+          <div class="col-md-2"><button class="btn btn-sm btn-outline-light w-100">{{ tr('admin_save_time') }}</button></div>
         </form>
 
         <div class="small text-info my-2">{{ tr('admin_group_ids') }}: {% for m in group.members %}{{ m.user_id }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
 
         <form action="/admin/group/member/add" method="post" class="row g-2 mb-2">
           <input type="hidden" name="group_id" value="{{ group.id }}">
-          <div class="col-md-9"><input class="form-control" type="number" name="user_id" placeholder="ID участника для добавления" required></div>
-          <div class="col-md-3"><button class="btn btn-sm btn-primary w-100">Добавить</button></div>
+          <div class="col-md-9"><input class="form-control" type="number" name="user_id" placeholder="{{ tr('admin_user_id_add') }}" required></div>
+          <div class="col-md-3"><button class="btn btn-sm btn-primary w-100">{{ tr('admin_add') }}</button></div>
         </form>
 
         <form action="/admin/group/member/remove" method="post" class="row g-2 mb-2">
           <input type="hidden" name="group_id" value="{{ group.id }}">
-          <div class="col-md-9"><input class="form-control" type="number" name="user_id" placeholder="ID участника для удаления" required></div>
-          <div class="col-md-3"><button class="btn btn-sm btn-outline-danger w-100">Удалить</button></div>
+          <div class="col-md-9"><input class="form-control" type="number" name="user_id" placeholder="{{ tr('admin_user_id_remove') }}" required></div>
+          <div class="col-md-3"><button class="btn btn-sm btn-outline-danger w-100">{{ tr('admin_remove') }}</button></div>
         </form>
 
         <form action="/admin/group/score" method="post" class="d-flex gap-2 mb-2">
@@ -202,7 +202,7 @@
         </form>
         <form action="/admin/group/tie-break" method="post" class="d-flex gap-2">
           <input type="hidden" name="group_id" value="{{ group.id }}">
-          <input class="form-control" name="tied_user_ids" placeholder="winner_id,loser_id">
+          <input class="form-control" name="tied_user_ids" placeholder="{{ tr('admin_winner_loser_placeholder') }}">
           <button class="btn btn-sm btn-warning">{{ tr('admin_save_tie_break') }}</button>
         </form>
         {% if coin_toss_candidates.get(group.id) %}
@@ -213,7 +213,7 @@
             <option value="{{ tie_case }}">{{ tie_case }}</option>
             {% endfor %}
           </select>
-          <button class="btn btn-sm btn-outline-warning">Coin toss</button>
+          <button class="btn btn-sm btn-outline-warning">{{ tr('admin_coin_toss') }}</button>
         </form>
         {% endif %}
       </div>

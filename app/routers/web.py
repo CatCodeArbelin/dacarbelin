@@ -193,23 +193,26 @@ async def register(
 
 @router.post("/register/preview")
 async def register_preview(
+    request: Request,
     steam_input: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
     """Проверяет Steam-ввод и возвращает данные профиля для предпросмотра регистрации."""
+    lang = get_lang(request.cookies.get("lang"))
+
     if await get_tournament_started(db):
-        return JSONResponse({"ok": False, "error": "Registration is closed"}, status_code=403)
+        return JSONResponse({"ok": False, "error": t(lang, "registration_closed")}, status_code=403)
 
     if not await get_registration_open(db):
-        return JSONResponse({"ok": False, "error": "Registration is closed"}, status_code=403)
+        return JSONResponse({"ok": False, "error": t(lang, "registration_closed")}, status_code=403)
 
     steam_id = await normalize_steam_id(steam_input)
     if not steam_id:
-        return JSONResponse({"ok": False, "error": "Invalid Steam ID"}, status_code=400)
+        return JSONResponse({"ok": False, "error": t(lang, "msg_invalid_steam_id")}, status_code=400)
 
     exists = await db.scalar(select(User).where(User.steam_id == steam_id))
     if exists:
-        return JSONResponse({"ok": False, "error": "User already registered"}, status_code=409)
+        return JSONResponse({"ok": False, "error": t(lang, "already_registered")}, status_code=409)
 
     try:
         profile = await fetch_autochess_data(steam_id)
@@ -289,7 +292,8 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
         for group in groups
     }
     playoff_stages = await get_playoff_stages_with_data(db)
-    current_stage_label = "Group Stage"
+    lang = get_lang(request.cookies.get("lang"))
+    current_stage_label = t(lang, "tournament_group_stage")
     active_playoff = next((stage for stage in playoff_stages if stage.is_started), None)
     if active_playoff:
         current_stage_label = active_playoff.title
