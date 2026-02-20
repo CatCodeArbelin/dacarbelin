@@ -29,9 +29,11 @@
       <div class="card-body">
         <h3>Chat</h3>
         <form action="/chat/send" method="post" class="mb-3">
+          {% if not chat_settings.is_enabled %}<div class="alert alert-warning">Chat is disabled by admin.</div>{% endif %}
           <input class="form-control mb-2" name="temp_nick" placeholder="Temporary nickname" required>
-          <textarea class="form-control mb-2" name="message" maxlength="1000" placeholder="Message" required></textarea>
-          <button class="btn btn-primary">Connect & Send</button>
+          <textarea class="form-control mb-2" name="message" maxlength="{{ chat_settings.max_length }}" placeholder="Message" required {% if not chat_settings.is_enabled %}disabled{% endif %}></textarea>
+          <button class="btn btn-primary" {% if not chat_settings.is_enabled %}disabled{% endif %}>Connect & Send</button>
+          <div class="small text-secondary">Cooldown: {{ chat_settings.cooldown_seconds }} sec · Max length: {{ chat_settings.max_length }}</div>
         </form>
         <div class="chat-box">
           {% for msg in chat_messages %}

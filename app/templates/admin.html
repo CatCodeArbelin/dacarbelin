@@ -8,7 +8,7 @@
       <h4>Registration toggle</h4>
       <form action="/admin/registration" method="post">
         <input type="hidden" name="admin_key" value="{{ admin_key }}">
-        <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="registration_open" checked><label class="form-check-label">Registration open</label></div>
+        <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="registration_open" {% if registration_open %}checked{% endif %}><label class="form-check-label">Registration open</label></div>
         <button class="btn btn-danger">Save</button>
       </form>
     </div></div>
@@ -35,102 +35,83 @@
         <div class="col-12"><button class="btn btn-primary">Save stage</button></div>
       </form>
     </div></div>
+
+    <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
+      <h4>Chat settings</h4>
+      <form action="/admin/chat-settings" method="post" class="row g-2">
+        <input type="hidden" name="admin_key" value="{{ admin_key }}">
+        <div class="col-6"><input class="form-control" type="number" name="cooldown_seconds" min="0" value="{{ chat_settings.cooldown_seconds }}"></div>
+        <div class="col-6"><input class="form-control" type="number" name="max_length" min="1" value="{{ chat_settings.max_length }}"></div>
+        <div class="col-12 form-check"><input class="form-check-input" name="is_enabled" type="checkbox" {% if chat_settings.is_enabled %}checked{% endif %}><label class="form-check-label">Chat enabled</label></div>
+        <div class="col-12"><button class="btn btn-primary">Save chat settings</button></div>
+      </form>
+    </div></div>
+
+    <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
+      <h4>Rules content</h4>
+      <form action="/admin/rules" method="post">
+        <input type="hidden" name="admin_key" value="{{ admin_key }}">
+        <textarea class="form-control mb-2" name="body" rows="8" placeholder="Rules text">{{ rules_content.body }}</textarea>
+        <button class="btn btn-primary">Save rules</button>
+      </form>
+    </div></div>
   </div>
   <div class="col-lg-8">
     <div class="card bg-black neon-border-red"><div class="card-body">
+      <h4>Content blocks (one per line)</h4>
+      <p class="small text-secondary mb-2">Donation links: <code>title|url|active(1/0)</code></p>
+      <form action="/admin/donation-links" method="post" class="mb-3">
+        <input type="hidden" name="admin_key" value="{{ admin_key }}">
+        <textarea class="form-control" name="items" rows="4">{% for row in donation_links %}{{ row.title }}|{{ row.url }}|{{ 1 if row.is_active else 0 }}{% if not loop.last %}
+{% endif %}{% endfor %}</textarea>
+        <button class="btn btn-sm btn-primary mt-2">Save donation links</button>
+      </form>
+
+      <p class="small text-secondary mb-2">Donation methods: <code>card/crypto|label|details|active(1/0)</code></p>
+      <form action="/admin/donation-methods" method="post" class="mb-3">
+        <input type="hidden" name="admin_key" value="{{ admin_key }}">
+        <textarea class="form-control" name="items" rows="4">{% for row in donation_methods %}{{ row.method_type }}|{{ row.label }}|{{ row.details }}|{{ 1 if row.is_active else 0 }}{% if not loop.last %}
+{% endif %}{% endfor %}</textarea>
+        <button class="btn btn-sm btn-primary mt-2">Save donation methods</button>
+      </form>
+
+      <p class="small text-secondary mb-2">Prize pool: <code>place|reward</code></p>
+      <form action="/admin/prize-pool" method="post" class="mb-3">
+        <input type="hidden" name="admin_key" value="{{ admin_key }}">
+        <textarea class="form-control" name="items" rows="4">{% for row in prize_pool_entries %}{{ row.place_label }}|{{ row.reward }}{% if not loop.last %}
+{% endif %}{% endfor %}</textarea>
+        <button class="btn btn-sm btn-primary mt-2">Save prize pool</button>
+      </form>
+
+      <p class="small text-secondary mb-2">Donors: <code>name|amount|message</code></p>
+      <form action="/admin/donors" method="post" class="mb-3">
+        <input type="hidden" name="admin_key" value="{{ admin_key }}">
+        <textarea class="form-control" name="items" rows="4">{% for row in donors %}{{ row.name }}|{{ row.amount }}|{{ row.message }}{% if not loop.last %}
+{% endif %}{% endfor %}</textarea>
+        <button class="btn btn-sm btn-primary mt-2">Save donors</button>
+      </form>
+
+      <p class="small text-secondary mb-2">Archive: <code>title|season|summary|url</code></p>
+      <form action="/admin/archive" method="post" class="mb-3">
+        <input type="hidden" name="admin_key" value="{{ admin_key }}">
+        <textarea class="form-control" name="items" rows="4">{% for row in archive_entries %}{{ row.title }}|{{ row.season }}|{{ row.summary }}|{{ row.link_url }}{% if not loop.last %}
+{% endif %}{% endfor %}</textarea>
+        <button class="btn btn-sm btn-primary mt-2">Save archive</button>
+      </form>
+    </div></div>
+
+    <div class="card bg-black neon-border-red mt-4"><div class="card-body">
       <h4>Draw controls</h4>
       <form action="/admin/draw/auto" method="post" class="mb-3">
         <input type="hidden" name="admin_key" value="{{ admin_key }}">
         <button class="btn btn-danger">Автоматическая жеребьевка</button>
       </form>
       <p class="small text-secondary">{{ score_hint }}</p>
-
       <form action="/admin/playoff/generate" method="post" class="mb-3">
         <input type="hidden" name="admin_key" value="{{ admin_key }}">
         <button class="btn btn-outline-warning">Сгенерировать playoff из групп</button>
       </form>
-      {% for group in groups %}
-      <div class="border rounded p-3 mb-3">
-        <div class="d-flex justify-content-between align-items-center">
-          <strong>{{ group.name }} (Game {{ group.current_game }})</strong>
-          <form action="/admin/group/password" method="post" class="d-flex gap-2">
-            <input type="hidden" name="admin_key" value="{{ admin_key }}">
-            <input type="hidden" name="group_id" value="{{ group.id }}">
-            <input class="form-control form-control-sm" style="width:120px" name="password" value="{{ group.lobby_password }}">
-            <button class="btn btn-sm btn-outline-info">Save PW</button>
-          </form>
-        </div>
-        <div class="small text-info my-2">IDs in group: {% for m in group.members %}{{ m.user_id }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
-        <form action="/admin/group/score" method="post" class="d-flex gap-2 mb-2">
-          <input type="hidden" name="admin_key" value="{{ admin_key }}">
-          <input type="hidden" name="group_id" value="{{ group.id }}">
-          <input class="form-control" name="placements" placeholder="8,5,12,... (user ids by places)">
-          <button class="btn btn-sm btn-success">Save game result</button>
-        </form>
-        <form action="/admin/group/tie-break" method="post" class="d-flex gap-2">
-          <input type="hidden" name="admin_key" value="{{ admin_key }}">
-          <input type="hidden" name="group_id" value="{{ group.id }}">
-          <input class="form-control" name="tied_user_ids" placeholder="Tie only: winner_id,loser_id,...">
-          <button class="btn btn-sm btn-warning">Save manual tie-break</button>
-        </form>
-      </div>
-      {% else %}
-      <div class="alert alert-secondary">Группы пока не созданы</div>
-      {% endfor %}
-
-      <h5 class="mt-4">Playoff controls</h5>
-      {% for stage in playoff_stages %}
-      <div class="border rounded p-3 mb-3">
-        <div class="d-flex justify-content-between"><strong>{{ stage.title }}</strong><span class="small">size {{ stage.stage_size }}</span></div>
-        <div class="small text-info mb-2">IDs: {% for p in stage.participants %}{{ p.user_id }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
-        <form action="/admin/playoff/start" method="post" class="d-flex gap-2 mb-2">
-          <input type="hidden" name="admin_key" value="{{ admin_key }}">
-          <input type="hidden" name="stage_id" value="{{ stage.id }}">
-          <button class="btn btn-sm btn-outline-success">Подтвердить старт этапа</button>
-        </form>
-        <form action="/admin/playoff/promote" method="post" class="d-flex gap-2 mb-2">
-          <input type="hidden" name="admin_key" value="{{ admin_key }}">
-          <input type="hidden" name="stage_id" value="{{ stage.id }}">
-          <input class="form-control form-control-sm" name="top_n" placeholder="top_n (e.g. 8)">
-          <button class="btn btn-sm btn-outline-primary">Перевести top-N</button>
-        </form>
-        <form action="/admin/playoff/score" method="post" class="d-flex gap-2 mb-2">
-          <input type="hidden" name="admin_key" value="{{ admin_key }}">
-          <input type="hidden" name="stage_id" value="{{ stage.id }}">
-          <input class="form-control form-control-sm" name="placements" placeholder="user_id1,user_id2,...,user_id8">
-          <button class="btn btn-sm btn-outline-success">Сохранить матч</button>
-        </form>
-      </div>
-      {% endfor %}
-
-      <div class="border rounded p-3 mb-3">
-        <h6>Ручной перевод игрока</h6>
-        <form action="/admin/playoff/move" method="post" class="row g-2">
-          <input type="hidden" name="admin_key" value="{{ admin_key }}">
-          <div class="col"><input class="form-control form-control-sm" name="from_stage_id" placeholder="from_stage_id"></div>
-          <div class="col"><input class="form-control form-control-sm" name="to_stage_id" placeholder="to_stage_id"></div>
-          <div class="col"><input class="form-control form-control-sm" name="user_id" placeholder="user_id"></div>
-          <div class="col-auto"><button class="btn btn-sm btn-warning">Move</button></div>
-        </form>
-      </div>
-
-      <div class="border rounded p-3 mb-3">
-        <h6>Замена игрока / корректировка очков</h6>
-        <form action="/admin/playoff/replace" method="post" class="row g-2 mb-2">
-          <input type="hidden" name="admin_key" value="{{ admin_key }}">
-          <div class="col"><input class="form-control form-control-sm" name="stage_id" placeholder="stage_id"></div>
-          <div class="col"><input class="form-control form-control-sm" name="from_user_id" placeholder="from_user_id"></div>
-          <div class="col"><input class="form-control form-control-sm" name="to_user_id" placeholder="to_user_id"></div>
-          <div class="col-auto"><button class="btn btn-sm btn-warning">Replace</button></div>
-        </form>
-        <form action="/admin/playoff/points" method="post" class="row g-2">
-          <input type="hidden" name="admin_key" value="{{ admin_key }}">
-          <div class="col"><input class="form-control form-control-sm" name="stage_id" placeholder="stage_id"></div>
-          <div class="col"><input class="form-control form-control-sm" name="user_id" placeholder="user_id"></div>
-          <div class="col"><input class="form-control form-control-sm" name="points_delta" placeholder="+/- points"></div>
-          <div class="col-auto"><button class="btn btn-sm btn-info">Adjust</button></div>
-        </form>
-      </div>
+      {% for group in groups %}<div class="border rounded p-3 mb-3"><div class="d-flex justify-content-between align-items-center"><strong>{{ group.name }} (Game {{ group.current_game }})</strong><form action="/admin/group/password" method="post" class="d-flex gap-2"><input type="hidden" name="admin_key" value="{{ admin_key }}"><input type="hidden" name="group_id" value="{{ group.id }}"><input class="form-control form-control-sm" style="width:120px" name="password" value="{{ group.lobby_password }}"><button class="btn btn-sm btn-outline-info">Save PW</button></form></div><div class="small text-info my-2">IDs in group: {% for m in group.members %}{{ m.user_id }}{% if not loop.last %}, {% endif %}{% endfor %}</div><form action="/admin/group/score" method="post" class="d-flex gap-2 mb-2"><input type="hidden" name="admin_key" value="{{ admin_key }}"><input type="hidden" name="group_id" value="{{ group.id }}"><input class="form-control" name="placements" placeholder="8,5,12,..."><button class="btn btn-sm btn-success">Save game result</button></form><form action="/admin/group/tie-break" method="post" class="d-flex gap-2"><input type="hidden" name="admin_key" value="{{ admin_key }}"><input type="hidden" name="group_id" value="{{ group.id }}"><input class="form-control" name="tied_user_ids" placeholder="winner_id,loser_id"><button class="btn btn-sm btn-warning">Save tie-break</button></form></div>{% else %}<div class="alert alert-secondary">Группы пока не созданы</div>{% endfor %}
     </div></div>
   </div>
 </div>

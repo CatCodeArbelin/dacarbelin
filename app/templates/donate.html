@@ -1,5 +1,40 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>Donate</h2>
-<p>TBD</p>
+
+<h4>Donation links</h4>
+<ul>
+  {% for item in donation_links %}
+    <li><a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.title }}</a></li>
+  {% else %}
+    <li>No links yet.</li>
+  {% endfor %}
+</ul>
+
+<h4>Card / Crypto</h4>
+<ul>
+  {% for item in donation_methods %}
+    <li><strong>{{ item.method_type|upper }}:</strong> {{ item.label }} — {{ item.details }}</li>
+  {% else %}
+    <li>No payment methods yet.</li>
+  {% endfor %}
+</ul>
+
+<h4>Prize pool</h4>
+<ul>
+  {% for item in prize_pool_entries %}
+    <li>{{ item.place_label }} — {{ item.reward }}</li>
+  {% else %}
+    <li>No prize pool data yet.</li>
+  {% endfor %}
+</ul>
+
+<h4>Donors</h4>
+<ul>
+  {% for donor in donors %}
+    <li>{{ donor.name }}{% if donor.amount %} ({{ donor.amount }}){% endif %}{% if donor.message %}: {{ donor.message }}{% endif %}</li>
+  {% else %}
+    <li>No donors yet.</li>
+  {% endfor %}
+</ul>
 {% endblock %}
