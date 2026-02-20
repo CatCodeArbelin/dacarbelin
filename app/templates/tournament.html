@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>{{ tr('tournament_title') }}</h2>
+<div class="alert alert-info mt-3">
+  Текущая стадия: <strong>{{ current_stage_label }}</strong>
+</div>
 
 {% if groups %}
-  <h3 class="mt-4">{{ tr('tournament_group_stage') }}</h3>
+  <h3 class="mt-4">Group Stage (Top 64)</h3>
   <div class="row g-3">
     {% for group in groups %}
     <div class="col-lg-6">
@@ -25,6 +28,7 @@
             </tr>
             {% endfor %}
           </table>
+          <div class="small text-warning">Продвигаются top-4 после 3 игр.</div>
         </div>
       </div>
     </div>
@@ -35,7 +39,7 @@
 {% endif %}
 
 {% if playoff_stages %}
-  <h3 class="mt-5">{{ tr('tournament_playoff_title') }}</h3>
+  <h3 class="mt-5">Playoff</h3>
   {% for stage in playoff_stages %}
   <div class="card bg-black neon-border-red mb-3">
     <div class="card-body">
@@ -43,7 +47,7 @@
         <h4>{{ stage.title }}</h4>
         <span class="badge {{ 'bg-success' if stage.is_started else 'bg-secondary' }}">{{ tr('tournament_started') if stage.is_started else tr('tournament_pending') }}</span>
       </div>
-      <p class="small text-secondary mb-1">{{ tr('tournament_scoring_mode') }}: {{ stage.scoring_mode }}</p>
+      <p class="small text-secondary mb-1">{{ tr('tournament_scoring_mode') }}: {{ stage.scoring_mode }}{% if stage.scoring_mode == 'final_22_top1' %} (22 очка + следующая игра Top1){% endif %}</p>
       <p class="small text-secondary">{{ tr('tournament_matches') }}: {{ stage.matches|length }} · {{ tr('tournament_players') }}: {{ stage.participants|length }}</p>
       <div class="row g-3">
         <div class="col-lg-6">
@@ -63,12 +67,12 @@
           </table>
         </div>
         <div class="col-lg-6">
-          <h6>{{ tr('tournament_bracket_matches') }}</h6>
+          <h6>Расписание / статусы</h6>
           <ul class="list-group list-group-flush">
             {% for match in stage.matches %}
             <li class="list-group-item bg-transparent text-light d-flex justify-content-between">
-              <span>{{ tr('tournament_match') }} {{ match.match_number }} · PW {{ match.lobby_password }}</span>
-              <span>{{ match.state }}</span>
+              <span>Group {{ match.group_number }} · Game {{ match.game_number }} · PW {{ match.lobby_password }}</span>
+              <span>{{ match.state }}{% if match.winner_user_id %} · winner {{ match.winner_user_id }}{% endif %}</span>
             </li>
             {% endfor %}
           </ul>

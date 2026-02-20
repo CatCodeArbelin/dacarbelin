@@ -77,6 +77,10 @@ class PlayoffStage(Base):
     stage_order: Mapped[int] = mapped_column(Integer, index=True)
     scoring_mode: Mapped[str] = mapped_column(String(32), default="standard")
     is_started: Mapped[bool] = mapped_column(Boolean, default=False)
+    final_candidate_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     matches: Mapped[list["PlayoffMatch"]] = relationship("PlayoffMatch", back_populates="stage", cascade="all, delete-orphan")
@@ -112,6 +116,8 @@ class PlayoffMatch(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     stage_id: Mapped[int] = mapped_column(ForeignKey("playoff_stages.id", ondelete="CASCADE"), index=True)
     match_number: Mapped[int] = mapped_column(Integer, index=True)
+    group_number: Mapped[int] = mapped_column(Integer, default=1, index=True)
+    game_number: Mapped[int] = mapped_column(Integer, default=1)
     lobby_password: Mapped[str] = mapped_column(String(4), default="0000")
     state: Mapped[str] = mapped_column(String(20), default="pending")
     winner_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

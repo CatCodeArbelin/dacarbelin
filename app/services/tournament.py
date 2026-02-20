@@ -355,6 +355,12 @@ def apply_points_to_playoff_participant(participant: PlayoffParticipant, place: 
     participant.last_place = place
 
 
+def get_group_count_for_stage(stage_size: int) -> int:
+    if stage_size == 16:
+        return 2
+    return max(1, stage_size // 8)
+
+
 async def rebuild_playoff_stages(db: AsyncSession, player_ids: list[int]) -> list[PlayoffStage]:
     usable_count = len(player_ids)
     stages_to_create = [size for size in PLAYOFF_STAGE_SIZES if usable_count >= size]
@@ -385,8 +391,16 @@ async def rebuild_playoff_stages(db: AsyncSession, player_ids: list[int]) -> lis
         db.add(PlayoffParticipant(stage_id=first_stage.id, user_id=user_id, seed=seed))
 
     for stage in stages:
-        for match_number in range(1, stage.stage_size // 8 + 1):
-            db.add(PlayoffMatch(stage_id=stage.id, match_number=match_number, lobby_password=generate_password()))
+        for group_number in range(1, get_group_count_for_stage(stage.stage_size) + 1):
+            db.add(
+                PlayoffMatch(
+                    stage_id=stage.id,
+                    match_number=group_number,
+                    group_number=group_number,
+                    game_number=1,
+                    lobby_password=generate_password(),
+                )
+            )
 
     await db.commit()
     return stages
@@ -397,6 +411,9 @@ async def generate_playoff_from_groups(db: AsyncSession) -> tuple[bool, str]:
     if not groups:
         return False, "Сначала требуется сформировать групповой этап"
 
+    if any(group.current_game < 3 for group in groups):
+        return False, "Продвижение возможно только после 3 игр в каждой группе"
+
     members = list((await db.scalars(select(GroupMember).where(GroupMember.group_id.in_([g.id for g in groups])))).all())
     by_group: dict[int, list[GroupMember]] = defaultdict(list)
     for member in members:
@@ -405,7 +422,7 @@ async def generate_playoff_from_groups(db: AsyncSession) -> tuple[bool, str]:
     promoted: list[int] = []
     for group in groups:
         ranked = sort_members_for_table(by_group.get(group.id, []))
-        promoted.extend([m.user_id for m in ranked[:8]])
+        promoted.extend([m.user_id for m in ranked[:4]])
 
     if len(promoted) < 8:
         return False, "Недостаточно участников для playoff"
@@ -417,7 +434,15 @@ async def generate_playoff_from_groups(db: AsyncSession) -> tuple[bool, str]:
 async def get_playoff_stages_with_data(db: AsyncSession) -> list[PlayoffStage]:
     stages = list((await db.scalars(select(PlayoffStage).order_by(PlayoffStage.stage_order))).all())
     for stage in stages:
-        stage.matches = list((await db.scalars(select(PlayoffMatch).where(PlayoffMatch.stage_id == stage.id).order_by(PlayoffMatch.match_number))).all())
+        stage.matches = list(
+            (
+                await db.scalars(
+                    select(PlayoffMatch)
+                    .where(PlayoffMatch.stage_id == stage.id)
+                    .order_by(PlayoffMatch.group_number, PlayoffMatch.game_number)
+                )
+            ).all()
+        )
         stage.participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage.id))).all())
     return stages
 
@@ -461,7 +486,12 @@ async def adjust_stage_points(db: AsyncSession, stage_id: int, user_id: int, poi
     await db.commit()
 
 
-async def apply_playoff_match_results(db: AsyncSession, stage_id: int, ordered_user_ids: list[int]) -> None:
+async def apply_playoff_match_results(
+    db: AsyncSession,
+    stage_id: int,
+    ordered_user_ids: list[int],
+    group_number: int = 1,
+) -> None:
     stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.id == stage_id))
     if not stage:
         raise ValueError("Stage not found")
@@ -474,17 +504,29 @@ async def apply_playoff_match_results(db: AsyncSession, stage_id: int, ordered_u
         if uid not in by_user:
             raise ValueError("В результатах есть игрок вне этапа")
 
+    match = await db.scalar(
+        select(PlayoffMatch).where(PlayoffMatch.stage_id == stage_id, PlayoffMatch.group_number == group_number)
+    )
+    if not match:
+        raise ValueError("Матч/группа для этапа не найдена")
+
     for place, user_id in enumerate(ordered_user_ids, start=1):
         apply_points_to_playoff_participant(by_user[user_id], place, stage.scoring_mode)
 
+    match.state = "in_progress"
+    match.game_number += 1
+
     if stage.scoring_mode == FINAL_SCORING_MODE:
-        winner = max(participants, key=playoff_sort_key)
-        if winner.points >= 22:
-            top_points = sorted([p.points for p in participants], reverse=True)
-            if len(top_points) == 1 or top_points[0] > top_points[1]:
-                for match in (await db.scalars(select(PlayoffMatch).where(PlayoffMatch.stage_id == stage_id))).all():
-                    match.state = "finished"
-                    match.winner_user_id = winner.user_id
+        ranked = sorted(participants, key=playoff_sort_key, reverse=True)
+        leader = ranked[0]
+        if stage.final_candidate_user_id:
+            if ordered_user_ids[0] == stage.final_candidate_user_id:
+                match.state = "finished"
+                match.winner_user_id = stage.final_candidate_user_id
+            elif leader.points >= 22:
+                stage.final_candidate_user_id = leader.user_id
+        elif leader.points >= 22:
+            stage.final_candidate_user_id = leader.user_id
 
     await db.commit()
 
@@ -499,6 +541,9 @@ async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int
 
     participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage.id))).all())
     ranked = sorted(participants, key=playoff_sort_key, reverse=True)
+
+    if stage.stage_size == 16 and next_stage.stage_size == 8:
+        top_n = 8
     top_players = ranked[:top_n]
 
     await db.execute(delete(PlayoffParticipant).where(PlayoffParticipant.stage_id == next_stage.id))
