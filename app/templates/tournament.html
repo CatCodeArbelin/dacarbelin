@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Tournament</h2>
+{% if groups %}
+  <div class="row g-3">
+    {% for group in groups %}
+    <div class="col-lg-6">
+      <div class="card bg-black neon-border-blue">
+        <div class="card-body">
+          <h4>{{ group.name }} · Game {{ group.current_game }}</h4>
+          <div>LobbyPW: <span class="text-info">{{ group.lobby_password }}</span></div>
+          <table class="table table-dark table-sm mt-3">
+            <tr><th>#</th><th>Nick</th><th>Highest</th><th>PTS</th><th>W</th><th>Top4</th></tr>
+            {% for member in standings[group.id] %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ member.user.nickname }}</td>
+              <td>{{ member.user.highest_rank }}</td>
+              <td>{{ member.total_points }}</td>
+              <td>{{ member.first_places }}</td>
+              <td>{{ member.top4_finishes }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+{% else %}
+<div class="alert alert-secondary">Жеребьевка еще не произведена</div>
+{% endif %}
+{% endblock %}

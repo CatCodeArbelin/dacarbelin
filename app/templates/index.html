@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+{% if request.query_params.get('msg') %}<div class="alert alert-info">{{ request.query_params.get('msg') }}</div>{% endif %}
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card bg-black neon-border-red">
+      <div class="card-body">
+        <h2>{{ tr('register') }}</h2>
+        {% if not registration_open %}<div class="alert alert-warning">{{ tr('registration_closed') }}</div>{% endif %}
+        <form action="/register" method="post">
+          <input class="form-control mb-2" name="nickname" placeholder="Ник" required {% if not registration_open %}disabled{% endif %}>
+          <input class="form-control mb-2" name="steam_input" placeholder="Steam ID / URL" required {% if not registration_open %}disabled{% endif %}>
+          <input class="form-control mb-2" name="telegram" placeholder="Telegram" {% if not registration_open %}disabled{% endif %}>
+          <input class="form-control mb-2" name="discord" placeholder="Discord" {% if not registration_open %}disabled{% endif %}>
+          <button class="btn btn-danger" {% if not registration_open %}disabled{% endif %}>{{ tr('submit') }}</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="chat" class="card bg-black neon-border-blue mt-4">
+      <div class="card-body">
+        <h3>Chat</h3>
+        <form action="/chat/send" method="post" class="mb-3">
+          <input class="form-control mb-2" name="temp_nick" placeholder="Temporary nickname" required>
+          <textarea class="form-control mb-2" name="message" maxlength="1000" placeholder="Message" required></textarea>
+          <button class="btn btn-primary">Connect & Send</button>
+        </form>
+        <div class="chat-box">
+          {% for msg in chat_messages %}
+            <div><strong>{{ msg.temp_nick }}</strong>: {{ msg.message }}</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card bg-black neon-border-blue">
+      <div class="card-body">
+        <h3>Stages</h3>
+        {% for stage in stages %}
+          <div class="mb-2">{{ stage.title_en if lang == 'en' else stage.title_ru }} — {{ stage.date_text }} — {% if stage.is_active %}active{% else %}done{% endif %}</div>
+        {% else %}
+          <div>TBD</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
