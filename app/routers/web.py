@@ -47,6 +47,22 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
+def template_context(request: Request, **extra):
+    lang = get_lang(request.cookies.get("lang"))
+    context = {"request": request, "lang": lang, "tr": lambda key: t(lang, key)}
+    context.update(extra)
+    return context
+
+
+def redirect_with_msg(url: str, msg_key: str, status_code: int = 303) -> RedirectResponse:
+    separator = "&" if "?" in url else "?"
+    return RedirectResponse(url=f"{url}{separator}msg={msg_key}", status_code=status_code)
+
+
+def redirect_with_admin_msg(admin_key: str, msg_key: str) -> RedirectResponse:
+    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg={msg_key}", status_code=303)
+
+
 async def get_registration_open(db: AsyncSession) -> bool:
     # Получаем флаг доступности регистрации из настроек.
     record = await db.scalar(select(SiteSetting).where(SiteSetting.key == "registration_open"))
@@ -91,22 +107,19 @@ async def set_lang(lang: str):
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request, db: AsyncSession = Depends(get_db)):
     # Рендерим главную страницу с формой и чатом.
-    lang = get_lang(request.cookies.get("lang"))
     stages = (await db.scalars(select(TournamentStage).order_by(TournamentStage.id))).all()
     chat_messages = (await db.scalars(select(ChatMessage).order_by(desc(ChatMessage.id)).limit(20))).all()
     registration_open = await get_registration_open(db)
     chat_settings = await get_chat_settings(db)
     return templates.TemplateResponse(
         "index.html",
-        {
-            "request": request,
-            "lang": lang,
-            "tr": lambda key: t(lang, key),
-            "stages": stages,
-            "chat_messages": list(reversed(chat_messages)),
-            "registration_open": registration_open,
-            "chat_settings": chat_settings,
-        },
+        template_context(
+            request,
+            stages=stages,
+            chat_messages=list(reversed(chat_messages)),
+            registration_open=registration_open,
+            chat_settings=chat_settings,
+        ),
     )
 
 
@@ -120,17 +133,16 @@ async def register(
     db: AsyncSession = Depends(get_db),
 ):
     """Регистрирует пользователя, если по steam_id запись в БД отсутствует."""
-    lang = get_lang(request.cookies.get("lang"))
     if not await get_registration_open(db):
-        return RedirectResponse(url=f"/?msg={t(lang, 'registration_closed')}", status_code=303)
+        return redirect_with_msg("/", "registration_closed")
 
     steam_id = await normalize_steam_id(steam_input)
     if not steam_id:
-        return RedirectResponse(url="/?msg=Invalid Steam ID", status_code=303)
+        return redirect_with_msg("/", "msg_invalid_steam_id")
 
     exists = await db.scalar(select(User).where(User.steam_id == steam_id))
     if exists:
-        return RedirectResponse(url=f"/?msg={t(lang, 'already_registered')}", status_code=303)
+        return redirect_with_msg("/", "already_registered")
 
     profile = await fetch_autochess_data(steam_id)
     target_basket = pick_basket(profile["highest_rank"], profile["current_rank"])
@@ -158,7 +170,7 @@ async def register(
     )
     db.add(user)
     await db.commit()
-    return RedirectResponse(url=f"/?msg={t(lang, 'registered_ok')}", status_code=303)
+    return redirect_with_msg("/", "registered_ok")
 
 
 @router.post("/register/preview")
@@ -202,10 +214,10 @@ async def send_chat(
     # Сохраняем сообщение чата с ограничением, настраиваемым в админке.
     chat_settings = await get_chat_settings(db)
     if not chat_settings.is_enabled:
-        return RedirectResponse(url="/?msg=Chat is disabled", status_code=303)
+        return redirect_with_msg("/", "msg_chat_disabled")
 
     if len(message) > chat_settings.max_length:
-        return RedirectResponse(url=f"/?msg=Message too long (max {chat_settings.max_length})", status_code=303)
+        return redirect_with_msg("/", "msg_message_too_long")
 
     ip = request.client.host if request.client else "unknown"
     last_msg = await db.scalar(
@@ -215,7 +227,7 @@ async def send_chat(
         .limit(1)
     )
     if last_msg and datetime.utcnow() - last_msg.created_at < timedelta(seconds=chat_settings.cooldown_seconds):
-        return RedirectResponse(url=f"/?msg=Cooldown {chat_settings.cooldown_seconds} sec", status_code=303)
+        return redirect_with_msg("/", "msg_cooldown_active")
 
     db.add(ChatMessage(temp_nick=temp_nick[:120], message=message, ip_address=ip))
     await db.commit()
@@ -225,9 +237,8 @@ async def send_chat(
 @router.get("/participants", response_class=HTMLResponse)
 async def participants(request: Request, basket: str = Query(Basket.QUEEN.value), db: AsyncSession = Depends(get_db)):
     # Показываем участников по выбранной корзине.
-    lang = get_lang(request.cookies.get("lang"))
     users = (await db.scalars(select(User).where(User.basket == basket).order_by(User.created_at))).all()
-    return templates.TemplateResponse("participants.html", {"request": request, "users": users, "basket": basket, "lang": lang})
+    return templates.TemplateResponse("participants.html", template_context(request, users=users, basket=basket))
 
 
 @router.get("/tournament", response_class=HTMLResponse)
@@ -263,7 +274,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
     }
     return templates.TemplateResponse(
         "tournament.html",
-        {"request": request, "groups": groups, "standings": standings, "playoff_stages": playoff_stages, "playoff_standings": playoff_standings},
+        template_context(request, groups=groups, standings=standings, playoff_stages=playoff_stages, playoff_standings=playoff_standings),
     )
 
 
@@ -276,13 +287,13 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
     donors = (await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all()
     return templates.TemplateResponse(
         "donate.html",
-        {
-            "request": request,
-            "donation_links": donation_links,
-            "donation_methods": donation_methods,
-            "prize_pool_entries": prize_pool_entries,
-            "donors": donors,
-        },
+        template_context(
+            request,
+            donation_links=donation_links,
+            donation_methods=donation_methods,
+            prize_pool_entries=prize_pool_entries,
+            donors=donors,
+        ),
     )
 
 
@@ -291,14 +302,14 @@ async def rules_page(request: Request, db: AsyncSession = Depends(get_db)):
     # Отдаем страницу правил.
     rules_content = await get_or_create_rules_content(db)
     await db.commit()
-    return templates.TemplateResponse("rules.html", {"request": request, "rules_content": rules_content})
+    return templates.TemplateResponse("rules.html", template_context(request, rules_content=rules_content))
 
 
 @router.get("/archive", response_class=HTMLResponse)
 async def archive_page(request: Request, db: AsyncSession = Depends(get_db)):
     # Отдаем страницу архива.
     archive_entries = (await db.scalars(select(ArchiveEntry).order_by(ArchiveEntry.sort_order, ArchiveEntry.id))).all()
-    return templates.TemplateResponse("archive.html", {"request": request, "archive_entries": archive_entries})
+    return templates.TemplateResponse("archive.html", template_context(request, archive_entries=archive_entries))
 
 
 @router.get("/admin", response_class=HTMLResponse)
@@ -331,23 +342,23 @@ async def admin_page(request: Request, admin_key: str = Query(default=""), db: A
     await db.commit()
     return templates.TemplateResponse(
         "admin.html",
-        {
-            "request": request,
-            "users": users,
-            "stages": stages,
-            "groups": groups,
-            "playoff_stages": playoff_stages,
-            "admin_key": admin_key,
-            "score_hint": "Формат: user_id1,user_id2,...,user_id8 (от 1 места к 8 месту)",
-            "registration_open": registration_open,
-            "donation_links": donation_links,
-            "donation_methods": donation_methods,
-            "prize_pool_entries": prize_pool_entries,
-            "donors": donors,
-            "rules_content": rules_content,
-            "archive_entries": archive_entries,
-            "chat_settings": chat_settings,
-        },
+        template_context(
+            request,
+            users=users,
+            stages=stages,
+            groups=groups,
+            playoff_stages=playoff_stages,
+            admin_key=admin_key,
+            score_hint="user_id1,user_id2,...,user_id8",
+            registration_open=registration_open,
+            donation_links=donation_links,
+            donation_methods=donation_methods,
+            prize_pool_entries=prize_pool_entries,
+            donors=donors,
+            rules_content=rules_content,
+            archive_entries=archive_entries,
+            chat_settings=chat_settings,
+        ),
     )
 
 
@@ -408,11 +419,11 @@ async def admin_invite_user(
         return HTMLResponse("Forbidden", status_code=403)
     steam_id = await normalize_steam_id(steam_input)
     if not steam_id:
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Invalid Steam ID", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_invalid_steam_id")
 
     exists = await db.scalar(select(User).where(User.steam_id == steam_id))
     if exists:
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=User already exists", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_user_exists")
 
     profile = await fetch_autochess_data(steam_id)
     user = User(
@@ -429,7 +440,7 @@ async def admin_invite_user(
     )
     db.add(user)
     await db.commit()
-    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Invited added", status_code=303)
+    return redirect_with_admin_msg(admin_key, "msg_invited_added")
 
 
 @router.post("/admin/draw/auto")
@@ -438,8 +449,7 @@ async def admin_auto_draw(admin_key: str = Form(...), db: AsyncSession = Depends
     if admin_key != settings.admin_key:
         return HTMLResponse("Forbidden", status_code=403)
     ok, message = await create_auto_draw(db)
-    status = "ok" if ok else "warn"
-    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg={status}:{message}", status_code=303)
+    return redirect_with_admin_msg(admin_key, "msg_status_ok" if ok else "msg_status_warn")
 
 
 @router.post("/admin/group/password")
@@ -454,10 +464,10 @@ async def admin_group_password(
         return HTMLResponse("Forbidden", status_code=403)
     group = await db.scalar(select(TournamentGroup).where(TournamentGroup.id == group_id))
     if not group:
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Group not found", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_group_not_found")
     group.lobby_password = (password or "0000")[:4].rjust(4, "0")
     await db.commit()
-    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Lobby password updated", status_code=303)
+    return redirect_with_admin_msg(admin_key, "msg_lobby_password_updated")
 
 
 @router.post("/admin/group/score")
@@ -473,9 +483,9 @@ async def admin_group_score(
     try:
         ordered_user_ids = [int(part.strip()) for part in placements.split(",") if part.strip()]
         await apply_game_results(db, group_id, ordered_user_ids)
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Game saved", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_game_saved")
     except Exception as exc:  # noqa: BLE001
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
 
 
 @router.post("/admin/group/tie-break")
@@ -491,9 +501,9 @@ async def admin_group_tie_break(
     try:
         ordered_user_ids = [int(part.strip()) for part in tied_user_ids.split(",") if part.strip()]
         await apply_manual_tie_break(db, group_id, ordered_user_ids)
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Manual tie-break saved", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_manual_tie_break_saved")
     except Exception as exc:  # noqa: BLE001
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
 
 
 @router.post("/admin/playoff/generate")
@@ -504,8 +514,7 @@ async def admin_generate_playoff(
     if admin_key != settings.admin_key:
         return HTMLResponse("Forbidden", status_code=403)
     ok, message = await generate_playoff_from_groups(db)
-    status = "ok" if ok else "warn"
-    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg={status}:{message}", status_code=303)
+    return redirect_with_admin_msg(admin_key, "msg_status_ok" if ok else "msg_status_warn")
 
 
 @router.post("/admin/playoff/start")
@@ -518,9 +527,9 @@ async def admin_start_playoff(
         return HTMLResponse("Forbidden", status_code=403)
     try:
         await start_playoff_stage(db, stage_id)
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Playoff stage started", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_playoff_stage_started")
     except Exception as exc:  # noqa: BLE001
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
 
 
 @router.post("/admin/playoff/promote")
@@ -534,9 +543,9 @@ async def admin_promote_playoff(
         return HTMLResponse("Forbidden", status_code=403)
     try:
         await promote_top_between_stages(db, stage_id, top_n)
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Players promoted", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_players_promoted")
     except Exception as exc:  # noqa: BLE001
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
 
 
 @router.post("/admin/playoff/move")
@@ -551,9 +560,9 @@ async def admin_move_playoff_player(
         return HTMLResponse("Forbidden", status_code=403)
     try:
         await move_user_to_stage(db, from_stage_id, to_stage_id, user_id)
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Player moved", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_player_moved")
     except Exception as exc:  # noqa: BLE001
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
 
 
 @router.post("/admin/playoff/replace")
@@ -568,9 +577,9 @@ async def admin_replace_playoff_player(
         return HTMLResponse("Forbidden", status_code=403)
     try:
         await replace_stage_player(db, stage_id, from_user_id, to_user_id)
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Player replaced", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_player_replaced")
     except Exception as exc:  # noqa: BLE001
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
 
 
 @router.post("/admin/playoff/points")
@@ -585,9 +594,9 @@ async def admin_adjust_playoff_points(
         return HTMLResponse("Forbidden", status_code=403)
     try:
         await adjust_stage_points(db, stage_id, user_id, points_delta)
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Points adjusted", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_points_adjusted")
     except Exception as exc:  # noqa: BLE001
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
 
 
 @router.post("/admin/playoff/score")
@@ -602,9 +611,9 @@ async def admin_playoff_score(
     try:
         ordered_user_ids = [int(part.strip()) for part in placements.split(",") if part.strip()]
         await apply_playoff_match_results(db, stage_id, ordered_user_ids)
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Playoff game saved", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_playoff_game_saved")
     except Exception as exc:  # noqa: BLE001
-        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
 
 
 @router.post("/admin/donation-links")
@@ -622,7 +631,7 @@ async def admin_save_donation_links(
             continue
         db.add(DonationLink(title=parts[0], url=parts[1], is_active=(parts[2] != "0") if len(parts) > 2 else True, sort_order=idx))
     await db.commit()
-    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Donation links saved", status_code=303)
+    return redirect_with_admin_msg(admin_key, "msg_donation_links_saved")
 
 
 @router.post("/admin/donation-methods")
@@ -640,7 +649,7 @@ async def admin_save_donation_methods(
             continue
         db.add(DonationMethod(method_type=parts[0], label=parts[1], details=parts[2], is_active=(parts[3] != "0") if len(parts) > 3 else True, sort_order=idx))
     await db.commit()
-    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Donation methods saved", status_code=303)
+    return redirect_with_admin_msg(admin_key, "msg_donation_methods_saved")
 
 
 @router.post("/admin/prize-pool")
@@ -658,7 +667,7 @@ async def admin_save_prize_pool(
             continue
         db.add(PrizePoolEntry(place_label=parts[0], reward=parts[1], sort_order=idx))
     await db.commit()
-    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Prize pool saved", status_code=303)
+    return redirect_with_admin_msg(admin_key, "msg_prize_pool_saved")
 
 
 @router.post("/admin/donors")
@@ -679,7 +688,7 @@ async def admin_save_donors(
         message = parts[2] if len(parts) > 2 else ""
         db.add(Donor(name=name, amount=amount, message=message, sort_order=idx))
     await db.commit()
-    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Donors saved", status_code=303)
+    return redirect_with_admin_msg(admin_key, "msg_donors_saved")
 
 
 @router.post("/admin/rules")
@@ -693,7 +702,7 @@ async def admin_save_rules(
     row = await get_or_create_rules_content(db)
     row.body = body
     await db.commit()
-    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Rules saved", status_code=303)
+    return redirect_with_admin_msg(admin_key, "msg_rules_saved")
 
 
 @router.post("/admin/archive")
@@ -715,7 +724,7 @@ async def admin_save_archive(
         link_url = parts[3] if len(parts) > 3 else ""
         db.add(ArchiveEntry(title=title, season=season, summary=summary, link_url=link_url, sort_order=idx))
     await db.commit()
-    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Archive saved", status_code=303)
+    return redirect_with_admin_msg(admin_key, "msg_archive_saved")
 
 
 @router.post("/admin/chat-settings")
@@ -733,4 +742,4 @@ async def admin_save_chat_settings(
     row.max_length = max(1, max_length)
     row.is_enabled = is_enabled
     await db.commit()
-    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Chat settings saved", status_code=303)
+    return redirect_with_admin_msg(admin_key, "msg_chat_settings_saved")

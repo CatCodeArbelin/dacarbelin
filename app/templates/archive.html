@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Archive</h2>
+<h2>{{ tr('archive_title') }}</h2>
 {% for entry in archive_entries %}
   <div class="card bg-black neon-border-blue mb-3">
     <div class="card-body">
       <h4>{{ entry.title }}</h4>
       {% if entry.season %}<div class="text-secondary mb-2">{{ entry.season }}</div>{% endif %}
       {% if entry.summary %}<p>{{ entry.summary }}</p>{% endif %}
-      {% if entry.link_url %}<a href="{{ entry.link_url }}" target="_blank" rel="noopener">Open</a>{% endif %}
+      {% if entry.link_url %}<a href="{{ entry.link_url }}" target="_blank" rel="noopener">{{ tr('archive_open') }}</a>{% endif %}
     </div>
   </div>
 {% else %}
-  <p>No archive entries yet.</p>
+  <p>{{ tr('archive_empty') }}</p>
 {% endfor %}
 {% endblock %}
