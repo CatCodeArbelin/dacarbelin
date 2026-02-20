@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Form, Query, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -97,6 +97,37 @@ async def register(
     db.add(user)
     await db.commit()
     return RedirectResponse(url=f"/?msg={t(lang, 'registered_ok')}", status_code=303)
+
+
+@router.post("/register/preview")
+async def register_preview(
+    steam_input: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Проверяет Steam-ввод и возвращает данные профиля для предпросмотра регистрации."""
+    if not await get_registration_open(db):
+        return JSONResponse({"ok": False, "error": "Registration is closed"}, status_code=403)
+
+    steam_id = await normalize_steam_id(steam_input)
+    if not steam_id:
+        return JSONResponse({"ok": False, "error": "Invalid Steam ID"}, status_code=400)
+
+    exists = await db.scalar(select(User).where(User.steam_id == steam_id))
+    if exists:
+        return JSONResponse({"ok": False, "error": "User already registered"}, status_code=409)
+
+    try:
+        profile = await fetch_autochess_data(steam_id)
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+
+    return {
+        "ok": True,
+        "steam_id": steam_id,
+        "game_nickname": profile["game_nickname"],
+        "current_rank": profile["current_rank"],
+        "highest_rank": profile["highest_rank"],
+    }
 
 
 @router.post("/chat/send")
