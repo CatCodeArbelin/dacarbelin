@@ -11,6 +11,7 @@
         <div class="card-body">
           <h4>{{ group.name }} · {{ tr('tournament_game') }} {{ group.current_game }}</h4>
           <div>{{ tr('tournament_lobby_pw') }}: <span class="text-info">{{ group.lobby_password }}</span></div>
+          <div class="small text-secondary mt-2">Состав: {% for member in group.members|sort(attribute='seat') %}#{{ member.seat }} · {{ member.user.nickname }} (ID {{ member.user_id }}){% if not loop.last %}; {% endif %}{% endfor %}</div>
           <table class="table table-dark table-sm mt-3">
             <tr><th>#</th><th>{{ tr('participants_nick') }}</th><th>{{ tr('participants_highest') }}</th><th>PTS</th><th>W</th><th>Top4</th></tr>
             {% for member in standings[group.id] %}

@@ -30,18 +30,23 @@ from app.services.i18n import get_lang, t
 from app.services.rank import pick_basket
 from app.services.steam import fetch_autochess_data, normalize_steam_id
 from app.services.tournament import (
+    add_group_member,
     apply_game_results,
     apply_manual_tie_break,
+    apply_playoff_match_results,
     create_auto_draw,
+    create_manual_group,
     generate_playoff_from_groups,
     get_playoff_stages_with_data,
+    move_group_member,
     move_user_to_stage,
     promote_top_between_stages,
+    remove_group_member,
     replace_stage_player,
     sort_members_for_table,
     start_playoff_stage,
+    swap_group_members,
     adjust_stage_points,
-    apply_playoff_match_results,
 )
 
 router = APIRouter()
@@ -481,6 +486,80 @@ async def admin_group_password(
     group.lobby_password = (password or "0000")[:4].rjust(4, "0")
     await db.commit()
     return redirect_with_admin_msg("msg_lobby_password_updated")
+
+
+@router.post("/admin/group/create")
+async def admin_group_create(
+    name: str = Form(...),
+    lobby_password: str = Form(default="0000"),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        await create_manual_group(db, name=name, lobby_password=lobby_password)
+        return redirect_with_admin_msg("msg_status_ok")
+    except Exception as exc:  # noqa: BLE001
+        return redirect_with_admin_msg("msg_operation_failed")
+
+
+@router.post("/admin/group/member/add")
+async def admin_group_member_add(
+    group_id: int = Form(...),
+    user_id: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        await add_group_member(db, group_id=group_id, user_id=user_id)
+        return redirect_with_admin_msg("msg_status_ok")
+    except Exception as exc:  # noqa: BLE001
+        return redirect_with_admin_msg("msg_operation_failed")
+
+
+@router.post("/admin/group/member/remove")
+async def admin_group_member_remove(
+    group_id: int = Form(...),
+    user_id: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        await remove_group_member(db, group_id=group_id, user_id=user_id)
+        return redirect_with_admin_msg("msg_status_ok")
+    except Exception as exc:  # noqa: BLE001
+        return redirect_with_admin_msg("msg_operation_failed")
+
+
+@router.post("/admin/group/member/move")
+async def admin_group_member_move(
+    from_group_id: int = Form(...),
+    to_group_id: int = Form(...),
+    user_id: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        await move_group_member(db, from_group_id=from_group_id, to_group_id=to_group_id, user_id=user_id)
+        return redirect_with_admin_msg("msg_status_ok")
+    except Exception as exc:  # noqa: BLE001
+        return redirect_with_admin_msg("msg_operation_failed")
+
+
+@router.post("/admin/group/member/swap")
+async def admin_group_member_swap(
+    first_group_id: int = Form(...),
+    first_user_id: int = Form(...),
+    second_group_id: int = Form(...),
+    second_user_id: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        await swap_group_members(
+            db,
+            first_group_id=first_group_id,
+            first_user_id=first_user_id,
+            second_group_id=second_group_id,
+            second_user_id=second_user_id,
+        )
+        return redirect_with_admin_msg("msg_status_ok")
+    except Exception as exc:  # noqa: BLE001
+        return redirect_with_admin_msg("msg_operation_failed")
 
 
 @router.post("/admin/group/score")
