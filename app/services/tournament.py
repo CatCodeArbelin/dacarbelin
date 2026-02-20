@@ -65,7 +65,11 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
     group_count = min(len(users) // 8, 8)
     groups: list[TournamentGroup] = []
     for idx in range(group_count):
-        group = TournamentGroup(name=f"Group {chr(65 + idx)}", lobby_password=generate_password())
+        group = TournamentGroup(
+            name=f"Group {chr(65 + idx)}",
+            lobby_password=generate_password(),
+            schedule_text="TBD",
+        )
         db.add(group)
         groups.append(group)
     await db.flush()
@@ -173,7 +177,11 @@ async def create_manual_group(db: AsyncSession, name: str, lobby_password: str) 
     if exists:
         raise ValueError("Группа с таким названием уже существует")
 
-    group = TournamentGroup(name=group_name, lobby_password=(lobby_password or "0000")[:4].rjust(4, "0"))
+    group = TournamentGroup(
+        name=group_name,
+        lobby_password=(lobby_password or "0000")[:4].rjust(4, "0"),
+        schedule_text="TBD",
+    )
     db.add(group)
     await db.commit()
     return group
@@ -399,6 +407,7 @@ async def rebuild_playoff_stages(db: AsyncSession, player_ids: list[int]) -> lis
                     group_number=group_number,
                     game_number=1,
                     lobby_password=generate_password(),
+                    schedule_text="TBD",
                 )
             )
 

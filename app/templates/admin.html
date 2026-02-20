@@ -174,6 +174,12 @@
             <button class="btn btn-sm btn-outline-info">{{ tr('admin_save_pw') }}</button>
           </form>
         </div>
+        <form action="/admin/group/schedule" method="post" class="row g-2 mt-2 mb-2">
+          <input type="hidden" name="group_id" value="{{ group.id }}">
+          <div class="col-md-4"><input class="form-control form-control-sm" type="datetime-local" name="scheduled_at" value="{{ group.scheduled_at.strftime('%Y-%m-%dT%H:%M') if group.scheduled_at else '' }}"></div>
+          <div class="col-md-6"><input class="form-control form-control-sm" name="schedule_text" value="{{ group.schedule_text or 'TBD' }}" placeholder="TBD"></div>
+          <div class="col-md-2"><button class="btn btn-sm btn-outline-light w-100">Сохранить время</button></div>
+        </form>
 
         <div class="small text-info my-2">{{ tr('admin_group_ids') }}: {% for m in group.members %}{{ m.user_id }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
 
