@@ -31,6 +31,7 @@ from app.services.rank import pick_basket
 from app.services.steam import fetch_autochess_data, normalize_steam_id
 from app.services.tournament import (
     add_group_member,
+    apply_coin_toss_tie_break,
     apply_game_results,
     apply_manual_tie_break,
     apply_playoff_match_results,
@@ -38,6 +39,7 @@ from app.services.tournament import (
     create_manual_group,
     generate_playoff_from_groups,
     get_playoff_stages_with_data,
+    get_fully_tied_member_groups,
     move_group_member,
     move_user_to_stage,
     promote_top_between_stages,
@@ -388,6 +390,24 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             )
         ).all()
     )
+    manual_tie_breaks = (
+        await db.scalars(
+            select(GroupManualTieBreak).where(GroupManualTieBreak.group_id.in_([group.id for group in groups]))
+        )
+    ).all()
+    manual_tie_break_map: dict[int, dict[int, int]] = {}
+    for tie_break in manual_tie_breaks:
+        manual_tie_break_map.setdefault(tie_break.group_id, {})[tie_break.user_id] = tie_break.priority
+
+    coin_toss_candidates: dict[int, list[str]] = {}
+    for group in groups:
+        ranked_members = sort_members_for_table(group.members, manual_tie_break_map.get(group.id))
+        tied_groups = get_fully_tied_member_groups(ranked_members)
+        if tied_groups:
+            coin_toss_candidates[group.id] = [
+                ",".join(str(member.user_id) for member in tied_group)
+                for tied_group in tied_groups
+            ]
     playoff_stages = await get_playoff_stages_with_data(db)
     registration_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "registration_open"))
     registration_open = (registration_setting.value == "1") if registration_setting else True
@@ -419,6 +439,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             rules_content=rules_content,
             archive_entries=archive_entries,
             chat_settings=chat_settings,
+            coin_toss_candidates=coin_toss_candidates,
         ),
     )
 
@@ -658,6 +679,21 @@ async def admin_group_tie_break(
     try:
         ordered_user_ids = [int(part.strip()) for part in tied_user_ids.split(",") if part.strip()]
         await apply_manual_tie_break(db, group_id, ordered_user_ids)
+        return redirect_with_admin_msg("msg_manual_tie_break_saved")
+    except Exception as exc:  # noqa: BLE001
+        return redirect_with_admin_msg("msg_operation_failed")
+
+
+@router.post("/admin/group/coin-toss")
+async def admin_group_coin_toss(
+    group_id: int = Form(...),
+    tied_user_ids: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    # Применяем coin toss только для полностью равных игроков и сохраняем результат в БД.
+    try:
+        ordered_user_ids = [int(part.strip()) for part in tied_user_ids.split(",") if part.strip()]
+        await apply_coin_toss_tie_break(db, group_id, ordered_user_ids)
         return redirect_with_admin_msg("msg_manual_tie_break_saved")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
