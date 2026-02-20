@@ -4,7 +4,7 @@ from collections import defaultdict
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.tournament import GroupGameResult, GroupMember, TournamentGroup
+from app.models.tournament import GroupGameResult, GroupManualTieBreak, GroupMember, TournamentGroup
 from app.models.user import Basket, User
 
 POINTS_BY_PLACE = {1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1}
@@ -89,8 +89,12 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
     return True, "Автоматическая жеребьевка успешно создана"
 
 
-def sort_members_for_table(members: list[GroupMember]) -> list[GroupMember]:
-    # Сортируем таблицу по очкам и tie-break правилам.
+def sort_members_for_table(
+    members: list[GroupMember],
+    manual_tie_break_priorities: dict[int, int] | None = None,
+) -> list[GroupMember]:
+    # Сортируем таблицу по очкам и tie-break правилам. Финальный ключ — user_id для стабильности.
+    manual_tie_break_priorities = manual_tie_break_priorities or {}
     return sorted(
         members,
         key=lambda m: (
@@ -99,10 +103,38 @@ def sort_members_for_table(members: list[GroupMember]) -> list[GroupMember]:
             m.top4_finishes,
             -m.eighth_places,
             -m.last_game_place,
-            random.random(),
+            manual_tie_break_priorities.get(m.user_id, -1),
+            -m.user_id,
         ),
         reverse=True,
     )
+
+
+async def apply_manual_tie_break(db: AsyncSession, group_id: int, ordered_user_ids: list[int]) -> None:
+    # Фиксируем ручной тай-брейк только для игроков с полностью равными метриками.
+    if len(ordered_user_ids) < 2 or len(ordered_user_ids) != len(set(ordered_user_ids)):
+        raise ValueError("Нужно передать минимум 2 уникальных user_id")
+
+    members = list((await db.scalars(select(GroupMember).where(GroupMember.group_id == group_id))).all())
+    members_by_user = {member.user_id: member for member in members}
+    if not members:
+        raise ValueError("Group not found")
+
+    for user_id in ordered_user_ids:
+        if user_id not in members_by_user:
+            raise ValueError("В тай-брейке есть игрок, которого нет в группе")
+
+    metric_key = lambda m: (m.total_points, m.first_places, m.top4_finishes, m.eighth_places, m.last_game_place)
+    first_metrics = metric_key(members_by_user[ordered_user_ids[0]])
+    for user_id in ordered_user_ids[1:]:
+        if metric_key(members_by_user[user_id]) != first_metrics:
+            raise ValueError("Ручной тай-брейк разрешен только для полностью равных игроков")
+
+    await db.execute(delete(GroupManualTieBreak).where(GroupManualTieBreak.group_id == group_id))
+    for priority, user_id in enumerate(reversed(ordered_user_ids), start=1):
+        db.add(GroupManualTieBreak(group_id=group_id, user_id=user_id, priority=priority))
+
+    await db.commit()
 
 
 async def apply_game_results(db: AsyncSession, group_id: int, ordered_user_ids: list[int]) -> None:
