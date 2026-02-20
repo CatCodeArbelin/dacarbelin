@@ -12,13 +12,18 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.chat import ChatMessage
 from app.models.settings import SiteSetting, TournamentStage
-from app.models.tournament import GroupMember, TournamentGroup
+from app.models.tournament import GroupManualTieBreak, GroupMember, TournamentGroup
 from app.models.user import Basket, User
 from app.services.basket_allocator import allocate_basket
 from app.services.i18n import get_lang, t
 from app.services.rank import pick_basket
 from app.services.steam import fetch_autochess_data, normalize_steam_id
-from app.services.tournament import apply_game_results, create_auto_draw, sort_members_for_table
+from app.services.tournament import (
+    apply_game_results,
+    apply_manual_tie_break,
+    create_auto_draw,
+    sort_members_for_table,
+)
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -187,7 +192,19 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             )
         ).all()
     )
-    standings = {group.id: sort_members_for_table(group.members) for group in groups}
+    manual_tie_breaks = (
+        await db.scalars(
+            select(GroupManualTieBreak).where(GroupManualTieBreak.group_id.in_([group.id for group in groups]))
+        )
+    ).all()
+    manual_tie_break_map: dict[int, dict[int, int]] = {}
+    for tie_break in manual_tie_breaks:
+        manual_tie_break_map.setdefault(tie_break.group_id, {})[tie_break.user_id] = tie_break.priority
+
+    standings = {
+        group.id: sort_members_for_table(group.members, manual_tie_break_map.get(group.id))
+        for group in groups
+    }
     return templates.TemplateResponse("tournament.html", {"request": request, "groups": groups, "standings": standings})
 
 
@@ -362,5 +379,23 @@ async def admin_group_score(
         ordered_user_ids = [int(part.strip()) for part in placements.split(",") if part.strip()]
         await apply_game_results(db, group_id, ordered_user_ids)
         return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Game saved", status_code=303)
+    except Exception as exc:  # noqa: BLE001
+        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+
+
+@router.post("/admin/group/tie-break")
+async def admin_group_tie_break(
+    group_id: int = Form(...),
+    tied_user_ids: str = Form(...),
+    admin_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    # Применяем ручную "монетку" для спорных кейсов и фиксируем результат в БД.
+    if admin_key != settings.admin_key:
+        return HTMLResponse("Forbidden", status_code=403)
+    try:
+        ordered_user_ids = [int(part.strip()) for part in tied_user_ids.split(",") if part.strip()]
+        await apply_manual_tie_break(db, group_id, ordered_user_ids)
+        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Manual tie-break saved", status_code=303)
     except Exception as exc:  # noqa: BLE001
         return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)

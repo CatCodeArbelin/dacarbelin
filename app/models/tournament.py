@@ -49,3 +49,17 @@ class GroupGameResult(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     place: Mapped[int] = mapped_column(Integer)
     points_awarded: Mapped[int] = mapped_column(Integer)
+
+
+class GroupManualTieBreak(Base):
+    __tablename__ = "group_manual_tie_breaks"
+    __table_args__ = (
+        UniqueConstraint("group_id", "user_id", name="uq_group_manual_tie_break_user"),
+        UniqueConstraint("group_id", "priority", name="uq_group_manual_tie_break_priority"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("tournament_groups.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    priority: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

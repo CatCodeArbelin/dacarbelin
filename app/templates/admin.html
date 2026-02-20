@@ -56,11 +56,17 @@
           </form>
         </div>
         <div class="small text-info my-2">IDs in group: {% for m in group.members %}{{ m.user_id }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
-        <form action="/admin/group/score" method="post" class="d-flex gap-2">
+        <form action="/admin/group/score" method="post" class="d-flex gap-2 mb-2">
           <input type="hidden" name="admin_key" value="{{ admin_key }}">
           <input type="hidden" name="group_id" value="{{ group.id }}">
           <input class="form-control" name="placements" placeholder="8,5,12,... (user ids by places)">
           <button class="btn btn-sm btn-success">Save game result</button>
+        </form>
+        <form action="/admin/group/tie-break" method="post" class="d-flex gap-2">
+          <input type="hidden" name="admin_key" value="{{ admin_key }}">
+          <input type="hidden" name="group_id" value="{{ group.id }}">
+          <input class="form-control" name="tied_user_ids" placeholder="Tie only: winner_id,loser_id,...">
+          <button class="btn btn-sm btn-warning">Save manual tie-break</button>
         </form>
       </div>
       {% else %}
