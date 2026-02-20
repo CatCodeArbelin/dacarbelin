@@ -11,7 +11,17 @@ from sqlalchemy.orm import selectinload
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.chat import ChatMessage
-from app.models.settings import SiteSetting, TournamentStage
+from app.models.settings import (
+    ArchiveEntry,
+    ChatSetting,
+    DonationLink,
+    DonationMethod,
+    Donor,
+    PrizePoolEntry,
+    RulesContent,
+    SiteSetting,
+    TournamentStage,
+)
 from app.models.tournament import GroupManualTieBreak, GroupMember, TournamentGroup
 from app.models.user import Basket, User
 from app.services.basket_allocator import allocate_basket
@@ -43,6 +53,33 @@ async def get_registration_open(db: AsyncSession) -> bool:
     return (record.value == "1") if record else True
 
 
+async def get_chat_settings(db: AsyncSession) -> ChatSetting:
+    row = await db.scalar(select(ChatSetting).where(ChatSetting.id == 1))
+    if row:
+        return row
+    return ChatSetting(id=1, cooldown_seconds=10, max_length=1000, is_enabled=True)
+
+
+async def get_or_create_chat_settings(db: AsyncSession) -> ChatSetting:
+    row = await db.scalar(select(ChatSetting).where(ChatSetting.id == 1))
+    if row:
+        return row
+    row = ChatSetting(id=1, cooldown_seconds=10, max_length=1000, is_enabled=True)
+    db.add(row)
+    await db.flush()
+    return row
+
+
+async def get_or_create_rules_content(db: AsyncSession) -> RulesContent:
+    row = await db.scalar(select(RulesContent).where(RulesContent.id == 1))
+    if row:
+        return row
+    row = RulesContent(id=1, body="")
+    db.add(row)
+    await db.flush()
+    return row
+
+
 @router.get("/set-lang/{lang}")
 async def set_lang(lang: str):
     # Сохраняем выбранный язык в cookie.
@@ -58,6 +95,7 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
     stages = (await db.scalars(select(TournamentStage).order_by(TournamentStage.id))).all()
     chat_messages = (await db.scalars(select(ChatMessage).order_by(desc(ChatMessage.id)).limit(20))).all()
     registration_open = await get_registration_open(db)
+    chat_settings = await get_chat_settings(db)
     return templates.TemplateResponse(
         "index.html",
         {
@@ -67,6 +105,7 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
             "stages": stages,
             "chat_messages": list(reversed(chat_messages)),
             "registration_open": registration_open,
+            "chat_settings": chat_settings,
         },
     )
 
@@ -160,9 +199,13 @@ async def send_chat(
     message: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    # Сохраняем сообщение чата с ограничением в 10 секунд.
-    if len(message) > 1000:
-        return RedirectResponse(url="/?msg=Message too long", status_code=303)
+    # Сохраняем сообщение чата с ограничением, настраиваемым в админке.
+    chat_settings = await get_chat_settings(db)
+    if not chat_settings.is_enabled:
+        return RedirectResponse(url="/?msg=Chat is disabled", status_code=303)
+
+    if len(message) > chat_settings.max_length:
+        return RedirectResponse(url=f"/?msg=Message too long (max {chat_settings.max_length})", status_code=303)
 
     ip = request.client.host if request.client else "unknown"
     last_msg = await db.scalar(
@@ -171,8 +214,8 @@ async def send_chat(
         .order_by(desc(ChatMessage.created_at))
         .limit(1)
     )
-    if last_msg and datetime.utcnow() - last_msg.created_at < timedelta(seconds=10):
-        return RedirectResponse(url="/?msg=Cooldown 10 sec", status_code=303)
+    if last_msg and datetime.utcnow() - last_msg.created_at < timedelta(seconds=chat_settings.cooldown_seconds):
+        return RedirectResponse(url=f"/?msg=Cooldown {chat_settings.cooldown_seconds} sec", status_code=303)
 
     db.add(ChatMessage(temp_nick=temp_nick[:120], message=message, ip_address=ip))
     await db.commit()
@@ -225,21 +268,37 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/donate", response_class=HTMLResponse)
-async def donate_page(request: Request):
+async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
     # Отдаем страницу донатов.
-    return templates.TemplateResponse("donate.html", {"request": request})
+    donation_links = (await db.scalars(select(DonationLink).where(DonationLink.is_active.is_(True)).order_by(DonationLink.sort_order, DonationLink.id))).all()
+    donation_methods = (await db.scalars(select(DonationMethod).where(DonationMethod.is_active.is_(True)).order_by(DonationMethod.method_type, DonationMethod.sort_order, DonationMethod.id))).all()
+    prize_pool_entries = (await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all()
+    donors = (await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all()
+    return templates.TemplateResponse(
+        "donate.html",
+        {
+            "request": request,
+            "donation_links": donation_links,
+            "donation_methods": donation_methods,
+            "prize_pool_entries": prize_pool_entries,
+            "donors": donors,
+        },
+    )
 
 
 @router.get("/rules", response_class=HTMLResponse)
-async def rules_page(request: Request):
+async def rules_page(request: Request, db: AsyncSession = Depends(get_db)):
     # Отдаем страницу правил.
-    return templates.TemplateResponse("rules.html", {"request": request})
+    rules_content = await get_or_create_rules_content(db)
+    await db.commit()
+    return templates.TemplateResponse("rules.html", {"request": request, "rules_content": rules_content})
 
 
 @router.get("/archive", response_class=HTMLResponse)
-async def archive_page(request: Request):
+async def archive_page(request: Request, db: AsyncSession = Depends(get_db)):
     # Отдаем страницу архива.
-    return templates.TemplateResponse("archive.html", {"request": request})
+    archive_entries = (await db.scalars(select(ArchiveEntry).order_by(ArchiveEntry.sort_order, ArchiveEntry.id))).all()
+    return templates.TemplateResponse("archive.html", {"request": request, "archive_entries": archive_entries})
 
 
 @router.get("/admin", response_class=HTMLResponse)
@@ -260,6 +319,16 @@ async def admin_page(request: Request, admin_key: str = Query(default=""), db: A
         ).all()
     )
     playoff_stages = await get_playoff_stages_with_data(db)
+    registration_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "registration_open"))
+    registration_open = (registration_setting.value == "1") if registration_setting else True
+    donation_links = (await db.scalars(select(DonationLink).order_by(DonationLink.sort_order, DonationLink.id))).all()
+    donation_methods = (await db.scalars(select(DonationMethod).order_by(DonationMethod.method_type, DonationMethod.sort_order, DonationMethod.id))).all()
+    prize_pool_entries = (await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all()
+    donors = (await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all()
+    rules_content = await get_or_create_rules_content(db)
+    archive_entries = (await db.scalars(select(ArchiveEntry).order_by(ArchiveEntry.sort_order, ArchiveEntry.id))).all()
+    chat_settings = await get_or_create_chat_settings(db)
+    await db.commit()
     return templates.TemplateResponse(
         "admin.html",
         {
@@ -270,6 +339,14 @@ async def admin_page(request: Request, admin_key: str = Query(default=""), db: A
             "playoff_stages": playoff_stages,
             "admin_key": admin_key,
             "score_hint": "Формат: user_id1,user_id2,...,user_id8 (от 1 места к 8 месту)",
+            "registration_open": registration_open,
+            "donation_links": donation_links,
+            "donation_methods": donation_methods,
+            "prize_pool_entries": prize_pool_entries,
+            "donors": donors,
+            "rules_content": rules_content,
+            "archive_entries": archive_entries,
+            "chat_settings": chat_settings,
         },
     )
 
@@ -528,3 +605,132 @@ async def admin_playoff_score(
         return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Playoff game saved", status_code=303)
     except Exception as exc:  # noqa: BLE001
         return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+
+
+@router.post("/admin/donation-links")
+async def admin_save_donation_links(
+    items: str = Form(default=""),
+    admin_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin_key != settings.admin_key:
+        return HTMLResponse("Forbidden", status_code=403)
+    await db.execute(DonationLink.__table__.delete())
+    for idx, line in enumerate([item.strip() for item in items.splitlines() if item.strip()]):
+        parts = [part.strip() for part in line.split("|")]
+        if len(parts) < 2:
+            continue
+        db.add(DonationLink(title=parts[0], url=parts[1], is_active=(parts[2] != "0") if len(parts) > 2 else True, sort_order=idx))
+    await db.commit()
+    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Donation links saved", status_code=303)
+
+
+@router.post("/admin/donation-methods")
+async def admin_save_donation_methods(
+    items: str = Form(default=""),
+    admin_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin_key != settings.admin_key:
+        return HTMLResponse("Forbidden", status_code=403)
+    await db.execute(DonationMethod.__table__.delete())
+    for idx, line in enumerate([item.strip() for item in items.splitlines() if item.strip()]):
+        parts = [part.strip() for part in line.split("|")]
+        if len(parts) < 3:
+            continue
+        db.add(DonationMethod(method_type=parts[0], label=parts[1], details=parts[2], is_active=(parts[3] != "0") if len(parts) > 3 else True, sort_order=idx))
+    await db.commit()
+    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Donation methods saved", status_code=303)
+
+
+@router.post("/admin/prize-pool")
+async def admin_save_prize_pool(
+    items: str = Form(default=""),
+    admin_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin_key != settings.admin_key:
+        return HTMLResponse("Forbidden", status_code=403)
+    await db.execute(PrizePoolEntry.__table__.delete())
+    for idx, line in enumerate([item.strip() for item in items.splitlines() if item.strip()]):
+        parts = [part.strip() for part in line.split("|")]
+        if len(parts) < 2:
+            continue
+        db.add(PrizePoolEntry(place_label=parts[0], reward=parts[1], sort_order=idx))
+    await db.commit()
+    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Prize pool saved", status_code=303)
+
+
+@router.post("/admin/donors")
+async def admin_save_donors(
+    items: str = Form(default=""),
+    admin_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin_key != settings.admin_key:
+        return HTMLResponse("Forbidden", status_code=403)
+    await db.execute(Donor.__table__.delete())
+    for idx, line in enumerate([item.strip() for item in items.splitlines() if item.strip()]):
+        parts = [part.strip() for part in line.split("|")]
+        if not parts:
+            continue
+        name = parts[0]
+        amount = parts[1] if len(parts) > 1 else ""
+        message = parts[2] if len(parts) > 2 else ""
+        db.add(Donor(name=name, amount=amount, message=message, sort_order=idx))
+    await db.commit()
+    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Donors saved", status_code=303)
+
+
+@router.post("/admin/rules")
+async def admin_save_rules(
+    body: str = Form(default=""),
+    admin_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin_key != settings.admin_key:
+        return HTMLResponse("Forbidden", status_code=403)
+    row = await get_or_create_rules_content(db)
+    row.body = body
+    await db.commit()
+    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Rules saved", status_code=303)
+
+
+@router.post("/admin/archive")
+async def admin_save_archive(
+    items: str = Form(default=""),
+    admin_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin_key != settings.admin_key:
+        return HTMLResponse("Forbidden", status_code=403)
+    await db.execute(ArchiveEntry.__table__.delete())
+    for idx, line in enumerate([item.strip() for item in items.splitlines() if item.strip()]):
+        parts = [part.strip() for part in line.split("|")]
+        if not parts:
+            continue
+        title = parts[0]
+        season = parts[1] if len(parts) > 1 else ""
+        summary = parts[2] if len(parts) > 2 else ""
+        link_url = parts[3] if len(parts) > 3 else ""
+        db.add(ArchiveEntry(title=title, season=season, summary=summary, link_url=link_url, sort_order=idx))
+    await db.commit()
+    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Archive saved", status_code=303)
+
+
+@router.post("/admin/chat-settings")
+async def admin_save_chat_settings(
+    cooldown_seconds: int = Form(...),
+    max_length: int = Form(...),
+    is_enabled: bool = Form(default=False),
+    admin_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin_key != settings.admin_key:
+        return HTMLResponse("Forbidden", status_code=403)
+    row = await get_or_create_chat_settings(db)
+    row.cooldown_seconds = max(0, cooldown_seconds)
+    row.max_length = max(1, max_length)
+    row.is_enabled = is_enabled
+    await db.commit()
+    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Chat settings saved", status_code=303)
