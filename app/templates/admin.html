@@ -13,6 +13,9 @@
         <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="registration_open" {% if registration_open %}checked{% endif %}><label class="form-check-label">{{ tr('admin_registration_open') }}</label></div>
         <button class="btn btn-danger">{{ tr('admin_save') }}</button>
       </form>
+      <hr>
+      <button class="btn btn-warning" type="button" data-bs-toggle="modal" data-bs-target="#startTournamentModal" {% if tournament_started %}disabled{% endif %}>{{ tr('admin_start_tournament') }}</button>
+      {% if tournament_started %}<div class="small text-success mt-2">{{ tr('admin_tournament_already_started') }}</div>{% endif %}
     </div></div>
     <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
       <h4>{{ tr('admin_manual_invited_add') }}</h4>
@@ -168,4 +171,23 @@
     </div></div>
   </div>
 </div>
+
+<div class="modal fade" id="startTournamentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header border-secondary">
+        <h5 class="modal-title">{{ tr('admin_start_tournament') }}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">{{ tr('admin_confirm_start_tournament') }}</div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">{{ tr('admin_no') }}</button>
+        <form action="/admin/tournament/start" method="post">
+          <button class="btn btn-danger" type="submit">{{ tr('admin_yes') }}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
