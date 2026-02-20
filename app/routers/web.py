@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -14,6 +14,7 @@ from app.models.chat import ChatMessage
 from app.models.settings import SiteSetting, TournamentStage
 from app.models.tournament import GroupMember, TournamentGroup
 from app.models.user import Basket, User
+from app.services.basket_allocator import allocate_basket
 from app.services.i18n import get_lang, t
 from app.services.rank import pick_basket
 from app.services.steam import fetch_autochess_data, normalize_steam_id
@@ -80,7 +81,16 @@ async def register(
         return RedirectResponse(url=f"/?msg={t(lang, 'already_registered')}", status_code=303)
 
     profile = await fetch_autochess_data(steam_id)
-    basket = pick_basket(profile["highest_rank"], profile["current_rank"])
+    target_basket = pick_basket(profile["highest_rank"], profile["current_rank"])
+    basket_counts_rows = (
+        await db.execute(
+            select(User.basket, func.count(User.id))
+            .where(User.basket.isnot(None))
+            .group_by(User.basket)
+        )
+    ).all()
+    basket_counts = {basket_name: basket_count for basket_name, basket_count in basket_counts_rows}
+    basket = allocate_basket(target_basket=target_basket, basket_counts=basket_counts)
 
     user = User(
         nickname=nickname,
