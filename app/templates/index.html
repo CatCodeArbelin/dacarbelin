@@ -7,12 +7,20 @@
       <div class="card-body">
         <h2>{{ tr('register') }}</h2>
         {% if not registration_open %}<div class="alert alert-warning">{{ tr('registration_closed') }}</div>{% endif %}
-        <form action="/register" method="post">
+        <form id="registration-form" action="/register" method="post">
           <input class="form-control mb-2" name="nickname" placeholder="Ник" required {% if not registration_open %}disabled{% endif %}>
-          <input class="form-control mb-2" name="steam_input" placeholder="Steam ID / URL" required {% if not registration_open %}disabled{% endif %}>
+          <div class="input-group mb-2">
+            <input id="steam-input" class="form-control" name="steam_input" placeholder="Steam ID / URL" required {% if not registration_open %}disabled{% endif %}>
+            <button id="steam-preview-btn" class="btn btn-outline-info" type="button" {% if not registration_open %}disabled{% endif %}>Проверить Steam</button>
+          </div>
+          <input id="preview-steam-id" class="form-control mb-2" placeholder="Steam ID" readonly>
+          <input id="preview-game-nickname" class="form-control mb-2" placeholder="Game nickname" readonly>
+          <input id="preview-current-rank" class="form-control mb-2" placeholder="Current rank" readonly>
+          <input id="preview-highest-rank" class="form-control mb-2" placeholder="Highest rank" readonly>
+          <div id="steam-preview-message" class="small mb-2"></div>
           <input class="form-control mb-2" name="telegram" placeholder="Telegram" {% if not registration_open %}disabled{% endif %}>
           <input class="form-control mb-2" name="discord" placeholder="Discord" {% if not registration_open %}disabled{% endif %}>
-          <button class="btn btn-danger" {% if not registration_open %}disabled{% endif %}>{{ tr('submit') }}</button>
+          <button id="register-submit" class="btn btn-danger" disabled>{{ tr('submit') }}</button>
         </form>
       </div>
     </div>
@@ -46,4 +54,78 @@
     </div>
   </div>
 </div>
+<script>
+(() => {
+  const form = document.getElementById("registration-form");
+  if (!form) return;
+
+  const steamInput = document.getElementById("steam-input");
+  const previewBtn = document.getElementById("steam-preview-btn");
+  const submitBtn = document.getElementById("register-submit");
+  const message = document.getElementById("steam-preview-message");
+  const steamIdField = document.getElementById("preview-steam-id");
+  const nicknameField = document.getElementById("preview-game-nickname");
+  const currentRankField = document.getElementById("preview-current-rank");
+  const highestRankField = document.getElementById("preview-highest-rank");
+
+  const setPreview = (data) => {
+    steamIdField.value = data?.steam_id || "";
+    nicknameField.value = data?.game_nickname || "";
+    currentRankField.value = data?.current_rank || "";
+    highestRankField.value = data?.highest_rank || "";
+  };
+
+  const setMessage = (text, isError = false) => {
+    message.textContent = text;
+    message.classList.toggle("text-danger", isError);
+    message.classList.toggle("text-success", !isError && !!text);
+  };
+
+  const resetPreview = () => {
+    setPreview(null);
+    setMessage("");
+    submitBtn.disabled = true;
+  };
+
+  steamInput?.addEventListener("input", resetPreview);
+
+  previewBtn?.addEventListener("click", async () => {
+    const rawValue = steamInput?.value?.trim();
+    if (!rawValue) {
+      resetPreview();
+      setMessage("Введите Steam ID или ссылку.", true);
+      return;
+    }
+
+    previewBtn.disabled = true;
+    setMessage("Проверяем Steam...");
+
+    try {
+      const payload = new URLSearchParams();
+      payload.set("steam_input", rawValue);
+      const response = await fetch("/register/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: payload.toString(),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        resetPreview();
+        setMessage(data.error || "Не удалось получить данные Steam.", true);
+        return;
+      }
+
+      setPreview(data);
+      setMessage("Steam проверен, можно отправлять форму.");
+      submitBtn.disabled = false;
+    } catch (err) {
+      resetPreview();
+      setMessage("Ошибка сети при проверке Steam.", true);
+    } finally {
+      previewBtn.disabled = false;
+    }
+  });
+})();
+</script>
 {% endblock %}
