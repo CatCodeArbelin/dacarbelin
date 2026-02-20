@@ -1,0 +1,5 @@
+body { background: #08090d; }
+.neon-border-blue { border: 1px solid #00b7ff !important; box-shadow: 0 0 8px #00b7ff66; }
+.neon-border-red { border: 1px solid #ff2d55 !important; box-shadow: 0 0 8px #ff2d5566; }
+.card { border-radius: 12px; }
+.chat-box { max-height: 260px; overflow-y: auto; border-top: 1px dashed #555; padding-top: 8px; }
