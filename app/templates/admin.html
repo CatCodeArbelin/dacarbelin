@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Admin Panel</h2>
+{% if request.query_params.get('msg') %}<div class="alert alert-info">{{ request.query_params.get('msg') }}</div>{% endif %}
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card bg-black neon-border-red"><div class="card-body">
+      <h4>Tournament start</h4>
+      <form action="/admin/tournament/start" method="post" class="row g-2">
+        <input type="hidden" name="admin_key" value="{{ admin_key }}">
+        <div class="col-12">
+          <select class="form-select" name="confirm">
+            <option value="no">Нет (продолжить редактирование)</option>
+            <option value="yes">Да (начать турнир и закрыть регистрацию)</option>
+          </select>
+        </div>
+        <div class="col-12"><button class="btn btn-danger">Начать турнир</button></div>
+      </form>
+    </div></div>
+
+    <div class="card bg-black neon-border-red mt-4"><div class="card-body">
+      <h4>Registration toggle</h4>
+      <form action="/admin/registration" method="post">
+        <input type="hidden" name="admin_key" value="{{ admin_key }}">
+        <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="registration_open" checked><label class="form-check-label">Registration open</label></div>
+        <button class="btn btn-danger">Save</button>
+      </form>
+    </div></div>
+
+    <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
+      <h4>Manual invited add</h4>
+      <form action="/admin/invite" method="post" class="row g-2">
+        <input type="hidden" name="admin_key" value="{{ admin_key }}">
+        <div class="col-12"><input class="form-control" name="nickname" placeholder="Nickname" required></div>
+        <div class="col-12"><input class="form-control" name="steam_input" placeholder="Steam ID or URL" required></div>
+        <div class="col-6"><input class="form-control" name="telegram" placeholder="Telegram"></div>
+        <div class="col-6"><input class="form-control" name="discord" placeholder="Discord"></div>
+        <div class="col-12"><button class="btn btn-warning">Add to INVITED</button></div>
+      </form>
+    </div></div>
+
+    <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
+      <h4>Stages editor</h4>
+      <form action="/admin/stage" method="post" class="row g-2">
+        <input type="hidden" name="admin_key" value="{{ admin_key }}">
+        <div class="col-6"><input class="form-control" name="key" placeholder="key"></div>
+        <div class="col-6"><input class="form-control" name="date_text" placeholder="date"></div>
+        <div class="col-6"><input class="form-control" name="title_ru" placeholder="title_ru"></div>
+        <div class="col-6"><input class="form-control" name="title_en" placeholder="title_en"></div>
+        <div class="col-12 form-check"><input class="form-check-input" name="is_active" type="checkbox"><label class="form-check-label">active</label></div>
+        <div class="col-12"><button class="btn btn-primary">Save stage</button></div>
+      </form>
+    </div></div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card bg-black neon-border-red"><div class="card-body">
+      <h4>Draw controls</h4>
+      <form action="/admin/draw/auto" method="post" class="mb-3">
+        <input type="hidden" name="admin_key" value="{{ admin_key }}">
+        <button class="btn btn-danger">Автоматическая жеребьевка</button>
+      </form>
+
+      <form action="/admin/draw/manual" method="post" class="mb-3">
+        <input type="hidden" name="admin_key" value="{{ admin_key }}">
+        <label class="form-label">Ручная жеребьевка (user_id через запятую, кратно 8)</label>
+        <input class="form-control" name="user_ids" placeholder="1,2,3,4,5,6,7,8,...">
+        <button class="btn btn-outline-warning mt-2">Создать ручную жеребьевку</button>
+      </form>
+
+      <p class="small text-secondary">{{ score_hint }}</p>
+      {% for group in groups %}
+      <div class="border rounded p-3 mb-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <strong>{{ group.name }} (Game {{ group.current_game }})</strong>
+          <form action="/admin/group/password" method="post" class="d-flex gap-2">
+            <input type="hidden" name="admin_key" value="{{ admin_key }}">
+            <input type="hidden" name="group_id" value="{{ group.id }}">
+            <input class="form-control form-control-sm" style="width:120px" name="password" value="{{ group.lobby_password }}">
+            <button class="btn btn-sm btn-outline-info">Save PW</button>
+          </form>
+        </div>
+        <div class="small text-info my-2">IDs in group: {% for m in group.members %}{{ m.user_id }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
+
+        <form action="/admin/group/member/add" method="post" class="row g-2 mb-2">
+          <input type="hidden" name="admin_key" value="{{ admin_key }}">
+          <input type="hidden" name="group_id" value="{{ group.id }}">
+          <div class="col-md-8"><input class="form-control" name="user_id" placeholder="user_id to add"></div>
+          <div class="col-md-4"><button class="btn btn-sm btn-outline-light w-100">Add member</button></div>
+        </form>
+
+        <form action="/admin/group/member/move" method="post" class="row g-2 mb-2">
+          <input type="hidden" name="admin_key" value="{{ admin_key }}">
+          <div class="col-md-5"><input class="form-control" name="user_id" placeholder="user_id to move"></div>
+          <div class="col-md-5"><input class="form-control" name="target_group_id" value="{{ group.id }}"></div>
+          <div class="col-md-2"><button class="btn btn-sm btn-outline-warning w-100">Move</button></div>
+        </form>
+
+        <form action="/admin/group/score" method="post" class="d-flex gap-2">
+          <input type="hidden" name="admin_key" value="{{ admin_key }}">
+          <input type="hidden" name="group_id" value="{{ group.id }}">
+          <input class="form-control" name="placements" placeholder="8,5,12,... (user ids by places)">
+          <button class="btn btn-sm btn-success">Save game result</button>
+        </form>
+      </div>
+      {% else %}
+      <div class="alert alert-secondary">Группы пока не созданы</div>
+      {% endfor %}
+    </div></div>
+
+    <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
+      <h4>Unassigned users</h4>
+      {% if unassigned_users %}
+      <div class="small">{% for u in unassigned_users %}{{ u.id }}:{{ u.nickname }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
+      {% else %}
+      <div class="small text-secondary">Все пользователи уже распределены по группам.</div>
+      {% endif %}
+    </div></div>
+  </div>
+</div>
+{% endblock %}
