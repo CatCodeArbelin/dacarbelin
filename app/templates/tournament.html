@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>Tournament</h2>
+
 {% if groups %}
+  <h3 class="mt-4">Group stage</h3>
   <div class="row g-3">
     {% for group in groups %}
     <div class="col-lg-6">
@@ -29,5 +31,50 @@
   </div>
 {% else %}
 <div class="alert alert-secondary">Жеребьевка еще не произведена</div>
+{% endif %}
+
+{% if playoff_stages %}
+  <h3 class="mt-5">Current playoff stage / bracket</h3>
+  {% for stage in playoff_stages %}
+  <div class="card bg-black neon-border-red mb-3">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center">
+        <h4>{{ stage.title }}</h4>
+        <span class="badge {{ 'bg-success' if stage.is_started else 'bg-secondary' }}">{{ 'started' if stage.is_started else 'pending' }}</span>
+      </div>
+      <p class="small text-secondary mb-1">Scoring mode: {{ stage.scoring_mode }}</p>
+      <p class="small text-secondary">Matches: {{ stage.matches|length }} · Players: {{ stage.participants|length }}</p>
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <h6>Standings</h6>
+          <table class="table table-dark table-sm">
+            <tr><th>#</th><th>User ID</th><th>PTS</th><th>W</th><th>Top4</th><th>Status</th></tr>
+            {% for participant in playoff_standings[stage.id] %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ participant.user_id }}</td>
+              <td>{{ participant.points }}</td>
+              <td>{{ participant.wins }}</td>
+              <td>{{ participant.top4_finishes }}</td>
+              <td>{{ 'out' if participant.is_eliminated else 'in' }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+        <div class="col-lg-6">
+          <h6>Bracket / matches</h6>
+          <ul class="list-group list-group-flush">
+            {% for match in stage.matches %}
+            <li class="list-group-item bg-transparent text-light d-flex justify-content-between">
+              <span>Match {{ match.match_number }} · PW {{ match.lobby_password }}</span>
+              <span>{{ match.state }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
 {% endif %}
 {% endblock %}
