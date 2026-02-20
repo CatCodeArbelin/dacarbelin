@@ -262,16 +262,36 @@ def sort_members_for_table(
     return sorted(
         members,
         key=lambda m: (
-            m.total_points,
-            m.first_places,
-            m.top4_finishes,
-            -m.eighth_places,
-            -m.last_game_place,
-            manual_tie_break_priorities.get(m.user_id, -1),
-            -m.user_id,
+            -m.total_points,
+            -m.first_places,
+            -m.top4_finishes,
+            m.eighth_places,
+            m.last_game_place,
+            -manual_tie_break_priorities.get(m.user_id, -1),
+            m.user_id,
         ),
-        reverse=True,
     )
+
+
+def get_fully_tied_member_groups(members: list[GroupMember]) -> list[list[GroupMember]]:
+    # Группируем только полностью равные кейсы, где ручной tie-break/coin toss действительно допустим.
+    by_metrics: dict[tuple[int, int, int, int, int], list[GroupMember]] = defaultdict(list)
+    for member in members:
+        by_metrics[
+            (
+                member.total_points,
+                member.first_places,
+                member.top4_finishes,
+                member.eighth_places,
+                member.last_game_place,
+            )
+        ].append(member)
+
+    tied_groups: list[list[GroupMember]] = []
+    for same_stats_members in by_metrics.values():
+        if len(same_stats_members) > 1:
+            tied_groups.append(sorted(same_stats_members, key=lambda member: member.user_id))
+    return tied_groups
 
 
 async def apply_manual_tie_break(db: AsyncSession, group_id: int, ordered_user_ids: list[int]) -> None:
@@ -299,6 +319,16 @@ async def apply_manual_tie_break(db: AsyncSession, group_id: int, ordered_user_i
         db.add(GroupManualTieBreak(group_id=group_id, user_id=user_id, priority=priority))
 
     await db.commit()
+
+
+async def apply_coin_toss_tie_break(db: AsyncSession, group_id: int, tied_user_ids: list[int]) -> None:
+    # Делаем случайный порядок только среди действительно равных участников и сохраняем его в БД.
+    if len(tied_user_ids) < 2:
+        raise ValueError("Нужно передать минимум 2 user_id")
+
+    shuffled_user_ids = list(tied_user_ids)
+    random.shuffle(shuffled_user_ids)
+    await apply_manual_tie_break(db, group_id, shuffled_user_ids)
 
 
 async def apply_game_results(db: AsyncSession, group_id: int, ordered_user_ids: list[int]) -> None:

@@ -205,6 +205,17 @@
           <input class="form-control" name="tied_user_ids" placeholder="winner_id,loser_id">
           <button class="btn btn-sm btn-warning">{{ tr('admin_save_tie_break') }}</button>
         </form>
+        {% if coin_toss_candidates.get(group.id) %}
+        <form action="/admin/group/coin-toss" method="post" class="d-flex gap-2 mt-2">
+          <input type="hidden" name="group_id" value="{{ group.id }}">
+          <select class="form-select" name="tied_user_ids">
+            {% for tie_case in coin_toss_candidates[group.id] %}
+            <option value="{{ tie_case }}">{{ tie_case }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-sm btn-outline-warning">Coin toss</button>
+        </form>
+        {% endif %}
       </div>
       {% else %}
       <div class="alert alert-secondary">{{ tr('admin_groups_not_created') }}</div>
