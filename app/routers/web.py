@@ -22,7 +22,15 @@ from app.services.tournament import (
     apply_game_results,
     apply_manual_tie_break,
     create_auto_draw,
+    generate_playoff_from_groups,
+    get_playoff_stages_with_data,
+    move_user_to_stage,
+    promote_top_between_stages,
+    replace_stage_player,
     sort_members_for_table,
+    start_playoff_stage,
+    adjust_stage_points,
+    apply_playoff_match_results,
 )
 
 router = APIRouter()
@@ -205,7 +213,15 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
         group.id: sort_members_for_table(group.members, manual_tie_break_map.get(group.id))
         for group in groups
     }
-    return templates.TemplateResponse("tournament.html", {"request": request, "groups": groups, "standings": standings})
+    playoff_stages = await get_playoff_stages_with_data(db)
+    playoff_standings = {
+        stage.id: sorted(stage.participants, key=lambda p: (p.points, p.wins, p.top4_finishes, -p.last_place, -p.user_id), reverse=True)
+        for stage in playoff_stages
+    }
+    return templates.TemplateResponse(
+        "tournament.html",
+        {"request": request, "groups": groups, "standings": standings, "playoff_stages": playoff_stages, "playoff_standings": playoff_standings},
+    )
 
 
 @router.get("/donate", response_class=HTMLResponse)
@@ -243,6 +259,7 @@ async def admin_page(request: Request, admin_key: str = Query(default=""), db: A
             )
         ).all()
     )
+    playoff_stages = await get_playoff_stages_with_data(db)
     return templates.TemplateResponse(
         "admin.html",
         {
@@ -250,6 +267,7 @@ async def admin_page(request: Request, admin_key: str = Query(default=""), db: A
             "users": users,
             "stages": stages,
             "groups": groups,
+            "playoff_stages": playoff_stages,
             "admin_key": admin_key,
             "score_hint": "Формат: user_id1,user_id2,...,user_id8 (от 1 места к 8 месту)",
         },
@@ -397,5 +415,116 @@ async def admin_group_tie_break(
         ordered_user_ids = [int(part.strip()) for part in tied_user_ids.split(",") if part.strip()]
         await apply_manual_tie_break(db, group_id, ordered_user_ids)
         return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Manual tie-break saved", status_code=303)
+    except Exception as exc:  # noqa: BLE001
+        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+
+
+@router.post("/admin/playoff/generate")
+async def admin_generate_playoff(
+    admin_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin_key != settings.admin_key:
+        return HTMLResponse("Forbidden", status_code=403)
+    ok, message = await generate_playoff_from_groups(db)
+    status = "ok" if ok else "warn"
+    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg={status}:{message}", status_code=303)
+
+
+@router.post("/admin/playoff/start")
+async def admin_start_playoff(
+    stage_id: int = Form(...),
+    admin_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin_key != settings.admin_key:
+        return HTMLResponse("Forbidden", status_code=403)
+    try:
+        await start_playoff_stage(db, stage_id)
+        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Playoff stage started", status_code=303)
+    except Exception as exc:  # noqa: BLE001
+        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+
+
+@router.post("/admin/playoff/promote")
+async def admin_promote_playoff(
+    stage_id: int = Form(...),
+    top_n: int = Form(...),
+    admin_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin_key != settings.admin_key:
+        return HTMLResponse("Forbidden", status_code=403)
+    try:
+        await promote_top_between_stages(db, stage_id, top_n)
+        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Players promoted", status_code=303)
+    except Exception as exc:  # noqa: BLE001
+        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+
+
+@router.post("/admin/playoff/move")
+async def admin_move_playoff_player(
+    from_stage_id: int = Form(...),
+    to_stage_id: int = Form(...),
+    user_id: int = Form(...),
+    admin_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin_key != settings.admin_key:
+        return HTMLResponse("Forbidden", status_code=403)
+    try:
+        await move_user_to_stage(db, from_stage_id, to_stage_id, user_id)
+        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Player moved", status_code=303)
+    except Exception as exc:  # noqa: BLE001
+        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+
+
+@router.post("/admin/playoff/replace")
+async def admin_replace_playoff_player(
+    stage_id: int = Form(...),
+    from_user_id: int = Form(...),
+    to_user_id: int = Form(...),
+    admin_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin_key != settings.admin_key:
+        return HTMLResponse("Forbidden", status_code=403)
+    try:
+        await replace_stage_player(db, stage_id, from_user_id, to_user_id)
+        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Player replaced", status_code=303)
+    except Exception as exc:  # noqa: BLE001
+        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+
+
+@router.post("/admin/playoff/points")
+async def admin_adjust_playoff_points(
+    stage_id: int = Form(...),
+    user_id: int = Form(...),
+    points_delta: int = Form(...),
+    admin_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin_key != settings.admin_key:
+        return HTMLResponse("Forbidden", status_code=403)
+    try:
+        await adjust_stage_points(db, stage_id, user_id, points_delta)
+        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Points adjusted", status_code=303)
+    except Exception as exc:  # noqa: BLE001
+        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
+
+
+@router.post("/admin/playoff/score")
+async def admin_playoff_score(
+    stage_id: int = Form(...),
+    placements: str = Form(...),
+    admin_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if admin_key != settings.admin_key:
+        return HTMLResponse("Forbidden", status_code=403)
+    try:
+        ordered_user_ids = [int(part.strip()) for part in placements.split(",") if part.strip()]
+        await apply_playoff_match_results(db, stage_id, ordered_user_ids)
+        return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Playoff game saved", status_code=303)
     except Exception as exc:  # noqa: BLE001
         return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg=Error: {exc}", status_code=303)
