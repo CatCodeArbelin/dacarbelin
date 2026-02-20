@@ -59,8 +59,8 @@ def redirect_with_msg(url: str, msg_key: str, status_code: int = 303) -> Redirec
     return RedirectResponse(url=f"{url}{separator}msg={msg_key}", status_code=status_code)
 
 
-def redirect_with_admin_msg(admin_key: str, msg_key: str) -> RedirectResponse:
-    return RedirectResponse(url=f"/admin?admin_key={admin_key}&msg={msg_key}", status_code=303)
+def redirect_with_admin_msg(msg_key: str) -> RedirectResponse:
+    return RedirectResponse(url=f"/admin?msg={msg_key}", status_code=303)
 
 
 async def get_registration_open(db: AsyncSession) -> bool:
@@ -312,11 +312,29 @@ async def archive_page(request: Request, db: AsyncSession = Depends(get_db)):
     return templates.TemplateResponse("archive.html", template_context(request, archive_entries=archive_entries))
 
 
-@router.get("/admin", response_class=HTMLResponse)
-async def admin_page(request: Request, admin_key: str = Query(default=""), db: AsyncSession = Depends(get_db)):
-    # Показываем админку только по секретному ключу из .env.
+@router.get("/admin/login", response_class=HTMLResponse)
+async def admin_login_page(request: Request):
+    if request.session.get("is_admin"):
+        return RedirectResponse(url="/admin", status_code=303)
+    return templates.TemplateResponse("admin_login.html", template_context(request))
+
+
+@router.post("/admin/login")
+async def admin_login(request: Request, admin_key: str = Form(...)):
     if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
+        return redirect_with_msg("/admin/login", "msg_admin_login_failed")
+    request.session["is_admin"] = True
+    return RedirectResponse(url="/admin", status_code=303)
+
+
+@router.post("/admin/logout")
+async def admin_logout(request: Request):
+    request.session.clear()
+    return RedirectResponse(url="/admin/login", status_code=303)
+
+
+@router.get("/admin", response_class=HTMLResponse)
+async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     users = (await db.scalars(select(User).order_by(desc(User.created_at)).limit(300))).all()
     stages = (await db.scalars(select(TournamentStage).order_by(TournamentStage.id))).all()
     groups = list(
@@ -348,7 +366,6 @@ async def admin_page(request: Request, admin_key: str = Query(default=""), db: A
             stages=stages,
             groups=groups,
             playoff_stages=playoff_stages,
-            admin_key=admin_key,
             score_hint="user_id1,user_id2,...,user_id8",
             registration_open=registration_open,
             donation_links=donation_links,
@@ -369,12 +386,9 @@ async def admin_update_stage(
     title_en: str = Form(...),
     date_text: str = Form(...),
     is_active: bool = Form(default=False),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
     # Обновляем этапы турнира из админ-панели.
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     row = await db.scalar(select(TournamentStage).where(TournamentStage.key == key))
     if not row:
         row = TournamentStage(key=key, title_ru=title_ru, title_en=title_en)
@@ -384,25 +398,22 @@ async def admin_update_stage(
     row.date_text = date_text
     row.is_active = is_active
     await db.commit()
-    return RedirectResponse(url=f"/admin?admin_key={admin_key}", status_code=303)
+    return redirect_with_admin_msg("msg_status_ok")
 
 
 @router.post("/admin/registration")
 async def admin_registration_toggle(
     registration_open: bool = Form(default=False),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
     # Переключаем состояние регистрации вручную.
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     row = await db.scalar(select(SiteSetting).where(SiteSetting.key == "registration_open"))
     if not row:
         row = SiteSetting(key="registration_open", value="1")
         db.add(row)
     row.value = "1" if registration_open else "0"
     await db.commit()
-    return RedirectResponse(url=f"/admin?admin_key={admin_key}", status_code=303)
+    return redirect_with_admin_msg("msg_status_ok")
 
 
 @router.post("/admin/invite")
@@ -411,19 +422,16 @@ async def admin_invite_user(
     nickname: str = Form(...),
     telegram: str = Form(default=""),
     discord: str = Form(default=""),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
     # Добавляем участника вручную в корзину invited.
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     steam_id = await normalize_steam_id(steam_input)
     if not steam_id:
-        return redirect_with_admin_msg(admin_key, "msg_invalid_steam_id")
+        return redirect_with_admin_msg("msg_invalid_steam_id")
 
     exists = await db.scalar(select(User).where(User.steam_id == steam_id))
     if exists:
-        return redirect_with_admin_msg(admin_key, "msg_user_exists")
+        return redirect_with_admin_msg("msg_user_exists")
 
     profile = await fetch_autochess_data(steam_id)
     user = User(
@@ -440,112 +448,92 @@ async def admin_invite_user(
     )
     db.add(user)
     await db.commit()
-    return redirect_with_admin_msg(admin_key, "msg_invited_added")
+    return redirect_with_admin_msg("msg_invited_added")
 
 
 @router.post("/admin/draw/auto")
-async def admin_auto_draw(admin_key: str = Form(...), db: AsyncSession = Depends(get_db)):
+async def admin_auto_draw(db: AsyncSession = Depends(get_db)):
     # Запускаем автоматическую жеребьевку группового этапа.
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     ok, message = await create_auto_draw(db)
-    return redirect_with_admin_msg(admin_key, "msg_status_ok" if ok else "msg_status_warn")
+    return redirect_with_admin_msg("msg_status_ok" if ok else "msg_status_warn")
 
 
 @router.post("/admin/group/password")
 async def admin_group_password(
     group_id: int = Form(...),
     password: str = Form(...),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
     # Обновляем пароль лобби конкретной группы.
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     group = await db.scalar(select(TournamentGroup).where(TournamentGroup.id == group_id))
     if not group:
-        return redirect_with_admin_msg(admin_key, "msg_group_not_found")
+        return redirect_with_admin_msg("msg_group_not_found")
     group.lobby_password = (password or "0000")[:4].rjust(4, "0")
     await db.commit()
-    return redirect_with_admin_msg(admin_key, "msg_lobby_password_updated")
+    return redirect_with_admin_msg("msg_lobby_password_updated")
 
 
 @router.post("/admin/group/score")
 async def admin_group_score(
     group_id: int = Form(...),
     placements: str = Form(...),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
     """Принимает порядок мест в игре и начисляет очки участникам выбранной группы."""
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     try:
         ordered_user_ids = [int(part.strip()) for part in placements.split(",") if part.strip()]
         await apply_game_results(db, group_id, ordered_user_ids)
-        return redirect_with_admin_msg(admin_key, "msg_game_saved")
+        return redirect_with_admin_msg("msg_game_saved")
     except Exception as exc:  # noqa: BLE001
-        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
+        return redirect_with_admin_msg("msg_operation_failed")
 
 
 @router.post("/admin/group/tie-break")
 async def admin_group_tie_break(
     group_id: int = Form(...),
     tied_user_ids: str = Form(...),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
     # Применяем ручную "монетку" для спорных кейсов и фиксируем результат в БД.
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     try:
         ordered_user_ids = [int(part.strip()) for part in tied_user_ids.split(",") if part.strip()]
         await apply_manual_tie_break(db, group_id, ordered_user_ids)
-        return redirect_with_admin_msg(admin_key, "msg_manual_tie_break_saved")
+        return redirect_with_admin_msg("msg_manual_tie_break_saved")
     except Exception as exc:  # noqa: BLE001
-        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
+        return redirect_with_admin_msg("msg_operation_failed")
 
 
 @router.post("/admin/playoff/generate")
 async def admin_generate_playoff(
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     ok, message = await generate_playoff_from_groups(db)
-    return redirect_with_admin_msg(admin_key, "msg_status_ok" if ok else "msg_status_warn")
+    return redirect_with_admin_msg("msg_status_ok" if ok else "msg_status_warn")
 
 
 @router.post("/admin/playoff/start")
 async def admin_start_playoff(
     stage_id: int = Form(...),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     try:
         await start_playoff_stage(db, stage_id)
-        return redirect_with_admin_msg(admin_key, "msg_playoff_stage_started")
+        return redirect_with_admin_msg("msg_playoff_stage_started")
     except Exception as exc:  # noqa: BLE001
-        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
+        return redirect_with_admin_msg("msg_operation_failed")
 
 
 @router.post("/admin/playoff/promote")
 async def admin_promote_playoff(
     stage_id: int = Form(...),
     top_n: int = Form(...),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     try:
         await promote_top_between_stages(db, stage_id, top_n)
-        return redirect_with_admin_msg(admin_key, "msg_players_promoted")
+        return redirect_with_admin_msg("msg_players_promoted")
     except Exception as exc:  # noqa: BLE001
-        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
+        return redirect_with_admin_msg("msg_operation_failed")
 
 
 @router.post("/admin/playoff/move")
@@ -553,16 +541,13 @@ async def admin_move_playoff_player(
     from_stage_id: int = Form(...),
     to_stage_id: int = Form(...),
     user_id: int = Form(...),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     try:
         await move_user_to_stage(db, from_stage_id, to_stage_id, user_id)
-        return redirect_with_admin_msg(admin_key, "msg_player_moved")
+        return redirect_with_admin_msg("msg_player_moved")
     except Exception as exc:  # noqa: BLE001
-        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
+        return redirect_with_admin_msg("msg_operation_failed")
 
 
 @router.post("/admin/playoff/replace")
@@ -570,16 +555,13 @@ async def admin_replace_playoff_player(
     stage_id: int = Form(...),
     from_user_id: int = Form(...),
     to_user_id: int = Form(...),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     try:
         await replace_stage_player(db, stage_id, from_user_id, to_user_id)
-        return redirect_with_admin_msg(admin_key, "msg_player_replaced")
+        return redirect_with_admin_msg("msg_player_replaced")
     except Exception as exc:  # noqa: BLE001
-        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
+        return redirect_with_admin_msg("msg_operation_failed")
 
 
 @router.post("/admin/playoff/points")
@@ -587,43 +569,34 @@ async def admin_adjust_playoff_points(
     stage_id: int = Form(...),
     user_id: int = Form(...),
     points_delta: int = Form(...),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     try:
         await adjust_stage_points(db, stage_id, user_id, points_delta)
-        return redirect_with_admin_msg(admin_key, "msg_points_adjusted")
+        return redirect_with_admin_msg("msg_points_adjusted")
     except Exception as exc:  # noqa: BLE001
-        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
+        return redirect_with_admin_msg("msg_operation_failed")
 
 
 @router.post("/admin/playoff/score")
 async def admin_playoff_score(
     stage_id: int = Form(...),
     placements: str = Form(...),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     try:
         ordered_user_ids = [int(part.strip()) for part in placements.split(",") if part.strip()]
         await apply_playoff_match_results(db, stage_id, ordered_user_ids)
-        return redirect_with_admin_msg(admin_key, "msg_playoff_game_saved")
+        return redirect_with_admin_msg("msg_playoff_game_saved")
     except Exception as exc:  # noqa: BLE001
-        return redirect_with_admin_msg(admin_key, "msg_operation_failed")
+        return redirect_with_admin_msg("msg_operation_failed")
 
 
 @router.post("/admin/donation-links")
 async def admin_save_donation_links(
     items: str = Form(default=""),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     await db.execute(DonationLink.__table__.delete())
     for idx, line in enumerate([item.strip() for item in items.splitlines() if item.strip()]):
         parts = [part.strip() for part in line.split("|")]
@@ -631,17 +604,14 @@ async def admin_save_donation_links(
             continue
         db.add(DonationLink(title=parts[0], url=parts[1], is_active=(parts[2] != "0") if len(parts) > 2 else True, sort_order=idx))
     await db.commit()
-    return redirect_with_admin_msg(admin_key, "msg_donation_links_saved")
+    return redirect_with_admin_msg("msg_donation_links_saved")
 
 
 @router.post("/admin/donation-methods")
 async def admin_save_donation_methods(
     items: str = Form(default=""),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     await db.execute(DonationMethod.__table__.delete())
     for idx, line in enumerate([item.strip() for item in items.splitlines() if item.strip()]):
         parts = [part.strip() for part in line.split("|")]
@@ -649,17 +619,14 @@ async def admin_save_donation_methods(
             continue
         db.add(DonationMethod(method_type=parts[0], label=parts[1], details=parts[2], is_active=(parts[3] != "0") if len(parts) > 3 else True, sort_order=idx))
     await db.commit()
-    return redirect_with_admin_msg(admin_key, "msg_donation_methods_saved")
+    return redirect_with_admin_msg("msg_donation_methods_saved")
 
 
 @router.post("/admin/prize-pool")
 async def admin_save_prize_pool(
     items: str = Form(default=""),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     await db.execute(PrizePoolEntry.__table__.delete())
     for idx, line in enumerate([item.strip() for item in items.splitlines() if item.strip()]):
         parts = [part.strip() for part in line.split("|")]
@@ -667,17 +634,14 @@ async def admin_save_prize_pool(
             continue
         db.add(PrizePoolEntry(place_label=parts[0], reward=parts[1], sort_order=idx))
     await db.commit()
-    return redirect_with_admin_msg(admin_key, "msg_prize_pool_saved")
+    return redirect_with_admin_msg("msg_prize_pool_saved")
 
 
 @router.post("/admin/donors")
 async def admin_save_donors(
     items: str = Form(default=""),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     await db.execute(Donor.__table__.delete())
     for idx, line in enumerate([item.strip() for item in items.splitlines() if item.strip()]):
         parts = [part.strip() for part in line.split("|")]
@@ -688,31 +652,25 @@ async def admin_save_donors(
         message = parts[2] if len(parts) > 2 else ""
         db.add(Donor(name=name, amount=amount, message=message, sort_order=idx))
     await db.commit()
-    return redirect_with_admin_msg(admin_key, "msg_donors_saved")
+    return redirect_with_admin_msg("msg_donors_saved")
 
 
 @router.post("/admin/rules")
 async def admin_save_rules(
     body: str = Form(default=""),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     row = await get_or_create_rules_content(db)
     row.body = body
     await db.commit()
-    return redirect_with_admin_msg(admin_key, "msg_rules_saved")
+    return redirect_with_admin_msg("msg_rules_saved")
 
 
 @router.post("/admin/archive")
 async def admin_save_archive(
     items: str = Form(default=""),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     await db.execute(ArchiveEntry.__table__.delete())
     for idx, line in enumerate([item.strip() for item in items.splitlines() if item.strip()]):
         parts = [part.strip() for part in line.split("|")]
@@ -724,7 +682,7 @@ async def admin_save_archive(
         link_url = parts[3] if len(parts) > 3 else ""
         db.add(ArchiveEntry(title=title, season=season, summary=summary, link_url=link_url, sort_order=idx))
     await db.commit()
-    return redirect_with_admin_msg(admin_key, "msg_archive_saved")
+    return redirect_with_admin_msg("msg_archive_saved")
 
 
 @router.post("/admin/chat-settings")
@@ -732,14 +690,11 @@ async def admin_save_chat_settings(
     cooldown_seconds: int = Form(...),
     max_length: int = Form(...),
     is_enabled: bool = Form(default=False),
-    admin_key: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if admin_key != settings.admin_key:
-        return HTMLResponse("Forbidden", status_code=403)
     row = await get_or_create_chat_settings(db)
     row.cooldown_seconds = max(0, cooldown_seconds)
     row.max_length = max(1, max_length)
     row.is_enabled = is_enabled
     await db.commit()
-    return redirect_with_admin_msg(admin_key, "msg_chat_settings_saved")
+    return redirect_with_admin_msg("msg_chat_settings_saved")

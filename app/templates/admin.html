@@ -2,21 +2,24 @@
 {% block content %}
 <h2>{{ tr('admin_title') }}</h2>
 {% if request.query_params.get('msg') %}<div class="alert alert-info">{{ tr(request.query_params.get('msg')) }}</div>{% endif %}
+<div class="d-flex justify-content-end mb-3">
+  <form action="/admin/logout" method="post">
+    <button class="btn btn-sm btn-outline-light">{{ tr('admin_logout') }}</button>
+  </form>
+</div>
 <div class="row g-4">
   <div class="col-lg-4">
     <div class="card bg-black neon-border-red"><div class="card-body">
       <h4>{{ tr('admin_registration_toggle') }}</h4>
       <form action="/admin/registration" method="post">
-        <input type="hidden" name="admin_key" value="{{ admin_key }}">
-        <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="registration_open" {% if registration_open %}checked{% endif %}><label class="form-check-label">{{ tr('admin_registration_open') }}</label></div>
+                <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="registration_open" {% if registration_open %}checked{% endif %}><label class="form-check-label">{{ tr('admin_registration_open') }}</label></div>
         <button class="btn btn-danger">{{ tr('admin_save') }}</button>
       </form>
     </div></div>
     <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
       <h4>{{ tr('admin_manual_invited_add') }}</h4>
       <form action="/admin/invite" method="post" class="row g-2">
-        <input type="hidden" name="admin_key" value="{{ admin_key }}">
-        <div class="col-12"><input class="form-control" name="nickname" placeholder="{{ tr('admin_nickname') }}" required></div>
+                <div class="col-12"><input class="form-control" name="nickname" placeholder="{{ tr('admin_nickname') }}" required></div>
         <div class="col-12"><input class="form-control" name="steam_input" placeholder="{{ tr('admin_steam_id_or_url') }}" required></div>
         <div class="col-6"><input class="form-control" name="telegram" placeholder="{{ tr('participants_telegram') }}"></div>
         <div class="col-6"><input class="form-control" name="discord" placeholder="{{ tr('participants_discord') }}"></div>
@@ -26,8 +29,7 @@
     <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
       <h4>{{ tr('admin_stages_editor') }}</h4>
       <form action="/admin/stage" method="post" class="row g-2">
-        <input type="hidden" name="admin_key" value="{{ admin_key }}">
-        <div class="col-6"><input class="form-control" name="key" placeholder="{{ tr('admin_key') }}"></div>
+                <div class="col-6"><input class="form-control" name="key" placeholder="{{ tr('admin_key') }}"></div>
         <div class="col-6"><input class="form-control" name="date_text" placeholder="{{ tr('admin_date') }}"></div>
         <div class="col-6"><input class="form-control" name="title_ru" placeholder="{{ tr('admin_title_ru') }}"></div>
         <div class="col-6"><input class="form-control" name="title_en" placeholder="{{ tr('admin_title_en') }}"></div>
@@ -39,8 +41,7 @@
     <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
       <h4>{{ tr('admin_chat_settings') }}</h4>
       <form action="/admin/chat-settings" method="post" class="row g-2">
-        <input type="hidden" name="admin_key" value="{{ admin_key }}">
-        <div class="col-6"><input class="form-control" type="number" name="cooldown_seconds" min="0" value="{{ chat_settings.cooldown_seconds }}"></div>
+                <div class="col-6"><input class="form-control" type="number" name="cooldown_seconds" min="0" value="{{ chat_settings.cooldown_seconds }}"></div>
         <div class="col-6"><input class="form-control" type="number" name="max_length" min="1" value="{{ chat_settings.max_length }}"></div>
         <div class="col-12 form-check"><input class="form-check-input" name="is_enabled" type="checkbox" {% if chat_settings.is_enabled %}checked{% endif %}><label class="form-check-label">{{ tr('admin_chat_enabled') }}</label></div>
         <div class="col-12"><button class="btn btn-primary">{{ tr('admin_save_chat_settings') }}</button></div>
@@ -50,8 +51,7 @@
     <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
       <h4>{{ tr('admin_rules_content') }}</h4>
       <form action="/admin/rules" method="post">
-        <input type="hidden" name="admin_key" value="{{ admin_key }}">
-        <textarea class="form-control mb-2" name="body" rows="8" placeholder="{{ tr('admin_rules_text') }}">{{ rules_content.body }}</textarea>
+                <textarea class="form-control mb-2" name="body" rows="8" placeholder="{{ tr('admin_rules_text') }}">{{ rules_content.body }}</textarea>
         <button class="btn btn-primary">{{ tr('admin_save_rules') }}</button>
       </form>
     </div></div>
@@ -61,40 +61,35 @@
       <h4>{{ tr('admin_content_blocks') }}</h4>
       <p class="small text-secondary mb-2">{{ tr('donate_links') }}: <code>title|url|active(1/0)</code></p>
       <form action="/admin/donation-links" method="post" class="mb-3">
-        <input type="hidden" name="admin_key" value="{{ admin_key }}">
-        <textarea class="form-control" name="items" rows="4">{% for row in donation_links %}{{ row.title }}|{{ row.url }}|{{ 1 if row.is_active else 0 }}{% if not loop.last %}
+                <textarea class="form-control" name="items" rows="4">{% for row in donation_links %}{{ row.title }}|{{ row.url }}|{{ 1 if row.is_active else 0 }}{% if not loop.last %}
 {% endif %}{% endfor %}</textarea>
         <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_links') }}</button>
       </form>
 
       <p class="small text-secondary mb-2">{{ tr('admin_save_donation_methods') }}: <code>card/crypto|label|details|active(1/0)</code></p>
       <form action="/admin/donation-methods" method="post" class="mb-3">
-        <input type="hidden" name="admin_key" value="{{ admin_key }}">
-        <textarea class="form-control" name="items" rows="4">{% for row in donation_methods %}{{ row.method_type }}|{{ row.label }}|{{ row.details }}|{{ 1 if row.is_active else 0 }}{% if not loop.last %}
+                <textarea class="form-control" name="items" rows="4">{% for row in donation_methods %}{{ row.method_type }}|{{ row.label }}|{{ row.details }}|{{ 1 if row.is_active else 0 }}{% if not loop.last %}
 {% endif %}{% endfor %}</textarea>
         <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_methods') }}</button>
       </form>
 
       <p class="small text-secondary mb-2">{{ tr('donate_prize_pool') }}: <code>place|reward</code></p>
       <form action="/admin/prize-pool" method="post" class="mb-3">
-        <input type="hidden" name="admin_key" value="{{ admin_key }}">
-        <textarea class="form-control" name="items" rows="4">{% for row in prize_pool_entries %}{{ row.place_label }}|{{ row.reward }}{% if not loop.last %}
+                <textarea class="form-control" name="items" rows="4">{% for row in prize_pool_entries %}{{ row.place_label }}|{{ row.reward }}{% if not loop.last %}
 {% endif %}{% endfor %}</textarea>
         <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_prize_pool') }}</button>
       </form>
 
       <p class="small text-secondary mb-2">{{ tr('donate_donors') }}: <code>name|amount|message</code></p>
       <form action="/admin/donors" method="post" class="mb-3">
-        <input type="hidden" name="admin_key" value="{{ admin_key }}">
-        <textarea class="form-control" name="items" rows="4">{% for row in donors %}{{ row.name }}|{{ row.amount }}|{{ row.message }}{% if not loop.last %}
+                <textarea class="form-control" name="items" rows="4">{% for row in donors %}{{ row.name }}|{{ row.amount }}|{{ row.message }}{% if not loop.last %}
 {% endif %}{% endfor %}</textarea>
         <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donors') }}</button>
       </form>
 
       <p class="small text-secondary mb-2">{{ tr('archive_title') }}: <code>title|season|summary|url</code></p>
       <form action="/admin/archive" method="post" class="mb-3">
-        <input type="hidden" name="admin_key" value="{{ admin_key }}">
-        <textarea class="form-control" name="items" rows="4">{% for row in archive_entries %}{{ row.title }}|{{ row.season }}|{{ row.summary }}|{{ row.link_url }}{% if not loop.last %}
+                <textarea class="form-control" name="items" rows="4">{% for row in archive_entries %}{{ row.title }}|{{ row.season }}|{{ row.summary }}|{{ row.link_url }}{% if not loop.last %}
 {% endif %}{% endfor %}</textarea>
         <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_archive') }}</button>
       </form>
@@ -103,15 +98,13 @@
     <div class="card bg-black neon-border-red mt-4"><div class="card-body">
       <h4>{{ tr('admin_draw_controls') }}</h4>
       <form action="/admin/draw/auto" method="post" class="mb-3">
-        <input type="hidden" name="admin_key" value="{{ admin_key }}">
-        <button class="btn btn-danger">{{ tr('admin_auto_draw') }}</button>
+                <button class="btn btn-danger">{{ tr('admin_auto_draw') }}</button>
       </form>
       <p class="small text-secondary">{{ score_hint }}</p>
       <form action="/admin/playoff/generate" method="post" class="mb-3">
-        <input type="hidden" name="admin_key" value="{{ admin_key }}">
-        <button class="btn btn-outline-warning">{{ tr('admin_generate_playoff') }}</button>
+                <button class="btn btn-outline-warning">{{ tr('admin_generate_playoff') }}</button>
       </form>
-      {% for group in groups %}<div class="border rounded p-3 mb-3"><div class="d-flex justify-content-between align-items-center"><strong>{{ group.name }} ({{ tr('tournament_game') }} {{ group.current_game }})</strong><form action="/admin/group/password" method="post" class="d-flex gap-2"><input type="hidden" name="admin_key" value="{{ admin_key }}"><input type="hidden" name="group_id" value="{{ group.id }}"><input class="form-control form-control-sm" style="width:120px" name="password" value="{{ group.lobby_password }}"><button class="btn btn-sm btn-outline-info">{{ tr('admin_save_pw') }}</button></form></div><div class="small text-info my-2">{{ tr('admin_group_ids') }}: {% for m in group.members %}{{ m.user_id }}{% if not loop.last %}, {% endif %}{% endfor %}</div><form action="/admin/group/score" method="post" class="d-flex gap-2 mb-2"><input type="hidden" name="admin_key" value="{{ admin_key }}"><input type="hidden" name="group_id" value="{{ group.id }}"><input class="form-control" name="placements" placeholder="8,5,12,..."><button class="btn btn-sm btn-success">{{ tr('admin_save_game_result') }}</button></form><form action="/admin/group/tie-break" method="post" class="d-flex gap-2"><input type="hidden" name="admin_key" value="{{ admin_key }}"><input type="hidden" name="group_id" value="{{ group.id }}"><input class="form-control" name="tied_user_ids" placeholder="winner_id,loser_id"><button class="btn btn-sm btn-warning">{{ tr('admin_save_tie_break') }}</button></form></div>{% else %}<div class="alert alert-secondary">{{ tr('admin_groups_not_created') }}</div>{% endfor %}
+      {% for group in groups %}<div class="border rounded p-3 mb-3"><div class="d-flex justify-content-between align-items-center"><strong>{{ group.name }} ({{ tr('tournament_game') }} {{ group.current_game }})</strong><form action="/admin/group/password" method="post" class="d-flex gap-2"><input type="hidden" name="group_id" value="{{ group.id }}"><input class="form-control form-control-sm" style="width:120px" name="password" value="{{ group.lobby_password }}"><button class="btn btn-sm btn-outline-info">{{ tr('admin_save_pw') }}</button></form></div><div class="small text-info my-2">{{ tr('admin_group_ids') }}: {% for m in group.members %}{{ m.user_id }}{% if not loop.last %}, {% endif %}{% endfor %}</div><form action="/admin/group/score" method="post" class="d-flex gap-2 mb-2"><input type="hidden" name="group_id" value="{{ group.id }}"><input class="form-control" name="placements" placeholder="8,5,12,..."><button class="btn btn-sm btn-success">{{ tr('admin_save_game_result') }}</button></form><form action="/admin/group/tie-break" method="post" class="d-flex gap-2"><input type="hidden" name="group_id" value="{{ group.id }}"><input class="form-control" name="tied_user_ids" placeholder="winner_id,loser_id"><button class="btn btn-sm btn-warning">{{ tr('admin_save_tie_break') }}</button></form></div>{% else %}<div class="alert alert-secondary">{{ tr('admin_groups_not_created') }}</div>{% endfor %}
     </div></div>
   </div>
 </div>
