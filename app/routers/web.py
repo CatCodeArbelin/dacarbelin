@@ -75,6 +75,11 @@ async def get_registration_open(db: AsyncSession) -> bool:
     return (record.value == "1") if record else True
 
 
+async def get_tournament_started(db: AsyncSession) -> bool:
+    record = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_started"))
+    return (record.value == "1") if record else False
+
+
 async def get_chat_settings(db: AsyncSession) -> ChatSetting:
     row = await db.scalar(select(ChatSetting).where(ChatSetting.id == 1))
     if row:
@@ -116,6 +121,7 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
     stages = (await db.scalars(select(TournamentStage).order_by(TournamentStage.id))).all()
     chat_messages = (await db.scalars(select(ChatMessage).order_by(desc(ChatMessage.id)).limit(20))).all()
     registration_open = await get_registration_open(db)
+    tournament_started = await get_tournament_started(db)
     chat_settings = await get_chat_settings(db)
     return templates.TemplateResponse(
         "index.html",
@@ -124,6 +130,7 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
             stages=stages,
             chat_messages=list(reversed(chat_messages)),
             registration_open=registration_open,
+            tournament_started=tournament_started,
             chat_settings=chat_settings,
         ),
     )
@@ -139,6 +146,9 @@ async def register(
     db: AsyncSession = Depends(get_db),
 ):
     """Регистрирует пользователя, если по steam_id запись в БД отсутствует."""
+    if await get_tournament_started(db):
+        return redirect_with_msg("/", "registration_closed")
+
     if not await get_registration_open(db):
         return redirect_with_msg("/", "registration_closed")
 
@@ -185,6 +195,9 @@ async def register_preview(
     db: AsyncSession = Depends(get_db),
 ):
     """Проверяет Steam-ввод и возвращает данные профиля для предпросмотра регистрации."""
+    if await get_tournament_started(db):
+        return JSONResponse({"ok": False, "error": "Registration is closed"}, status_code=403)
+
     if not await get_registration_open(db):
         return JSONResponse({"ok": False, "error": "Registration is closed"}, status_code=403)
 
@@ -365,6 +378,8 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     playoff_stages = await get_playoff_stages_with_data(db)
     registration_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "registration_open"))
     registration_open = (registration_setting.value == "1") if registration_setting else True
+    tournament_started_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_started"))
+    tournament_started = (tournament_started_setting.value == "1") if tournament_started_setting else False
     donation_links = (await db.scalars(select(DonationLink).order_by(DonationLink.sort_order, DonationLink.id))).all()
     donation_methods = (await db.scalars(select(DonationMethod).order_by(DonationMethod.method_type, DonationMethod.sort_order, DonationMethod.id))).all()
     prize_pool_entries = (await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all()
@@ -383,6 +398,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             playoff_stages=playoff_stages,
             score_hint="user_id1,user_id2,...,user_id8",
             registration_open=registration_open,
+            tournament_started=tournament_started,
             donation_links=donation_links,
             donation_methods=donation_methods,
             prize_pool_entries=prize_pool_entries,
@@ -427,6 +443,24 @@ async def admin_registration_toggle(
         row = SiteSetting(key="registration_open", value="1")
         db.add(row)
     row.value = "1" if registration_open else "0"
+    await db.commit()
+    return redirect_with_admin_msg("msg_status_ok")
+
+
+@router.post("/admin/tournament/start")
+async def admin_start_tournament(db: AsyncSession = Depends(get_db)):
+    tournament_started_row = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_started"))
+    if not tournament_started_row:
+        tournament_started_row = SiteSetting(key="tournament_started", value="0")
+        db.add(tournament_started_row)
+    tournament_started_row.value = "1"
+
+    registration_open_row = await db.scalar(select(SiteSetting).where(SiteSetting.key == "registration_open"))
+    if not registration_open_row:
+        registration_open_row = SiteSetting(key="registration_open", value="1")
+        db.add(registration_open_row)
+    registration_open_row.value = "0"
+
     await db.commit()
     return redirect_with_admin_msg("msg_status_ok")
 

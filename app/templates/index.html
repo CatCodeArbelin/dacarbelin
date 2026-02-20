@@ -6,20 +6,20 @@
     <div class="card bg-black neon-border-red">
       <div class="card-body">
         <h2>{{ tr('register') }}</h2>
-        {% if not registration_open %}<div class="alert alert-warning">{{ tr('registration_closed') }}</div>{% endif %}
+        {% if tournament_started %}<div class="alert alert-warning">{{ tr('registration_closed') }}</div>{% elif not registration_open %}<div class="alert alert-warning">{{ tr('registration_closed') }}</div>{% endif %}
         <form id="registration-form" action="/register" method="post">
-          <input class="form-control mb-2" name="nickname" placeholder="{{ tr('index_nickname') }}" required {% if not registration_open %}disabled{% endif %}>
+          <input class="form-control mb-2" name="nickname" placeholder="{{ tr('index_nickname') }}" required {% if not registration_open or tournament_started %}disabled{% endif %}>
           <div class="input-group mb-2">
-            <input id="steam-input" class="form-control" name="steam_input" placeholder="{{ tr('index_steam_id_or_url') }}" required {% if not registration_open %}disabled{% endif %}>
-            <button id="steam-preview-btn" class="btn btn-outline-info" type="button" {% if not registration_open %}disabled{% endif %}>{{ tr('index_check_steam') }}</button>
+            <input id="steam-input" class="form-control" name="steam_input" placeholder="{{ tr('index_steam_id_or_url') }}" required {% if not registration_open or tournament_started %}disabled{% endif %}>
+            <button id="steam-preview-btn" class="btn btn-outline-info" type="button" {% if not registration_open or tournament_started %}disabled{% endif %}>{{ tr('index_check_steam') }}</button>
           </div>
           <input id="preview-steam-id" class="form-control mb-2" placeholder="{{ tr('index_steam_id') }}" readonly>
           <input id="preview-game-nickname" class="form-control mb-2" placeholder="{{ tr('index_game_nickname') }}" readonly>
           <input id="preview-current-rank" class="form-control mb-2" placeholder="{{ tr('index_current_rank') }}" readonly>
           <input id="preview-highest-rank" class="form-control mb-2" placeholder="{{ tr('index_highest_rank') }}" readonly>
           <div id="steam-preview-message" class="small mb-2"></div>
-          <input class="form-control mb-2" name="telegram" placeholder="{{ tr('participants_telegram') }}" {% if not registration_open %}disabled{% endif %}>
-          <input class="form-control mb-2" name="discord" placeholder="{{ tr('participants_discord') }}" {% if not registration_open %}disabled{% endif %}>
+          <input class="form-control mb-2" name="telegram" placeholder="{{ tr('participants_telegram') }}" {% if not registration_open or tournament_started %}disabled{% endif %}>
+          <input class="form-control mb-2" name="discord" placeholder="{{ tr('participants_discord') }}" {% if not registration_open or tournament_started %}disabled{% endif %}>
           <button id="register-submit" class="btn btn-danger" disabled>{{ tr('submit') }}</button>
         </form>
       </div>
@@ -61,6 +61,7 @@
   const form = document.getElementById("registration-form");
   if (!form) return;
 
+  const registrationAllowed = {{ 'true' if registration_open and not tournament_started else 'false' }};
   const steamInput = document.getElementById("steam-input");
   const previewBtn = document.getElementById("steam-preview-btn");
   const submitBtn = document.getElementById("register-submit");
@@ -92,6 +93,10 @@
   steamInput?.addEventListener("input", resetPreview);
 
   previewBtn?.addEventListener("click", async () => {
+    if (!registrationAllowed) {
+      resetPreview();
+      return;
+    }
     const rawValue = steamInput?.value?.trim();
     if (!rawValue) {
       resetPreview();
@@ -120,7 +125,7 @@
 
       setPreview(data);
       setMessage("{{ tr('js_steam_ok') }}");
-      submitBtn.disabled = false;
+      if (registrationAllowed) submitBtn.disabled = false;
     } catch (err) {
       resetPreview();
       setMessage("{{ tr('js_steam_network_error') }}", true);
