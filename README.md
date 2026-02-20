@@ -14,7 +14,7 @@
 - Назначение корзины по highest rank.
 - Переключение языка ENG/RU с сохранением в cookie.
 - Чат-бокс без регистрации (кд 10 секунд, длина до 1000).
-- Базовая admin-панель по `admin_key` из `.env`:
+- Базовая admin-панель с сессионной авторизацией по `admin_key` из `.env`:
   - редактирование этапов
   - открытие/закрытие регистрации
 - Турнирный движок группового этапа:
@@ -38,7 +38,7 @@
    docker compose up --build
    ```
 4. Откройте: `http://0.0.0.0:8000/`
-5. Админка: `http://0.0.0.0:8000/admin?admin_key=superadmin`
+5. Админка: `http://0.0.0.0:8000/admin/login` (введите `ADMIN_KEY`, после входа выставляется signed session cookie).
 
 ## План следующих итераций
 - **Итерация 3:** ручная жеребьевка с drag/drop и замены игроков в группах.
@@ -77,5 +77,13 @@ docker compose up -d --build
 
 ### Рекомендации для production
 - Поставьте reverse proxy (Nginx) и SSL (Let's Encrypt).
-- Ограничьте доступ к `/admin` по IP и сложному `ADMIN_KEY`.
+- Используйте сложные `ADMIN_KEY` и `SECRET_KEY`; доступ к `/admin/*` только через login/logout и signed session cookie.
+- Дополнительно ограничьте доступ к `/admin` по IP через reverse proxy.
 - Настройте регулярные backup базы PostgreSQL.
+
+## Безопасный доступ к админке
+1. В `.env` задайте сложные значения `ADMIN_KEY` и `SECRET_KEY` (не оставляйте `change_me`).
+2. Перейдите на `/admin/login` и отправьте `ADMIN_KEY` через POST-форму.
+3. При успешной проверке приложение создаст signed session cookie (FastAPI `SessionMiddleware`).
+4. Все `/admin/*` endpoints доступны только при активной сессии; `admin_key` больше не передается в query/form.
+5. Для завершения сессии используйте `POST /admin/logout`.
