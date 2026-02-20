@@ -97,6 +97,154 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
     return True, "Автоматическая жеребьевка успешно создана"
 
 
+async def _require_group(db: AsyncSession, group_id: int) -> TournamentGroup:
+    group = await db.scalar(select(TournamentGroup).where(TournamentGroup.id == group_id))
+    if not group:
+        raise ValueError("Group not found")
+    return group
+
+
+async def validate_group_member_constraints(
+    db: AsyncSession,
+    *,
+    group_id: int,
+    user_id: int,
+    ignore_member_ids: set[int] | None = None,
+) -> TournamentGroup:
+    """Проверяем лимит 8 участников в группе и уникальность игрока в рамках стадии."""
+    group = await _require_group(db, group_id)
+
+    user = await db.scalar(select(User.id).where(User.id == user_id))
+    if not user:
+        raise ValueError("User not found")
+
+    ignored_ids = ignore_member_ids or set()
+
+    group_member_exists = await db.scalar(
+        select(GroupMember.id).where(GroupMember.group_id == group_id, GroupMember.user_id == user_id)
+    )
+    if group_member_exists and group_member_exists not in ignored_ids:
+        raise ValueError("Игрок уже есть в этой группе")
+
+    stage_group_ids = list(
+        (
+            await db.scalars(select(TournamentGroup.id).where(TournamentGroup.stage == group.stage))
+        ).all()
+    )
+    stage_member_ids = list(
+        (
+            await db.scalars(
+                select(GroupMember.id)
+                .where(
+                    GroupMember.group_id.in_(stage_group_ids),
+                    GroupMember.user_id == user_id,
+                )
+            )
+        ).all()
+    )
+    if ignored_ids:
+        stage_member_ids = [member_id for member_id in stage_member_ids if member_id not in ignored_ids]
+    if stage_member_ids:
+        raise ValueError("Игрок уже находится в другой группе этой стадии")
+
+    member_count = len(list((await db.scalars(select(GroupMember.id).where(GroupMember.group_id == group_id))).all()))
+    if ignored_ids:
+        member_count -= len([member_id for member_id in ignored_ids if member_id])
+    if member_count >= 8:
+        raise ValueError("Группа уже заполнена (максимум 8 участников)")
+
+    return group
+
+
+async def reseat_group_members(db: AsyncSession, group_id: int) -> None:
+    members = list((await db.scalars(select(GroupMember).where(GroupMember.group_id == group_id).order_by(GroupMember.seat, GroupMember.id))).all())
+    for seat, member in enumerate(members, start=1):
+        member.seat = seat
+
+
+async def create_manual_group(db: AsyncSession, name: str, lobby_password: str) -> TournamentGroup:
+    group_name = (name or "").strip()
+    if not group_name:
+        raise ValueError("Название группы обязательно")
+
+    exists = await db.scalar(
+        select(TournamentGroup.id).where(TournamentGroup.stage == "group_stage", TournamentGroup.name == group_name)
+    )
+    if exists:
+        raise ValueError("Группа с таким названием уже существует")
+
+    group = TournamentGroup(name=group_name, lobby_password=(lobby_password or "0000")[:4].rjust(4, "0"))
+    db.add(group)
+    await db.commit()
+    return group
+
+
+async def add_group_member(db: AsyncSession, group_id: int, user_id: int) -> None:
+    await validate_group_member_constraints(db, group_id=group_id, user_id=user_id)
+    next_seat = 1 + len(list((await db.scalars(select(GroupMember.id).where(GroupMember.group_id == group_id))).all()))
+    db.add(GroupMember(group_id=group_id, user_id=user_id, seat=next_seat))
+    await db.commit()
+
+
+async def remove_group_member(db: AsyncSession, group_id: int, user_id: int) -> None:
+    member = await db.scalar(select(GroupMember).where(GroupMember.group_id == group_id, GroupMember.user_id == user_id))
+    if not member:
+        raise ValueError("Участник не найден в группе")
+
+    await db.delete(member)
+    await reseat_group_members(db, group_id)
+    await db.commit()
+
+
+async def move_group_member(db: AsyncSession, from_group_id: int, to_group_id: int, user_id: int) -> None:
+    member = await db.scalar(select(GroupMember).where(GroupMember.group_id == from_group_id, GroupMember.user_id == user_id))
+    if not member:
+        raise ValueError("Участник не найден в исходной группе")
+
+    await validate_group_member_constraints(db, group_id=to_group_id, user_id=user_id, ignore_member_ids={member.id})
+    target_count = len(list((await db.scalars(select(GroupMember.id).where(GroupMember.group_id == to_group_id))).all()))
+    member.group_id = to_group_id
+    member.seat = target_count + 1
+    await reseat_group_members(db, from_group_id)
+    await reseat_group_members(db, to_group_id)
+    await db.commit()
+
+
+async def swap_group_members(
+    db: AsyncSession,
+    first_group_id: int,
+    first_user_id: int,
+    second_group_id: int,
+    second_user_id: int,
+) -> None:
+    if first_group_id == second_group_id:
+        raise ValueError("Нужно выбрать разные группы")
+
+    first_member = await db.scalar(select(GroupMember).where(GroupMember.group_id == first_group_id, GroupMember.user_id == first_user_id))
+    second_member = await db.scalar(select(GroupMember).where(GroupMember.group_id == second_group_id, GroupMember.user_id == second_user_id))
+    if not first_member or not second_member:
+        raise ValueError("Один из участников не найден в указанных группах")
+
+    await validate_group_member_constraints(
+        db,
+        group_id=first_group_id,
+        user_id=second_user_id,
+        ignore_member_ids={first_member.id, second_member.id},
+    )
+    await validate_group_member_constraints(
+        db,
+        group_id=second_group_id,
+        user_id=first_user_id,
+        ignore_member_ids={first_member.id, second_member.id},
+    )
+
+    first_member.group_id, second_member.group_id = second_group_id, first_group_id
+    first_member.seat, second_member.seat = second_member.seat, first_member.seat
+    await reseat_group_members(db, first_group_id)
+    await reseat_group_members(db, second_group_id)
+    await db.commit()
+
+
 def sort_members_for_table(
     members: list[GroupMember],
     manual_tie_break_priorities: dict[int, int] | None = None,
