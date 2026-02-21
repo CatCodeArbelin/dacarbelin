@@ -472,8 +472,29 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             archive_entries=archive_entries,
             chat_settings=chat_settings,
             coin_toss_candidates=coin_toss_candidates,
+            basket_values=[basket.value for basket in Basket],
         ),
     )
+
+
+@router.post("/admin/user/basket")
+async def admin_update_user_basket(
+    user_id: int = Form(...),
+    basket: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    # Обновляем корзину пользователя из админ-панели.
+    user = await db.get(User, user_id)
+    if not user:
+        return redirect_with_admin_msg("msg_operation_failed")
+
+    allowed_values = {item.value for item in Basket}
+    if basket not in allowed_values:
+        return redirect_with_admin_msg("msg_operation_failed")
+
+    user.basket = basket
+    await db.commit()
+    return redirect_with_admin_msg("msg_status_ok")
 
 
 @router.post("/admin/stage")

@@ -39,7 +39,7 @@ MMR_THRESHOLDS: list[tuple[str, int]] = [
     ("Pawn-4", 660),
     ("Pawn-3", 580),
     ("Pawn-2", 500),
-    ("Pawn-1", 420),
+    ("Pawn-1", 0),
 ]
 
 
