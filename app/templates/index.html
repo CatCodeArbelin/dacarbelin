@@ -8,18 +8,34 @@
         <h2>{{ tr('register') }}</h2>
         {% if tournament_started %}<div class="alert alert-warning">{{ tr('registration_closed') }}</div>{% elif not registration_open %}<div class="alert alert-warning">{{ tr('registration_closed') }}</div>{% endif %}
         <form id="registration-form" action="/register" method="post">
-          <input class="form-control mb-2" name="nickname" placeholder="{{ tr('index_nickname') }}" required {% if not registration_open or tournament_started %}disabled{% endif %}>
+          <label class="form-label" for="registration-nickname">{{ tr('index_nickname') }}</label>
+          <input id="registration-nickname" class="form-control mb-2" name="nickname" placeholder="{{ tr('index_nickname') }}" required {% if not registration_open or tournament_started %}disabled{% endif %}>
+
+          <label class="form-label" for="steam-input">{{ tr('index_steam_id_or_url') }}</label>
           <div class="input-group mb-2">
             <input id="steam-input" class="form-control" name="steam_input" placeholder="{{ tr('index_steam_id_or_url') }}" required {% if not registration_open or tournament_started %}disabled{% endif %}>
             <button id="steam-preview-btn" class="btn btn-outline-info" type="button" {% if not registration_open or tournament_started %}disabled{% endif %}>{{ tr('index_check_steam') }}</button>
           </div>
+
+          <label class="form-label" for="preview-steam-id">{{ tr('index_steam_id') }}</label>
           <input id="preview-steam-id" class="form-control mb-2" placeholder="{{ tr('index_steam_id') }}" readonly>
+
+          <label class="form-label" for="preview-game-nickname">{{ tr('index_game_nickname') }}</label>
           <input id="preview-game-nickname" class="form-control mb-2" placeholder="{{ tr('index_game_nickname') }}" readonly>
+
+          <label class="form-label" for="preview-current-rank">{{ tr('index_current_rank') }}</label>
           <input id="preview-current-rank" class="form-control mb-2" placeholder="{{ tr('index_current_rank') }}" readonly>
+
+          <label class="form-label" for="preview-highest-rank">{{ tr('index_highest_rank') }}</label>
           <input id="preview-highest-rank" class="form-control mb-2" placeholder="{{ tr('index_highest_rank') }}" readonly>
+
           <div id="steam-preview-message" class="small mb-2"></div>
-          <input class="form-control mb-2" name="telegram" placeholder="{{ tr('participants_telegram') }}" {% if not registration_open or tournament_started %}disabled{% endif %}>
-          <input class="form-control mb-2" name="discord" placeholder="{{ tr('participants_discord') }}" {% if not registration_open or tournament_started %}disabled{% endif %}>
+
+          <label class="form-label" for="registration-telegram">{{ tr('participants_telegram') }}</label>
+          <input id="registration-telegram" class="form-control mb-2" name="telegram" placeholder="{{ tr('participants_telegram') }}" {% if not registration_open or tournament_started %}disabled{% endif %}>
+
+          <label class="form-label" for="registration-discord">{{ tr('participants_discord') }}</label>
+          <input id="registration-discord" class="form-control mb-2" name="discord" placeholder="{{ tr('participants_discord') }}" {% if not registration_open or tournament_started %}disabled{% endif %}>
           <button id="register-submit" class="btn btn-danger" disabled>{{ tr('submit') }}</button>
         </form>
       </div>
