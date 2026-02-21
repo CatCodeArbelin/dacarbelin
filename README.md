@@ -92,10 +92,20 @@ docker compose up -d --build
 
 ## Быстрое заполнение 64 участниками (для теста жеребьевки)
 
-После запуска контейнеров и миграций можно создать тестовых участников:
+Скрипт `scripts/seed_64_participants.py` требует переменные окружения `DATABASE_URL` и `ADMIN_KEY`.
+
+Предпочтительный вариант (внутри контейнера `web`, где env уже подхватывается из `.env`):
 
 ```bash
 docker compose exec web python scripts/seed_64_participants.py
+```
+
+Локальный запуск из venv (с предварительным экспортом env-переменных):
+
+```bash
+export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/dac
+export ADMIN_KEY=local_seed_admin_key
+python scripts/seed_64_participants.py
 ```
 
 Скрипт добавляет 64 уникальных участника с рандомными никами, MMR/рангами и корзинами.
