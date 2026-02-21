@@ -54,51 +54,76 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
     if len(users) < 64:
         return False, "ДОСТУПНА ТОЛЬКО РУЧНАЯ Жеребьевка, т.к. количество участников в основных корзинах меньше 64"
 
-    await clear_group_stage(db)
-    by_basket: dict[str, list[User]] = defaultdict(list)
-    for user in users:
-        by_basket[user.basket].append(user)
+    expected_group_count = min(len(users) // 8, 8)
+    if expected_group_count <= 0:
+        return False, "ДОСТУПНА ТОЛЬКО РУЧНАЯ Жеребьевка, т.к. невозможно сформировать группы по 8 участников"
 
-    for bucket in by_basket.values():
-        random.shuffle(bucket)
+    try:
+        await clear_group_stage(db)
+        by_basket: dict[str, list[User]] = defaultdict(list)
+        for user in users:
+            by_basket[user.basket].append(user)
 
-    group_count = min(len(users) // 8, 8)
-    groups: list[TournamentGroup] = []
-    for idx in range(group_count):
-        group = TournamentGroup(
-            name=f"Group {chr(65 + idx)}",
-            lobby_password=generate_password(),
-            schedule_text="TBD",
-        )
-        db.add(group)
-        groups.append(group)
-    await db.flush()
+        for bucket in by_basket.values():
+            random.shuffle(bucket)
 
-    for idx, group in enumerate(groups):
-        picked: list[User] = []
-        for basket in [Basket.QUEEN.value, Basket.KING.value, Basket.ROOK.value, Basket.BISHOP.value]:
-            if by_basket[basket]:
-                picked.append(by_basket[basket].pop())
-            if by_basket[basket]:
-                picked.append(by_basket[basket].pop())
-            if len(picked) >= 8:
-                break
+        assigned_by_group: list[list[User]] = []
+        for _ in range(expected_group_count):
+            picked: list[User] = []
+            for basket in [Basket.QUEEN.value, Basket.KING.value, Basket.ROOK.value, Basket.BISHOP.value]:
+                if by_basket[basket]:
+                    picked.append(by_basket[basket].pop())
+                if by_basket[basket]:
+                    picked.append(by_basket[basket].pop())
+                if len(picked) >= 8:
+                    break
 
-        fallback_pool: list[User] = []
-        for basket in PRIMARY_BASKETS:
-            fallback_pool.extend(by_basket[basket])
-        random.shuffle(fallback_pool)
-        while len(picked) < 8 and fallback_pool:
-            candidate = fallback_pool.pop()
-            if candidate not in picked and candidate in by_basket[candidate.basket]:
-                by_basket[candidate.basket].remove(candidate)
-                picked.append(candidate)
+            fallback_pool: list[User] = []
+            for basket in PRIMARY_BASKETS:
+                fallback_pool.extend(by_basket[basket])
+            random.shuffle(fallback_pool)
+            while len(picked) < 8 and fallback_pool:
+                candidate = fallback_pool.pop()
+                if candidate not in picked and candidate in by_basket[candidate.basket]:
+                    by_basket[candidate.basket].remove(candidate)
+                    picked.append(candidate)
 
-        for seat, player in enumerate(picked, start=1):
-            db.add(GroupMember(group_id=group.id, user_id=player.id, seat=seat))
+            unique_ids = {player.id for player in picked}
+            if len(picked) != 8 or len(unique_ids) != 8:
+                raise ValueError(
+                    "Не удалось собрать 8 уникальных участников для группы. "
+                    "Доступна только ручная жеребьевка."
+                )
 
-    await db.commit()
-    return True, "Автоматическая жеребьевка успешно создана"
+            assigned_by_group.append(picked)
+
+        assigned_players_count = sum(len(group_players) for group_players in assigned_by_group)
+        if len(assigned_by_group) != expected_group_count or assigned_players_count != expected_group_count * 8:
+            raise ValueError(
+                "Итоговое количество групп и участников не соответствует формату автоматической жеребьевки. "
+                "Доступна только ручная жеребьевка."
+            )
+
+        groups: list[TournamentGroup] = []
+        for idx in range(expected_group_count):
+            group = TournamentGroup(
+                name=f"Group {chr(65 + idx)}",
+                lobby_password=generate_password(),
+                schedule_text="TBD",
+            )
+            db.add(group)
+            groups.append(group)
+        await db.flush()
+
+        for group, players in zip(groups, assigned_by_group, strict=True):
+            for seat, player in enumerate(players, start=1):
+                db.add(GroupMember(group_id=group.id, user_id=player.id, seat=seat))
+
+        await db.commit()
+        return True, "Автоматическая жеребьевка успешно создана"
+    except ValueError as exc:
+        await db.rollback()
+        return False, str(exc)
 
 
 async def _require_group(db: AsyncSession, group_id: int) -> TournamentGroup:
