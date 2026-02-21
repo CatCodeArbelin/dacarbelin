@@ -747,11 +747,21 @@ async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int
     if target_size == 0:
         raise ValueError("Для этого этапа продвижение не поддерживается")
 
-    per_group_limit = 3 if stage.key == "stage_1_8" else 4
+    allowed_top_n_by_stage = {
+        "stage_1_8": 3,
+        "stage_1_4": 4,
+        "stage_semifinal_groups": 4,
+    }
+    allowed_top_n = allowed_top_n_by_stage.get(stage.key)
+    if allowed_top_n is None:
+        raise ValueError("Для этого этапа нельзя выбрать количество продвигаемых из группы")
+    if top_n != allowed_top_n:
+        raise ValueError(f"Для этапа {stage.title} можно продвинуть только top-{allowed_top_n} из группы")
+
     top_players: list[PlayoffParticipant] = []
     for group_number in sorted(stage_grouped.keys()):
         group_ranked = sorted(stage_grouped[group_number], key=playoff_sort_key, reverse=True)
-        top_players.extend(group_ranked[:per_group_limit])
+        top_players.extend(group_ranked[:top_n])
 
     if stage.key == "stage_1_8":
         direct_invite_users = list(
