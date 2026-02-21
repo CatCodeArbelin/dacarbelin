@@ -1,3 +1,5 @@
+"""Настраивает окружение Alembic и запускает миграции в offline/online режимах."""
+
 from logging.config import fileConfig
 
 from alembic import context

@@ -1,3 +1,5 @@
+"""Содержит ORM-модели турнира, матчей, стадий и связанных сущностей."""
+
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint

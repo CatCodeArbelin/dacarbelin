@@ -1,3 +1,5 @@
+"""Собирает ORM-модели приложения в одном пространстве импорта."""
+
 from app.models.chat import ChatMessage
 from app.models.settings import (
     ArchiveEntry,

@@ -1,3 +1,5 @@
+"""Проверяет ограничения по количеству матчей и переходам в плей-офф."""
+
 import unittest
 from unittest.mock import AsyncMock
 

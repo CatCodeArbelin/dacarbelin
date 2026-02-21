@@ -1,3 +1,5 @@
+"""Содержит веб-маршруты для страниц турнира, админки и пользовательских действий."""
+
 import json
 import re
 from datetime import datetime, timedelta

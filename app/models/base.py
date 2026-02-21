@@ -1,3 +1,5 @@
+"""Определяет базовый класс ORM-моделей и общие миксины."""
+
 from sqlalchemy.orm import DeclarativeBase
 
 

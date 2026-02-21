@@ -1,3 +1,5 @@
+"""Создаёт движок и фабрику сессий SQLAlchemy для работы с БД."""
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings

@@ -1,3 +1,5 @@
+"""Распределяет участников по корзинам и проверяет ограничения посева."""
+
 from collections.abc import Mapping
 
 from app.models.user import Basket

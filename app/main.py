@@ -1,3 +1,5 @@
+"""Создаёт FastAPI-приложение, подключает маршруты и middleware."""
+
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles

@@ -1,3 +1,5 @@
+"""Проверяет корректность расчёта рейтинга и порядка участников."""
+
 import unittest
 
 from app.services.rank import mmr_to_rank

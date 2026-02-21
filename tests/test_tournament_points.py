@@ -1,3 +1,5 @@
+"""Проверяет начисление очков и обновление турнирной таблицы."""
+
 import unittest
 
 from app.models.tournament import GroupMember, PlayoffParticipant, TournamentGroup

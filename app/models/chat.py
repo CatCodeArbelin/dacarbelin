@@ -1,3 +1,5 @@
+"""Описывает модели и структуры данных для чата и сообщений."""
+
 from datetime import datetime
 
 from sqlalchemy import DateTime, Integer, String, Text

@@ -1,3 +1,5 @@
+"""Проверяет интеграцию сервиса Steam и обработку ответов API."""
+
 import asyncio
 
 import pytest

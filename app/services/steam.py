@@ -1,3 +1,5 @@
+"""Инкапсулирует интеграцию со Steam API и валидацию профилей."""
+
 import re
 from urllib.parse import urlparse
 
