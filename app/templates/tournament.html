@@ -2,7 +2,22 @@
 {% block content %}
 <h2>{{ tr('tournament_title') }}</h2>
 <div class="alert alert-info mt-3">
-  {{ tr('tournament_current_stage') }}: <strong>{{ current_stage_label }}</strong>
+  {{ tr('tournament_current_stage') }}:
+  <strong>
+    {% if current_stage_label == tr('tournament_group_stage') %}
+      {{ tr('tournament_stage_group_stage_label') }}
+    {% elif current_stage_label == 'Stage 1/8' %}
+      {{ tr('tournament_stage_1_8_label') }}
+    {% elif current_stage_label == 'Stage 1/4' %}
+      {{ tr('tournament_stage_1_4_label') }}
+    {% elif current_stage_label == 'Semifinal Groups' %}
+      {{ tr('tournament_stage_semifinal_groups_label') }}
+    {% elif current_stage_label == 'Final' %}
+      {{ tr('tournament_stage_final_label') }}
+    {% else %}
+      {{ current_stage_label }}
+    {% endif %}
+  </strong>
 </div>
 
 {% if groups %}
@@ -28,7 +43,12 @@
             </tr>
             {% endfor %}
           </table>
-          <div class="small text-warning">{{ tr('tournament_promote_rule') }}</div>
+          <div class="small text-warning">
+            {{ tr('tournament_promote_rule') }}
+            {{ tr('tournament_stage_1_8_label') }} → {{ tr('tournament_stage_1_4_label') }};
+            {{ tr('tournament_stage_1_4_label') }} → {{ tr('tournament_stage_semifinal_groups_label') }};
+            {{ tr('tournament_stage_semifinal_groups_label') }} → {{ tr('tournament_stage_final_label') }}.
+          </div>
         </div>
       </div>
     </div>
@@ -44,7 +64,19 @@
   <div class="card bg-black neon-border-red mb-3">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center">
-        <h4>{{ stage.title }}</h4>
+        <h4>
+          {% if stage.key == 'stage_1_8' %}
+            {{ tr('tournament_stage_1_8_label') }}
+          {% elif stage.key == 'stage_1_4' %}
+            {{ tr('tournament_stage_1_4_label') }}
+          {% elif stage.key == 'stage_semifinal_groups' %}
+            {{ tr('tournament_stage_semifinal_groups_label') }}
+          {% elif stage.key == 'stage_final' %}
+            {{ tr('tournament_stage_final_label') }}
+          {% else %}
+            {{ stage.title }}
+          {% endif %}
+        </h4>
         <span class="badge {{ 'bg-success' if stage.is_started else 'bg-secondary' }}">{{ tr('tournament_started') if stage.is_started else tr('tournament_pending') }}</span>
       </div>
       <p class="small text-contrast-muted mb-1">{{ tr('tournament_scoring_mode') }}: {{ stage.scoring_mode }}{% if stage.scoring_mode == 'final_22_top1' %} ({{ tr('tournament_final_22_hint') }}){% endif %}</p>
