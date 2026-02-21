@@ -24,6 +24,12 @@
         <div class="col-12"><input class="form-control" name="steam_input" placeholder="{{ tr('admin_steam_id_or_url') }}" required></div>
         <div class="col-6"><input class="form-control" name="telegram" placeholder="{{ tr('participants_telegram') }}"></div>
         <div class="col-6"><input class="form-control" name="discord" placeholder="{{ tr('participants_discord') }}"></div>
+        <div class="col-12">
+          <select class="form-select" name="invite_type">
+            <option value="regular">Обычный инвайт</option>
+            <option value="stage_2">Прямой инвайт во II этап</option>
+          </select>
+        </div>
         <div class="col-12"><button class="btn btn-warning">{{ tr('admin_add_to_invited') }}</button></div>
       </form>
     </div></div>
@@ -39,6 +45,7 @@
               <th>Steam ID</th>
               <th>{{ tr('participants_highest') }}</th>
               <th>Basket</th>
+              <th>Direct invite</th>
               <th>{{ tr('admin_save') }}</th>
             </tr>
           </thead>
@@ -49,6 +56,7 @@
               <td>{{ user.nickname }}</td>
               <td>{{ user.steam_id }}</td>
               <td>{{ user.highest_rank }}</td>
+              <td>{{ user.direct_invite_stage or '-' }}</td>
               <td colspan="2">
                 <form action="/admin/user/basket" method="post" class="d-flex gap-2">
                   <input type="hidden" name="user_id" value="{{ user.id }}">

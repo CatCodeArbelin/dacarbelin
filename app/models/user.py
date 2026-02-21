@@ -35,5 +35,6 @@ class User(Base):
     telegram: Mapped[str | None] = mapped_column(String(255), nullable=True)
     discord: Mapped[str | None] = mapped_column(String(255), nullable=True)
     basket: Mapped[str] = mapped_column(String(50), default=Basket.LOW_RANK.value, index=True)
+    direct_invite_stage: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     extra_data: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
