@@ -430,18 +430,19 @@ async def apply_game_results(db: AsyncSession, group_id: int, ordered_user_ids: 
     await db.commit()
 
 
-PLAYOFF_STAGE_BLUEPRINT = [
-    ("playoff_1_16", "1/16 final", 32, "standard"),
-    ("playoff_1_8", "1/8 final", 16, "standard"),
-    ("playoff_1_4", "1/4 final", 8, "standard"),
-    ("playoff_semifinal", "Semifinal", 4, "standard"),
-    ("playoff_final", "Final", 2, "standard"),
+PLAYOFF_STAGE_SEQUENCE = [
+    ("stage_1_8", "Stage 1/8", 56, "standard"),
+    ("stage_1_4", "Stage 1/4", 32, "standard"),
+    ("stage_semifinal_groups", "Semifinal Groups", 16, "standard"),
+    ("stage_final", "Final", 8, "final_22_top1"),
 ]
 FINAL_SCORING_MODE = "final_22_top1"
 
 
 def get_playoff_stage_blueprint(usable_count: int) -> list[tuple[str, str, int, str]]:
-    return [item for item in PLAYOFF_STAGE_BLUEPRINT if usable_count >= item[2]]
+    if usable_count < PLAYOFF_STAGE_SEQUENCE[0][2]:
+        return []
+    return PLAYOFF_STAGE_SEQUENCE
 
 
 def playoff_sort_key(participant: PlayoffParticipant) -> tuple[int, int, int, int, int]:
@@ -467,9 +468,28 @@ def apply_points_to_playoff_participant(participant: PlayoffParticipant, place: 
 
 
 def get_group_count_for_stage(stage_size: int) -> int:
-    if stage_size <= 8:
-        return 1
     return max(1, stage_size // 8)
+
+
+def get_promoted_count_for_stage(stage: PlayoffStage) -> int:
+    if stage.key == "stage_1_8":
+        return 32
+    if stage.key == "stage_1_4":
+        return 16
+    if stage.key == "stage_semifinal_groups":
+        return 8
+    return 0
+
+
+def get_stage_group_number_by_seed(seed: int) -> int:
+    return ((seed - 1) // 8) + 1
+
+
+def split_participants_by_group(participants: list[PlayoffParticipant]) -> dict[int, list[PlayoffParticipant]]:
+    grouped: dict[int, list[PlayoffParticipant]] = defaultdict(list)
+    for participant in participants:
+        grouped[get_stage_group_number_by_seed(participant.seed)].append(participant)
+    return grouped
 
 
 async def rebuild_playoff_stages(db: AsyncSession, player_ids: list[int]) -> list[PlayoffStage]:
@@ -535,9 +555,9 @@ async def generate_playoff_from_groups(db: AsyncSession) -> tuple[bool, str]:
     promoted: list[int] = []
     for group in groups:
         ranked = sort_members_for_table(by_group.get(group.id, []))
-        promoted.extend([m.user_id for m in ranked[:4]])
+        promoted.extend([m.user_id for m in ranked[:7]])
 
-    if len(promoted) < 8:
+    if len(promoted) < 56:
         return False, "Недостаточно участников для playoff"
 
     await rebuild_playoff_stages(db, promoted)
@@ -613,9 +633,12 @@ async def apply_playoff_match_results(
 
     participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))).all())
     by_user = {p.user_id: p for p in participants}
+    expected_group = {p.user_id for p in participants if get_stage_group_number_by_seed(p.seed) == group_number}
     for uid in ordered_user_ids:
         if uid not in by_user:
             raise ValueError("В результатах есть игрок вне этапа")
+        if uid not in expected_group:
+            raise ValueError("В результатах есть игрок из другой группы этапа")
 
     match = await db.scalar(
         select(PlayoffMatch).where(PlayoffMatch.stage_id == stage_id, PlayoffMatch.group_number == group_number)
@@ -672,14 +695,33 @@ async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int
     participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage.id))).all())
     ranked = sorted(participants, key=playoff_sort_key, reverse=True)
 
-    if stage.stage_size == 16 and next_stage.stage_size == 8:
-        top_n = 8
-    top_players = ranked[:top_n]
+    stage_grouped = split_participants_by_group(participants)
+    target_size = get_promoted_count_for_stage(stage)
+    if target_size == 0:
+        raise ValueError("Для этого этапа продвижение не поддерживается")
+
+    per_group_limit = 3 if stage.key == "stage_1_8" else 4
+    top_players: list[PlayoffParticipant] = []
+    for group_number in sorted(stage_grouped.keys()):
+        group_ranked = sorted(stage_grouped[group_number], key=playoff_sort_key, reverse=True)
+        top_players.extend(group_ranked[:per_group_limit])
+
+    if len(top_players) < target_size:
+        selected_ids = {participant.user_id for participant in top_players}
+        for participant in ranked:
+            if participant.user_id not in selected_ids:
+                top_players.append(participant)
+                selected_ids.add(participant.user_id)
+            if len(top_players) >= target_size:
+                break
+    else:
+        top_players = sorted(top_players, key=playoff_sort_key, reverse=True)[:target_size]
 
     await db.execute(delete(PlayoffParticipant).where(PlayoffParticipant.stage_id == next_stage.id))
     for seed, participant in enumerate(top_players, start=1):
         db.add(PlayoffParticipant(stage_id=next_stage.id, user_id=participant.user_id, seed=seed))
         participant.is_eliminated = False
-    for participant in ranked[top_n:]:
-        participant.is_eliminated = True
+    promoted_ids = {participant.user_id for participant in top_players}
+    for participant in ranked:
+        participant.is_eliminated = participant.user_id not in promoted_ids
     await db.commit()
