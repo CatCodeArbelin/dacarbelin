@@ -27,60 +27,73 @@
 - Страница Tournament теперь показывает группы, текущую игру и очки.
 - Docker-окружение: `docker compose up --build`.
 
-## Быстрый старт (Windows 11 локально)
-1. Скопируйте env:
-   ```bash
-   copy .env.example .env
-   ```
-2. (Опционально) впишите `STEAM_API_KEY`, если нужны vanity ID.
-3. Запуск:
-   ```bash
-   docker compose up --build
-   ```
-4. Откройте: `http://0.0.0.0:8000/`
-5. Админка (базовый поток): `http://0.0.0.0:8000/admin?admin_key=YOUR_ADMIN_KEY` (при валидном ключе автоматически создается signed cookie `admin_session` и выполняется редирект на `/admin`).
-6. Запасной путь: `http://0.0.0.0:8000/admin/login` (ручной ввод `ADMIN_KEY` через форму).
+## Единый сценарий запуска (Windows 11 и Ubuntu VDS)
+
+Ниже один и тот же набор переменных и шагов, который работает и локально на Windows 11, и на Ubuntu VDS.
+
+### 1) Создайте `.env` из шаблона
+
+**Windows (PowerShell):**
+```powershell
+copy .env.example .env
+```
+
+**Ubuntu (bash):**
+```bash
+cp .env.example .env
+```
+
+### 2) Заполните `.env` (реальный пример)
+
+```env
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/dac
+ADMIN_KEY=admin_2026_super_secret
+SECRET_KEY=secret_2026_super_long_random_string
+STEAM_API_KEY=
+APP_HOST=0.0.0.0
+APP_PORT=8000
+```
+
+Примечания:
+- `STEAM_API_KEY` можно оставить пустым, если не используете vanity ID.
+- Для внешнего доступа к VDS обычно оставляют `APP_HOST=0.0.0.0`.
+- В production обязательно задайте сложные `ADMIN_KEY` и `SECRET_KEY`.
+
+### 3) Запуск через Docker Compose
+
+```bash
+docker compose up --build
+```
+
+Для фонового режима (чаще на VDS):
+```bash
+docker compose up -d --build
+```
+
+### 4) Проверка
+
+```bash
+docker compose ps
+docker compose logs -f web
+```
+
+Приложение доступно по адресу: `http://<host>:8000/`.
+
+Админка:
+- Основной вход: `http://<host>:8000/admin?admin_key=admin_2026_super_secret`
+- Резервный вход через форму: `http://<host>:8000/admin/login`
+
+### 5) Обновление версии
+
+```bash
+git pull
+docker compose up -d --build
+```
 
 ## План следующих итераций
 - **Итерация 3:** ручная жеребьевка с drag/drop и замены игроков в группах.
 - **Итерация 4:** стадии playoff (1/16, 1/8, 1/4, semifinal/final), продвижение участников.
 - **Итерация 5:** расширенный архив, донаты/правила из БД, аудит/история действий админа.
-
-## Деплой на Ubuntu VDS (пошагово)
-```bash
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y ca-certificates curl git
-
-# Docker
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-newgrp docker
-
-git clone <YOUR_REPO_URL> dacarbelin
-cd dacarbelin
-cp .env.example .env
-nano .env
-
-# Запуск
-docker compose up -d --build
-
-# Проверка
-docker compose ps
-docker compose logs -f web
-```
-
-### Обновление версии
-```bash
-cd dacarbelin
-git pull
-docker compose up -d --build
-```
-
-### Рекомендации для production
-- Поставьте reverse proxy (Nginx) и SSL (Let's Encrypt).
-- Используйте сложные `ADMIN_KEY` и `SECRET_KEY`; доступ к `/admin/*` только через валидную admin-сессию (через ссылку с `admin_key` или через `/admin/login`) и signed session cookie.
-- Дополнительно ограничьте доступ к `/admin` по IP через reverse proxy.
-- Настройте регулярные backup базы PostgreSQL.
 
 ## Безопасный доступ к админке
 1. В `.env` задайте сложные значения `ADMIN_KEY` и `SECRET_KEY` (не оставляйте `change_me`).
