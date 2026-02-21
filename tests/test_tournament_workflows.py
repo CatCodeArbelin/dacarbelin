@@ -64,6 +64,14 @@ class TournamentWorkflowTests(unittest.TestCase):
             group_sizes[group_number] = group_sizes.get(group_number, 0) + 1
         self.assertEqual(group_sizes, {1: 8, 2: 8, 3: 8, 4: 8})
 
+
+    def test_stage_2_players_requires_exactly_21_promoted(self) -> None:
+        with self.assertRaises(ValueError):
+            build_stage_2_player_ids(list(range(1, 21)), list(range(101, 112)))
+
+        with self.assertRaises(ValueError):
+            build_stage_2_player_ids(list(range(1, 23)), list(range(101, 112)))
+
     def test_stage_2_players_validation_for_limit_and_duplicates(self) -> None:
         promoted = list(range(1, 22))
 

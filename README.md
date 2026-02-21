@@ -103,6 +103,23 @@ git pull
 docker compose up -d --build
 ```
 
+
+## Запуск тестов
+
+Проект использует `pytest` (с тестами в `tests/`).
+
+Запуск всех тестов:
+
+```bash
+pytest
+```
+
+Запуск выборочно (пример для новых сценариев playoff/direct invites):
+
+```bash
+pytest tests/test_tournament_auto_draw.py tests/test_tournament_workflows.py tests/test_playoff_match_limits.py tests/test_participants_direct_invites.py
+```
+
 ## Быстрое заполнение турнира: 56 обычных + 11 direct invite
 
 Скрипт `scripts/seed_tournament_56_plus_11.py` требует переменные окружения `DATABASE_URL` и `ADMIN_KEY`.
@@ -121,7 +138,7 @@ export ADMIN_KEY=local_seed_admin_key
 python scripts/seed_tournament_56_plus_11.py
 ```
 
-Скрипт добавляет 56 обычных уникальных участников с рандомными никами, MMR/рангами и корзинами, а также 11 direct invite участников (`basket=invited`, `direct_invite_stage=stage_2`).
+Скрипт подготавливает сценарий для II этапа 21+11: добавляет 56 обычных уникальных участников с рандомными никами, MMR/рангами и корзинами, а также 11 direct invite участников (`basket=invited`, `direct_invite_stage=stage_2`), из которых формируется сетка 32 (21 прошедший + 11 инвайтов).
 
 ## План следующих итераций
 - **Итерация 3:** ручная жеребьевка с drag/drop и замены игроков в группах.
