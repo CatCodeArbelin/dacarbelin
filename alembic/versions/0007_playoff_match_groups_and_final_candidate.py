@@ -1,7 +1,7 @@
 """playoff match groups and final candidate
 
-Revision ID: 0007_playoff_match_groups_and_final_candidate
-Revises: 0006_site_content_and_chat_settings
+Revision ID: 0007_playoff_groups_final
+Revises: 0006_site_content_chat_set
 Create Date: 2026-02-20
 """
 
@@ -9,8 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0007_playoff_match_groups_and_final_candidate"
-down_revision = "0006_site_content_and_chat_settings"
+revision = "0007_playoff_groups_final"
+down_revision = "0006_site_content_chat_set"
 branch_labels = None
 depends_on = None
 

@@ -1,7 +1,7 @@
 """group and playoff match schedule fields
 
-Revision ID: 0008_group_and_match_schedule_fields
-Revises: 0007_playoff_match_groups_and_final_candidate
+Revision ID: 0008_group_match_schedule
+Revises: 0007_playoff_groups_final
 Create Date: 2026-02-20
 """
 
@@ -9,8 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0008_group_and_match_schedule_fields"
-down_revision = "0007_playoff_match_groups_and_final_candidate"
+revision = "0008_group_match_schedule"
+down_revision = "0007_playoff_groups_final"
 branch_labels = None
 depends_on = None
 
