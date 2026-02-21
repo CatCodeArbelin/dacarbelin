@@ -440,9 +440,11 @@ STAGE_2_DIRECT_INVITES_LIMIT = 11
 
 
 def get_playoff_stage_blueprint(usable_count: int) -> list[tuple[str, str, int, str]]:
-    if usable_count < PLAYOFF_STAGE_SEQUENCE[0][2]:
-        return []
-    return PLAYOFF_STAGE_SEQUENCE
+    if usable_count >= PLAYOFF_STAGE_SEQUENCE[0][2]:
+        return PLAYOFF_STAGE_SEQUENCE
+    if usable_count >= PLAYOFF_STAGE_SEQUENCE[1][2]:
+        return PLAYOFF_STAGE_SEQUENCE[1:]
+    return []
 
 
 def playoff_sort_key(participant: PlayoffParticipant) -> tuple[int, int, int, int, int]:
@@ -573,15 +575,30 @@ async def generate_playoff_from_groups(db: AsyncSession) -> tuple[bool, str]:
     for member in members:
         by_group[member.group_id].append(member)
 
-    promoted: list[int] = []
+    stage_1_promoted_ids: list[int] = []
     for group in groups:
         ranked = sort_members_for_table(by_group.get(group.id, []))
-        promoted.extend([m.user_id for m in ranked[:7]])
+        stage_1_promoted_ids.extend([member.user_id for member in ranked[:3]])
 
-    if len(promoted) < 56:
-        return False, "Недостаточно участников для playoff"
+    if len(stage_1_promoted_ids) != 21:
+        return False, "Недостаточно участников: из I этапа должны пройти ровно 21 участник"
 
-    await rebuild_playoff_stages(db, promoted)
+    direct_invite_ids = list(
+        (
+            await db.scalars(
+                select(User.id)
+                .where(User.direct_invite_stage == DIRECT_INVITE_STAGE_2)
+                .order_by(User.created_at)
+            )
+        ).all()
+    )
+
+    try:
+        stage_2_player_ids = build_stage_2_player_ids(stage_1_promoted_ids, direct_invite_ids)
+    except ValueError as exc:
+        return False, str(exc)
+
+    await rebuild_playoff_stages(db, stage_2_player_ids)
     return True, "Playoff-этапы сформированы"
 
 
