@@ -15,7 +15,7 @@ from app.models.tournament import (
 )
 from app.models.user import Basket, User
 
-POINTS_BY_PLACE = {1: 8, 2: 7, 3: 6, 4: 5, 5: 4, 6: 3, 7: 2, 8: 1}
+POINTS_BY_PLACE = {1: 8, 2: 6, 3: 5, 4: 4, 5: 3, 6: 2, 7: 1, 8: 0}
 PRIMARY_BASKETS = [
     Basket.QUEEN_TOP.value,
     Basket.QUEEN.value,
