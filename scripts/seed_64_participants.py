@@ -1,10 +1,10 @@
 import asyncio
+import os
 import random
 import string
 
 from sqlalchemy import func, select
 
-from app.db.session import SessionLocal
 from app.models.user import User
 from app.services.basket_allocator import allocate_basket
 from app.services.rank import mmr_to_rank, pick_basket
@@ -29,6 +29,11 @@ def _rank_from_mmr(mmr: int) -> str:
 
 async def main() -> None:
     """Создает 64 тестовых участника с рандомными никами, рангами и корзинами."""
+    os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/dac")
+    os.environ.setdefault("ADMIN_KEY", "local_seed_admin_key")
+
+    from app.db.session import SessionLocal
+
     async with SessionLocal() as db:
         basket_counts_rows = (
             await db.execute(
