@@ -212,6 +212,44 @@ async def create_manual_group(db: AsyncSession, name: str, lobby_password: str) 
     return group
 
 
+
+
+def parse_manual_draw_user_ids(raw_user_ids: str) -> list[int]:
+    if not raw_user_ids.strip():
+        return []
+    parsed = [int(part.strip()) for part in raw_user_ids.split(",") if part.strip()]
+    if len(parsed) != len(set(parsed)):
+        raise ValueError("ID участников в ручной жеребьевке должны быть уникальны")
+    return parsed
+
+
+async def create_manual_draw(db: AsyncSession, group_count: int, user_ids: list[int]) -> None:
+    if group_count < 1 or group_count > 8:
+        raise ValueError("Количество групп должно быть от 1 до 8")
+    if len(user_ids) > group_count * 8:
+        raise ValueError("Слишком много участников для выбранного числа групп")
+
+    await clear_group_stage(db)
+    groups: list[TournamentGroup] = []
+    for idx in range(group_count):
+        group = TournamentGroup(
+            name=f"Group {chr(65 + idx)}",
+            lobby_password=generate_password(),
+            schedule_text="TBD",
+            draw_mode="manual",
+        )
+        db.add(group)
+        groups.append(group)
+    await db.flush()
+
+    for offset, user_id in enumerate(user_ids):
+        group = groups[offset % group_count]
+        await validate_group_member_constraints(db, group_id=group.id, user_id=user_id)
+        seat = 1 + len(list((await db.scalars(select(GroupMember.id).where(GroupMember.group_id == group.id))).all()))
+        db.add(GroupMember(group_id=group.id, user_id=user_id, seat=seat))
+
+    await db.commit()
+
 async def add_group_member(db: AsyncSession, group_id: int, user_id: int) -> None:
     await validate_group_member_constraints(db, group_id=group_id, user_id=user_id)
     next_seat = 1 + len(list((await db.scalars(select(GroupMember.id).where(GroupMember.group_id == group_id))).all()))
@@ -392,8 +430,18 @@ async def apply_game_results(db: AsyncSession, group_id: int, ordered_user_ids: 
     await db.commit()
 
 
-PLAYOFF_STAGE_SIZES = [64, 32, 16, 8]
+PLAYOFF_STAGE_BLUEPRINT = [
+    ("playoff_1_16", "1/16 final", 32, "standard"),
+    ("playoff_1_8", "1/8 final", 16, "standard"),
+    ("playoff_1_4", "1/4 final", 8, "standard"),
+    ("playoff_semifinal", "Semifinal", 4, "standard"),
+    ("playoff_final", "Final", 2, "standard"),
+]
 FINAL_SCORING_MODE = "final_22_top1"
+
+
+def get_playoff_stage_blueprint(usable_count: int) -> list[tuple[str, str, int, str]]:
+    return [item for item in PLAYOFF_STAGE_BLUEPRINT if usable_count >= item[2]]
 
 
 def playoff_sort_key(participant: PlayoffParticipant) -> tuple[int, int, int, int, int]:
@@ -419,14 +467,14 @@ def apply_points_to_playoff_participant(participant: PlayoffParticipant, place: 
 
 
 def get_group_count_for_stage(stage_size: int) -> int:
-    if stage_size == 16:
-        return 2
+    if stage_size <= 8:
+        return 1
     return max(1, stage_size // 8)
 
 
 async def rebuild_playoff_stages(db: AsyncSession, player_ids: list[int]) -> list[PlayoffStage]:
     usable_count = len(player_ids)
-    stages_to_create = [size for size in PLAYOFF_STAGE_SIZES if usable_count >= size]
+    stages_to_create = get_playoff_stage_blueprint(usable_count)
     if not stages_to_create:
         raise ValueError("Недостаточно игроков для playoff-этапов")
 
@@ -435,13 +483,14 @@ async def rebuild_playoff_stages(db: AsyncSession, player_ids: list[int]) -> lis
     await db.execute(delete(PlayoffStage))
 
     stages: list[PlayoffStage] = []
-    for order, size in enumerate(stages_to_create):
+    for order, (key, title, size, scoring_mode) in enumerate(stages_to_create):
         stage = PlayoffStage(
-            key=f"top_{size}",
-            title=f"Top {size}",
+            key=key,
+            title=title,
             stage_size=size,
             stage_order=order,
-            scoring_mode=FINAL_SCORING_MODE if size == 8 else "standard",
+            scoring_mode=scoring_mode,
+            stage_code=key,
             is_started=False,
         )
         db.add(stage)
@@ -594,6 +643,23 @@ async def apply_playoff_match_results(
 
     await db.commit()
 
+
+
+
+async def override_playoff_match_winner(db: AsyncSession, stage_id: int, group_number: int, winner_user_id: int, note: str = "") -> None:
+    match = await db.scalar(select(PlayoffMatch).where(PlayoffMatch.stage_id == stage_id, PlayoffMatch.group_number == group_number))
+    if not match:
+        raise ValueError("Матч/группа для этапа не найдена")
+
+    participant = await db.scalar(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id, PlayoffParticipant.user_id == winner_user_id))
+    if not participant:
+        raise ValueError("Победитель должен быть участником этапа")
+
+    match.manual_winner_user_id = winner_user_id
+    match.winner_user_id = winner_user_id
+    match.manual_override_note = note.strip()
+    match.state = "finished"
+    await db.commit()
 
 async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int) -> None:
     stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.id == stage_id))

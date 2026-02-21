@@ -127,9 +127,9 @@
         <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donors') }}</button>
       </form>
 
-      <p class="small text-contrast-muted mb-2">{{ tr('archive_title') }}: <code>title|season|summary|url</code></p>
+      <p class="small text-contrast-muted mb-2">{{ tr('archive_title') }}: <code>title|season|summary|url|champion|bracket_json|published(1/0)</code></p>
       <form action="/admin/archive" method="post" class="mb-3">
-        <textarea class="form-control" name="items" rows="4">{% for row in archive_entries %}{{ row.title }}|{{ row.season }}|{{ row.summary }}|{{ row.link_url }}{% if not loop.last %}
+        <textarea class="form-control" name="items" rows="4">{% for row in archive_entries %}{{ row.title }}|{{ row.season }}|{{ row.summary }}|{{ row.link_url }}|{{ row.champion_name }}|{{ row.bracket_payload }}|{{ 1 if row.is_published else 0 }}{% if not loop.last %}
 {% endif %}{% endfor %}</textarea>
         <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_archive') }}</button>
       </form>
@@ -141,6 +141,11 @@
         <button class="btn btn-danger">{{ tr('admin_auto_draw') }}</button>
       </form>
       <p class="small text-contrast-muted">{{ score_hint }}</p>
+      <form action="/admin/draw/manual" method="post" class="row g-2 mb-3">
+        <div class="col-md-3"><input class="form-control" type="number" min="1" max="8" name="group_count" value="8" required></div>
+        <div class="col-md-7"><input class="form-control" name="user_ids" placeholder="user_id,user_id,... (optional)"></div>
+        <div class="col-md-2"><button class="btn btn-outline-danger w-100">Manual draw</button></div>
+      </form>
 
       <h5 class="mt-3">{{ tr('admin_group_manual_controls') }}</h5>
       <form action="/admin/group/create" method="post" class="row g-2 mb-3">
@@ -201,6 +206,13 @@
         <div class="col-md-2"><input class="form-control" type="number" name="group_number" placeholder="{{ tr('admin_group') }}" value="1"></div>
         <div class="col-md-6"><input class="form-control" name="placements" placeholder="8,5,12,..."></div>
         <div class="col-md-2"><button class="btn btn-success w-100">{{ tr('admin_save_playoff_game') }}</button></div>
+      </form>
+      <form action="/admin/playoff/override" method="post" class="row g-2 mb-3">
+        <div class="col-md-2"><input class="form-control" type="number" name="stage_id" placeholder="stage_id" required></div>
+        <div class="col-md-2"><input class="form-control" type="number" name="group_number" value="1" required></div>
+        <div class="col-md-3"><input class="form-control" type="number" name="winner_user_id" placeholder="winner_user_id" required></div>
+        <div class="col-md-3"><input class="form-control" name="note" placeholder="override note"></div>
+        <div class="col-md-2"><button class="btn btn-outline-light w-100">Set winner</button></div>
       </form>
 
       {% for group in groups %}
