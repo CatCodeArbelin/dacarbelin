@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.core.admin_session import ADMIN_SESSION_COOKIE, is_admin_session
+from app.core.admin_session import ADMIN_SESSION_COOKIE, create_admin_session_cookie, is_admin_session
 from app.core.config import settings
 from app.routers.web import router as web_router
 
@@ -11,6 +11,20 @@ app = FastAPI(title=settings.app_name)
 
 @app.middleware("http")
 async def admin_auth_middleware(request: Request, call_next):
+    if request.url.path == "/admin" and not is_admin_session(request.cookies.get(ADMIN_SESSION_COOKIE)):
+        admin_key = request.query_params.get("admin_key")
+        if admin_key and admin_key == settings.admin_key:
+            response = RedirectResponse(url="/admin", status_code=303)
+            response.set_cookie(
+                ADMIN_SESSION_COOKIE,
+                create_admin_session_cookie(),
+                httponly=True,
+                samesite="lax",
+                max_age=60 * 60 * 12,
+            )
+            return response
+        return HTMLResponse("Forbidden", status_code=403)
+
     if request.url.path.startswith("/admin") and request.url.path not in {"/admin/login", "/admin/logout"}:
         if not is_admin_session(request.cookies.get(ADMIN_SESSION_COOKIE)):
             if request.method == "GET":
