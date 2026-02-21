@@ -37,9 +37,12 @@ from app.services.tournament import (
     apply_manual_tie_break,
     apply_playoff_match_results,
     create_auto_draw,
+    create_manual_draw,
     create_manual_group,
     generate_playoff_from_groups,
     get_playoff_stages_with_data,
+    override_playoff_match_winner,
+    parse_manual_draw_user_ids,
     get_fully_tied_member_groups,
     move_group_member,
     move_user_to_stage,
@@ -374,7 +377,7 @@ async def rules_page(request: Request, db: AsyncSession = Depends(get_db)):
 @router.get("/archive", response_class=HTMLResponse)
 async def archive_page(request: Request, db: AsyncSession = Depends(get_db)):
     # Отдаем страницу архива.
-    archive_entries = (await db.scalars(select(ArchiveEntry).order_by(ArchiveEntry.sort_order, ArchiveEntry.id))).all()
+    archive_entries = (await db.scalars(select(ArchiveEntry).where(ArchiveEntry.is_published.is_(True)).order_by(ArchiveEntry.sort_order, ArchiveEntry.id))).all()
     return templates.TemplateResponse("archive.html", template_context(request, archive_entries=archive_entries))
 
 
@@ -593,6 +596,21 @@ async def admin_auto_draw(db: AsyncSession = Depends(get_db)):
     ok, message = await create_auto_draw(db)
     return redirect_with_admin_msg("msg_status_ok" if ok else "msg_status_warn")
 
+
+
+
+@router.post("/admin/draw/manual")
+async def admin_manual_draw(
+    group_count: int = Form(...),
+    user_ids: str = Form(default=""),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        parsed_user_ids = parse_manual_draw_user_ids(user_ids)
+        await create_manual_draw(db, group_count=group_count, user_ids=parsed_user_ids)
+        return redirect_with_admin_msg("msg_status_ok")
+    except Exception:  # noqa: BLE001
+        return redirect_with_admin_msg("msg_operation_failed")
 
 @router.post("/admin/group/password")
 async def admin_group_password(
@@ -847,6 +865,22 @@ async def admin_playoff_score(
         return redirect_with_admin_msg("msg_operation_failed")
 
 
+
+
+@router.post("/admin/playoff/override")
+async def admin_playoff_override(
+    stage_id: int = Form(...),
+    group_number: int = Form(default=1),
+    winner_user_id: int = Form(...),
+    note: str = Form(default=""),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        await override_playoff_match_winner(db, stage_id, group_number, winner_user_id, note=note)
+        return redirect_with_admin_msg("msg_status_ok")
+    except Exception:  # noqa: BLE001
+        return redirect_with_admin_msg("msg_operation_failed")
+
 @router.post("/admin/donation-links")
 async def admin_save_donation_links(
     items: str = Form(default=""),
@@ -935,7 +969,21 @@ async def admin_save_archive(
         season = parts[1] if len(parts) > 1 else ""
         summary = parts[2] if len(parts) > 2 else ""
         link_url = parts[3] if len(parts) > 3 else ""
-        db.add(ArchiveEntry(title=title, season=season, summary=summary, link_url=link_url, sort_order=idx))
+        champion_name = parts[4] if len(parts) > 4 else ""
+        bracket_payload = parts[5] if len(parts) > 5 else ""
+        is_published = parts[6] != "0" if len(parts) > 6 else True
+        db.add(
+            ArchiveEntry(
+                title=title,
+                season=season,
+                summary=summary,
+                link_url=link_url,
+                champion_name=champion_name,
+                bracket_payload=bracket_payload,
+                is_published=is_published,
+                sort_order=idx,
+            )
+        )
     await db.commit()
     return redirect_with_admin_msg("msg_archive_saved")
 

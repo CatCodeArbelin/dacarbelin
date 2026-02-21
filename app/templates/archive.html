@@ -7,6 +7,8 @@
       <h4>{{ entry.title }}</h4>
       {% if entry.season %}<div class="text-contrast-muted mb-2">{{ entry.season }}</div>{% endif %}
       {% if entry.summary %}<p>{{ entry.summary }}</p>{% endif %}
+      {% if entry.champion_name %}<p><strong>Champion:</strong> {{ entry.champion_name }}</p>{% endif %}
+      {% if entry.bracket_payload %}<pre class="small">{{ entry.bracket_payload }}</pre>{% endif %}
       {% if entry.link_url %}<a href="{{ entry.link_url }}" target="_blank" rel="noopener">{{ tr('archive_open') }}</a>{% endif %}
     </div>
   </div>

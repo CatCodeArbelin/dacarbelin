@@ -81,6 +81,9 @@ class ArchiveEntry(Base):
     season: Mapped[str] = mapped_column(String(120), default="")
     summary: Mapped[str] = mapped_column(Text, default="")
     link_url: Mapped[str] = mapped_column(String(512), default="")
+    champion_name: Mapped[str] = mapped_column(String(120), default="")
+    bracket_payload: Mapped[str] = mapped_column(Text, default="")
+    is_published: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
 

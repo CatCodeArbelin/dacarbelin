@@ -19,6 +19,7 @@ class TournamentGroup(Base):
     schedule_text: Mapped[str] = mapped_column(String(120), default="TBD")
     current_game: Mapped[int] = mapped_column(Integer, default=1)
     is_started: Mapped[bool] = mapped_column(Boolean, default=False)
+    draw_mode: Mapped[str] = mapped_column(String(20), default="auto")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     members: Mapped[list["GroupMember"]] = relationship("GroupMember", back_populates="group", cascade="all, delete-orphan")
@@ -78,6 +79,7 @@ class PlayoffStage(Base):
     stage_size: Mapped[int] = mapped_column(Integer)
     stage_order: Mapped[int] = mapped_column(Integer, index=True)
     scoring_mode: Mapped[str] = mapped_column(String(32), default="standard")
+    stage_code: Mapped[str] = mapped_column(String(20), default="playoff")
     is_started: Mapped[bool] = mapped_column(Boolean, default=False)
     final_candidate_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
@@ -125,5 +127,7 @@ class PlayoffMatch(Base):
     schedule_text: Mapped[str] = mapped_column(String(120), default="TBD")
     state: Mapped[str] = mapped_column(String(20), default="pending")
     winner_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    manual_winner_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    manual_override_note: Mapped[str] = mapped_column(String(255), default="")
 
     stage: Mapped[PlayoffStage] = relationship("PlayoffStage", back_populates="matches")
