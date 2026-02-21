@@ -84,6 +84,58 @@ async def _resolve_vanity_by_profile_page(vanity: str) -> str | None:
     return match.group(1) if match else None
 
 
+async def fetch_steam_nickname(steam_id: str) -> str | None:
+    """Получает display name профиля Steam по Steam64 через API и fallback по странице профиля."""
+    nickname_by_api = await _fetch_steam_nickname_by_api(steam_id)
+    if nickname_by_api:
+        return nickname_by_api
+
+    return await _fetch_steam_nickname_by_profile_page(steam_id)
+
+
+async def _fetch_steam_nickname_by_api(steam_id: str) -> str | None:
+    if not settings.steam_api_key:
+        return None
+
+    url = "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/"
+    params = {"key": settings.steam_api_key, "steamids": steam_id}
+    async with httpx.AsyncClient(timeout=15) as client:
+        response = await client.get(url, params=params)
+
+    if response.status_code != 200:
+        return None
+
+    players = response.json().get("response", {}).get("players", [])
+    if not players:
+        return None
+
+    personaname = players[0].get("personaname")
+    return personaname if isinstance(personaname, str) and personaname.strip() else None
+
+
+async def _fetch_steam_nickname_by_profile_page(steam_id: str) -> str | None:
+    profile_url = f"https://steamcommunity.com/profiles/{steam_id}/?xml=1"
+    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+        response = await client.get(profile_url)
+
+    if response.status_code != 200:
+        return None
+
+    xml_match = re.search(r"<steamID><!\[CDATA\[(.*?)\]\]></steamID>", response.text, flags=re.DOTALL)
+    if xml_match:
+        nickname = xml_match.group(1).strip()
+        if nickname:
+            return nickname
+
+    title_match = re.search(r"<title>(.*?)</title>", response.text, flags=re.IGNORECASE | re.DOTALL)
+    if title_match:
+        nickname = re.sub(r"\s*-\s*Steam\s*Community\s*$", "", title_match.group(1), flags=re.IGNORECASE).strip()
+        if nickname:
+            return nickname
+
+    return None
+
+
 def _extract_profile_id_from_url(value: str) -> str | None:
     # Извлекаем vanity или steam64 из steamcommunity URL.
     if "steamcommunity.com" not in value:
@@ -127,8 +179,15 @@ async def fetch_autochess_data(steam_id: str) -> dict:
     highest_mmr = int(user_info.get(max_keys[0], 0)) if max_keys else current_mmr
     queen_rank = int(user_info.get("queen_rank", 0)) or None
 
+    game_nickname = user_info.get("name")
+    if not isinstance(game_nickname, str) or not game_nickname.strip():
+        game_nickname = await fetch_steam_nickname(steam_id)
+
+    if not game_nickname:
+        game_nickname = steam_id
+
     return {
-        "game_nickname": user_info.get("name") or user_info.get("steam_id") or steam_id,
+        "game_nickname": game_nickname,
         "current_rank": mmr_to_rank(current_mmr, queen_rank),
         "highest_rank": mmr_to_rank(highest_mmr, queen_rank),
         "raw": user_info,
