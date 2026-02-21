@@ -168,9 +168,10 @@
       <div class="border rounded p-3 mb-3">
         <div class="d-flex justify-content-between align-items-center">
           <strong>{{ group.name }} ({{ tr('tournament_game') }} {{ group.current_game }})</strong>
-          <form action="/admin/group/password" method="post" class="d-flex gap-2">
+          <form action="/admin/group/password" method="post" class="d-flex gap-2 align-items-center">
             <input type="hidden" name="group_id" value="{{ group.id }}">
-            <input class="form-control form-control-sm" style="width:120px" name="password" value="{{ group.lobby_password }}">
+            <input class="form-control form-control-sm js-group-password" style="width:120px" name="password" value="{{ group.lobby_password }}" pattern="[0-9]{4}" inputmode="numeric" maxlength="4" title="4 digits">
+            <button type="button" class="btn btn-sm btn-outline-secondary js-generate-pin">{{ tr('admin_generate_pin') }}</button>
             <button class="btn btn-sm btn-outline-info">{{ tr('admin_save_pw') }}</button>
           </form>
         </div>
@@ -241,5 +242,16 @@
     </div>
   </div>
 </div>
+
+<script>
+document.querySelectorAll('.js-generate-pin').forEach((button) => {
+  button.addEventListener('click', () => {
+    const form = button.closest('form');
+    const input = form?.querySelector('.js-group-password');
+    if (!input) return;
+    input.value = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+  });
+});
+</script>
 
 {% endblock %}

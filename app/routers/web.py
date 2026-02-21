@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Form, Query, Request
@@ -555,7 +556,12 @@ async def admin_group_password(
     group = await db.scalar(select(TournamentGroup).where(TournamentGroup.id == group_id))
     if not group:
         return redirect_with_admin_msg("msg_group_not_found")
-    group.lobby_password = (password or "0000")[:4].rjust(4, "0")
+
+    normalized_password = (password or "").strip()
+    if not re.fullmatch(r"^[0-9]{4}$", normalized_password):
+        return redirect_with_admin_msg("msg_invalid_lobby_password")
+
+    group.lobby_password = normalized_password
     await db.commit()
     return redirect_with_admin_msg("msg_lobby_password_updated")
 
