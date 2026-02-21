@@ -41,7 +41,7 @@ async def clear_group_stage(db: AsyncSession) -> None:
 
 
 async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
-    """Создает автоматическую жеребьевку по 8 игроков на группу для стартового этапа."""
+    """Создает автоматическую жеребьевку в формате 7x8 для стартового этапа."""
     users = list(
         (
             await db.scalars(
@@ -51,12 +51,10 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
             )
         ).all()
     )
-    if len(users) < 64:
-        return False, "ДОСТУПНА ТОЛЬКО РУЧНАЯ Жеребьевка, т.к. количество участников в основных корзинах меньше 64"
+    if len(users) < 56:
+        return False, "ДОСТУПНА ТОЛЬКО РУЧНАЯ Жеребьевка: нужно минимум 56 валидных участников (формат 7x8)"
 
-    expected_group_count = min(len(users) // 8, 8)
-    if expected_group_count <= 0:
-        return False, "ДОСТУПНА ТОЛЬКО РУЧНАЯ Жеребьевка, т.к. невозможно сформировать группы по 8 участников"
+    expected_group_count = 7
 
     try:
         await clear_group_stage(db)
@@ -91,16 +89,16 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
             unique_ids = {player.id for player in picked}
             if len(picked) != 8 or len(unique_ids) != 8:
                 raise ValueError(
-                    "Не удалось собрать 8 уникальных участников для группы. "
+                    "Не удалось собрать 8 уникальных участников для группы в формате 7x8. "
                     "Доступна только ручная жеребьевка."
                 )
 
             assigned_by_group.append(picked)
 
         assigned_players_count = sum(len(group_players) for group_players in assigned_by_group)
-        if len(assigned_by_group) != expected_group_count or assigned_players_count != expected_group_count * 8:
+        if len(assigned_by_group) != 7 or assigned_players_count != 56:
             raise ValueError(
-                "Итоговое количество групп и участников не соответствует формату автоматической жеребьевки. "
+                "Итоговая автожеребьевка невалидна: требуется ровно 7 групп и 56 назначенных участников (7x8). "
                 "Доступна только ручная жеребьевка."
             )
 
