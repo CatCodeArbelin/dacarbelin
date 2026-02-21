@@ -281,22 +281,20 @@ async def participants(
     selected_pair = basket_to_pair.get(basket, basket_pairs[0])
     main_basket, reserve_basket = selected_pair
 
-    def is_direct_invite_stage_2(user: User) -> bool:
-        if not user.extra_data:
-            return False
-        try:
-            extra_data = json.loads(user.extra_data)
-        except json.JSONDecodeError:
-            return False
-        return bool(extra_data.get("direct_invite_stage_2") or extra_data.get("direct_invite_stage2"))
-
     direct_invite_users: list[User] = []
 
     if view == "direct_invites":
         invited_users = (
-            await db.scalars(select(User).where(User.basket == Basket.INVITED.value).order_by(User.created_at))
+            await db.scalars(
+                select(User)
+                .where(
+                    User.basket == Basket.INVITED.value,
+                    User.direct_invite_stage == "stage_2",
+                )
+                .order_by(User.created_at)
+            )
         ).all()
-        direct_invite_users = [user for user in invited_users if is_direct_invite_stage_2(user)]
+        direct_invite_users = list(invited_users)
         main_users = []
         reserve_users = []
     else:
