@@ -56,8 +56,9 @@
               <td>{{ user.nickname }}</td>
               <td>{{ user.steam_id }}</td>
               <td>{{ user.highest_rank }}</td>
+              <td>{{ user.basket }}</td>
               <td>{{ user.direct_invite_stage or '-' }}</td>
-              <td colspan="2">
+              <td>
                 <form action="/admin/user/basket" method="post" class="d-flex gap-2">
                   <input type="hidden" name="user_id" value="{{ user.id }}">
                   <select class="form-select form-select-sm" name="basket">
