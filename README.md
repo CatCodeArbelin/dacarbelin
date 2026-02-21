@@ -103,14 +103,14 @@ git pull
 docker compose up -d --build
 ```
 
-## Быстрое заполнение 64 участниками (для теста жеребьевки)
+## Быстрое заполнение турнира: 56 обычных + 11 direct invite
 
-Скрипт `scripts/seed_64_participants.py` требует переменные окружения `DATABASE_URL` и `ADMIN_KEY`.
+Скрипт `scripts/seed_tournament_56_plus_11.py` требует переменные окружения `DATABASE_URL` и `ADMIN_KEY`.
 
 Предпочтительный вариант (внутри контейнера `web`, где env уже подхватывается из `.env`):
 
 ```bash
-docker compose exec web python scripts/seed_64_participants.py
+docker compose exec web python scripts/seed_tournament_56_plus_11.py
 ```
 
 Локальный запуск из venv (с предварительным экспортом env-переменных):
@@ -118,10 +118,10 @@ docker compose exec web python scripts/seed_64_participants.py
 ```bash
 export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/dac
 export ADMIN_KEY=local_seed_admin_key
-python scripts/seed_64_participants.py
+python scripts/seed_tournament_56_plus_11.py
 ```
 
-Скрипт добавляет 64 уникальных участника с рандомными никами, MMR/рангами и корзинами.
+Скрипт добавляет 56 обычных уникальных участников с рандомными никами, MMR/рангами и корзинами, а также 11 direct invite участников (`basket=invited`, `direct_invite_stage=stage_2`).
 
 ## План следующих итераций
 - **Итерация 3:** ручная жеребьевка с drag/drop и замены игроков в группах.
