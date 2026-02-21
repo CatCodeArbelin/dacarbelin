@@ -2,7 +2,15 @@ body { background: #08090d; }
 .neon-border-blue { border: 1px solid #00b7ff !important; box-shadow: 0 0 8px #00b7ff66; }
 .neon-border-red { border: 1px solid #ff2d55 !important; box-shadow: 0 0 8px #ff2d5566; }
 .card { border-radius: 12px; }
-.chat-box { max-height: 260px; overflow-y: auto; border-top: 1px dashed #555; padding-top: 8px; }
+.chat-box { max-height: 260px; overflow-y: auto; border-top: 1px dashed #555; padding-top: 8px; color: #f5f8ff; }
+.chat-box strong { color: #ffffff; }
+.neon-text-outline {
+  color: #ffffff !important;
+  text-shadow:
+    0 0 2px rgba(255, 255, 255, 0.95),
+    0 0 6px rgba(0, 183, 255, 0.8),
+    0 0 14px rgba(0, 183, 255, 0.55);
+}
 
 /* Semantic helpers for highly readable text on dark backgrounds */
 .text-contrast-high { color: #f5f8ff !important; }

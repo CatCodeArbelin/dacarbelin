@@ -90,11 +90,11 @@ docker compose ps
 docker compose logs -f web
 ```
 
-Приложение доступно по адресу: `http://<host>:8000/`.
+Приложение доступно по адресу: `http://0.0.0.0:8000/`.
 
 Админка:
-- Основной вход: `http://<host>:8000/admin?admin_key=admin_2026_super_secret`
-- Резервный вход через форму: `http://<host>:8000/admin/login`
+- Основной вход: `http://0.0.0.0:8000/admin?admin_key=admin_2026_super_secret`
+- Резервный вход через форму: `http://0.0.0.0:8000/admin/login`
 
 ### 5) Обновление версии
 
