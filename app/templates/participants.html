@@ -2,15 +2,30 @@
 {% block content %}
 <h2>{{ tr('participants_title') }}</h2>
 <div class="mb-3 d-flex flex-wrap gap-2">
-{% for main_basket, reserve_basket in basket_pairs %}
-<a class="btn btn-sm {% if basket == main_basket %}btn-danger{% else %}btn-outline-light{% endif %}" href="/participants?basket={{ main_basket }}">{{ main_basket }} + {{ reserve_basket }}</a>
-{% endfor %}
+<a class="btn btn-sm {% if view == 'baskets' %}btn-danger{% else %}btn-outline-light{% endif %}" href="/participants?view=baskets&basket={{ basket }}">{{ tr('participants_baskets_filter') }}</a>
+<a class="btn btn-sm {% if view == 'direct_invites' %}btn-danger{% else %}btn-outline-light{% endif %}" href="/participants?view=direct_invites">{{ tr('participants_direct_invites_filter') }}</a>
 </div>
 
+{% if view == 'baskets' %}
+<div class="mb-3 d-flex flex-wrap gap-2">
+{% for main_basket, reserve_basket in basket_pairs %}
+<a class="btn btn-sm {% if basket == main_basket %}btn-danger{% else %}btn-outline-light{% endif %}" href="/participants?view=baskets&basket={{ main_basket }}">{{ main_basket }} + {{ reserve_basket }}</a>
+{% endfor %}
+</div>
+{% endif %}
+
 {% if is_empty %}
-<div class="alert alert-secondary">Еще никто не зарегистрировался</div>
+<div class="alert alert-secondary">{{ tr('participants_empty') }}</div>
+{% elif view == 'direct_invites' %}
+<h4>{{ tr('participants_direct_invites_title') }}</h4>
+<table class="table table-dark table-striped">
+<tr><th>{{ tr('participants_nick') }}</th><th>{{ tr('participants_steam_id') }}</th><th>{{ tr('participants_game') }}</th><th>{{ tr('participants_current') }}</th><th>{{ tr('participants_highest') }}</th><th>{{ tr('participants_telegram') }}</th><th>{{ tr('participants_discord') }}</th></tr>
+{% for u in direct_invite_users %}
+<tr><td>{{u.nickname}}</td><td>{{u.steam_id}}</td><td>{{u.game_nickname}}</td><td>{{u.current_rank}}</td><td>{{u.highest_rank}}</td><td>{{u.telegram or ''}}</td><td>{{u.discord or ''}}</td></tr>
+{% endfor %}
+</table>
 {% else %}
-<h4>Основной состав</h4>
+<h4>{{ tr('participants_main_roster_title') }}</h4>
 {% if main_users %}
 <table class="table table-dark table-striped">
 <tr><th>{{ tr('participants_nick') }}</th><th>{{ tr('participants_steam_id') }}</th><th>{{ tr('participants_game') }}</th><th>{{ tr('participants_current') }}</th><th>{{ tr('participants_highest') }}</th><th>{{ tr('participants_telegram') }}</th><th>{{ tr('participants_discord') }}</th></tr>
@@ -19,10 +34,10 @@
 {% endfor %}
 </table>
 {% else %}
-<div class="alert alert-secondary">В данной корзине нет участников</div>
+<div class="alert alert-secondary">{{ tr('participants_empty') }}</div>
 {% endif %}
 
-<h4>Резерв</h4>
+<h4>{{ tr('participants_reserve_roster_title') }}</h4>
 {% if reserve_users %}
 <table class="table table-dark table-striped">
 <tr><th>{{ tr('participants_nick') }}</th><th>{{ tr('participants_steam_id') }}</th><th>{{ tr('participants_game') }}</th><th>{{ tr('participants_current') }}</th><th>{{ tr('participants_highest') }}</th><th>{{ tr('participants_telegram') }}</th><th>{{ tr('participants_discord') }}</th></tr>
@@ -31,7 +46,7 @@
 {% endfor %}
 </table>
 {% else %}
-<div class="alert alert-secondary">В данной корзине нет участников</div>
+<div class="alert alert-secondary">{{ tr('participants_empty') }}</div>
 {% endif %}
 {% endif %}
 {% endblock %}
