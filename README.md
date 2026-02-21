@@ -38,7 +38,8 @@
    docker compose up --build
    ```
 4. Откройте: `http://0.0.0.0:8000/`
-5. Админка: `http://0.0.0.0:8000/admin/login` (введите `ADMIN_KEY`, после входа выставляется signed cookie `admin_session`).
+5. Админка (базовый поток): `http://0.0.0.0:8000/admin?admin_key=YOUR_ADMIN_KEY` (при валидном ключе автоматически создается signed cookie `admin_session` и выполняется редирект на `/admin`).
+6. Запасной путь: `http://0.0.0.0:8000/admin/login` (ручной ввод `ADMIN_KEY` через форму).
 
 ## План следующих итераций
 - **Итерация 3:** ручная жеребьевка с drag/drop и замены игроков в группах.
@@ -77,13 +78,14 @@ docker compose up -d --build
 
 ### Рекомендации для production
 - Поставьте reverse proxy (Nginx) и SSL (Let's Encrypt).
-- Используйте сложные `ADMIN_KEY` и `SECRET_KEY`; доступ к `/admin/*` только через login/logout и signed session cookie.
+- Используйте сложные `ADMIN_KEY` и `SECRET_KEY`; доступ к `/admin/*` только через валидную admin-сессию (через ссылку с `admin_key` или через `/admin/login`) и signed session cookie.
 - Дополнительно ограничьте доступ к `/admin` по IP через reverse proxy.
 - Настройте регулярные backup базы PostgreSQL.
 
 ## Безопасный доступ к админке
 1. В `.env` задайте сложные значения `ADMIN_KEY` и `SECRET_KEY` (не оставляйте `change_me`).
-2. Перейдите на `/admin/login` и отправьте `ADMIN_KEY` через POST-форму.
-3. При успешной проверке приложение создаст signed cookie `admin_session` (подпись на базе `SECRET_KEY`).
-4. Все `/admin/*` endpoints доступны только при активной сессии; `admin_key` больше не передается в query/form.
-5. Для завершения сессии используйте `/admin/logout` (доступны GET и POST).
+2. Базовый вход в админку: откройте `http://0.0.0.0:8000/admin?admin_key=YOUR_ADMIN_KEY`.
+3. Если `admin_key` валиден, приложение создаст signed cookie `admin_session` (подпись на базе `SECRET_KEY`) и редиректнет на `/admin` без query-параметра.
+4. Если `admin_key` невалиден и активной сессии нет, доступ к `/admin` будет отклонен.
+5. Запасной путь остаётся доступным: `/admin/login` (POST-форма с `ADMIN_KEY`).
+6. Для завершения сессии используйте `/admin/logout` (доступны GET и POST).
