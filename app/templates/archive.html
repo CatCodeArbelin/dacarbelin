@@ -5,7 +5,7 @@
   <div class="card bg-black neon-border-blue mb-3">
     <div class="card-body">
       <h4>{{ entry.title }}</h4>
-      {% if entry.season %}<div class="text-secondary mb-2">{{ entry.season }}</div>{% endif %}
+      {% if entry.season %}<div class="text-contrast-muted mb-2">{{ entry.season }}</div>{% endif %}
       {% if entry.summary %}<p>{{ entry.summary }}</p>{% endif %}
       {% if entry.link_url %}<a href="{{ entry.link_url }}" target="_blank" rel="noopener">{{ tr('archive_open') }}</a>{% endif %}
     </div>

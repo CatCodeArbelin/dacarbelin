@@ -99,35 +99,35 @@
   <div class="col-lg-8">
     <div class="card bg-black neon-border-red"><div class="card-body">
       <h4>{{ tr('admin_content_blocks') }}</h4>
-      <p class="small text-secondary mb-2">{{ tr('donate_links') }}: <code>title|url|active(1/0)</code></p>
+      <p class="small text-contrast-muted mb-2">{{ tr('donate_links') }}: <code>title|url|active(1/0)</code></p>
       <form action="/admin/donation-links" method="post" class="mb-3">
         <textarea class="form-control" name="items" rows="4">{% for row in donation_links %}{{ row.title }}|{{ row.url }}|{{ 1 if row.is_active else 0 }}{% if not loop.last %}
 {% endif %}{% endfor %}</textarea>
         <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_links') }}</button>
       </form>
 
-      <p class="small text-secondary mb-2">{{ tr('admin_save_donation_methods') }}: <code>card/crypto|label|details|active(1/0)</code></p>
+      <p class="small text-contrast-muted mb-2">{{ tr('admin_save_donation_methods') }}: <code>card/crypto|label|details|active(1/0)</code></p>
       <form action="/admin/donation-methods" method="post" class="mb-3">
         <textarea class="form-control" name="items" rows="4">{% for row in donation_methods %}{{ row.method_type }}|{{ row.label }}|{{ row.details }}|{{ 1 if row.is_active else 0 }}{% if not loop.last %}
 {% endif %}{% endfor %}</textarea>
         <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_methods') }}</button>
       </form>
 
-      <p class="small text-secondary mb-2">{{ tr('donate_prize_pool') }}: <code>place|reward</code></p>
+      <p class="small text-contrast-muted mb-2">{{ tr('donate_prize_pool') }}: <code>place|reward</code></p>
       <form action="/admin/prize-pool" method="post" class="mb-3">
         <textarea class="form-control" name="items" rows="4">{% for row in prize_pool_entries %}{{ row.place_label }}|{{ row.reward }}{% if not loop.last %}
 {% endif %}{% endfor %}</textarea>
         <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_prize_pool') }}</button>
       </form>
 
-      <p class="small text-secondary mb-2">{{ tr('donate_donors') }}: <code>name|amount|message</code></p>
+      <p class="small text-contrast-muted mb-2">{{ tr('donate_donors') }}: <code>name|amount|message</code></p>
       <form action="/admin/donors" method="post" class="mb-3">
         <textarea class="form-control" name="items" rows="4">{% for row in donors %}{{ row.name }}|{{ row.amount }}|{{ row.message }}{% if not loop.last %}
 {% endif %}{% endfor %}</textarea>
         <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donors') }}</button>
       </form>
 
-      <p class="small text-secondary mb-2">{{ tr('archive_title') }}: <code>title|season|summary|url</code></p>
+      <p class="small text-contrast-muted mb-2">{{ tr('archive_title') }}: <code>title|season|summary|url</code></p>
       <form action="/admin/archive" method="post" class="mb-3">
         <textarea class="form-control" name="items" rows="4">{% for row in archive_entries %}{{ row.title }}|{{ row.season }}|{{ row.summary }}|{{ row.link_url }}{% if not loop.last %}
 {% endif %}{% endfor %}</textarea>
@@ -140,7 +140,7 @@
       <form action="/admin/draw/auto" method="post" class="mb-3">
         <button class="btn btn-danger">{{ tr('admin_auto_draw') }}</button>
       </form>
-      <p class="small text-secondary">{{ score_hint }}</p>
+      <p class="small text-contrast-muted">{{ score_hint }}</p>
 
       <h5 class="mt-3">{{ tr('admin_group_manual_controls') }}</h5>
       <form action="/admin/group/create" method="post" class="row g-2 mb-3">

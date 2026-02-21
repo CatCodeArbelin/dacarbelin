@@ -14,7 +14,7 @@
         <div class="card-body">
           <h4>{{ group.name }} · {{ tr('tournament_game') }} {{ group.current_game }} · {{ tr('tournament_schedule') }}: {{ group.schedule_text or tr('tournament_tbd') }}</h4>
           <div>{{ tr('tournament_lobby_pw') }}: <span class="text-info">{{ group.lobby_password }}</span> · {{ tr('tournament_schedule') }}: <span class="text-warning">{{ group.schedule_text or tr('tournament_tbd') }}</span></div>
-          <div class="small text-secondary mt-2">{{ tr('tournament_roster') }}: {% for member in group.members|sort(attribute='seat') %}#{{ member.seat }} · {{ member.user.nickname }} ({{ tr('tournament_id') }} {{ member.user_id }}){% if not loop.last %}; {% endif %}{% endfor %}</div>
+          <div class="small text-contrast-muted mt-2">{{ tr('tournament_roster') }}: {% for member in group.members|sort(attribute='seat') %}#{{ member.seat }} · {{ member.user.nickname }} ({{ tr('tournament_id') }} {{ member.user_id }}){% if not loop.last %}; {% endif %}{% endfor %}</div>
           <table class="table table-dark table-sm mt-3">
             <tr><th>#</th><th>{{ tr('participants_nick') }}</th><th>{{ tr('participants_highest') }}</th><th>{{ tr('tournament_pts') }}</th><th>{{ tr('tournament_wins_short') }}</th><th>{{ tr('tournament_top4') }}</th></tr>
             {% for member in standings[group.id] %}
@@ -47,8 +47,8 @@
         <h4>{{ stage.title }}</h4>
         <span class="badge {{ 'bg-success' if stage.is_started else 'bg-secondary' }}">{{ tr('tournament_started') if stage.is_started else tr('tournament_pending') }}</span>
       </div>
-      <p class="small text-secondary mb-1">{{ tr('tournament_scoring_mode') }}: {{ stage.scoring_mode }}{% if stage.scoring_mode == 'final_22_top1' %} ({{ tr('tournament_final_22_hint') }}){% endif %}</p>
-      <p class="small text-secondary">{{ tr('tournament_matches') }}: {{ stage.matches|length }} · {{ tr('tournament_players') }}: {{ stage.participants|length }}</p>
+      <p class="small text-contrast-muted mb-1">{{ tr('tournament_scoring_mode') }}: {{ stage.scoring_mode }}{% if stage.scoring_mode == 'final_22_top1' %} ({{ tr('tournament_final_22_hint') }}){% endif %}</p>
+      <p class="small text-contrast-muted">{{ tr('tournament_matches') }}: {{ stage.matches|length }} · {{ tr('tournament_players') }}: {{ stage.participants|length }}</p>
       <div class="row g-3">
         <div class="col-lg-6">
           <h6>{{ tr('tournament_standings') }}</h6>
