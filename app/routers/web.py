@@ -561,6 +561,7 @@ async def admin_invite_user(
     nickname: str = Form(...),
     telegram: str = Form(default=""),
     discord: str = Form(default=""),
+    invite_type: str = Form(default="regular"),
     db: AsyncSession = Depends(get_db),
 ):
     # Добавляем участника вручную в корзину invited.
@@ -573,6 +574,13 @@ async def admin_invite_user(
         return redirect_with_admin_msg("msg_user_exists")
 
     profile = await fetch_autochess_data(steam_id)
+    direct_invite_stage = "stage_2" if invite_type == "stage_2" else None
+    if direct_invite_stage:
+        direct_invite_count = await db.scalar(
+            select(func.count(User.id)).where(User.direct_invite_stage == direct_invite_stage)
+        )
+        if (direct_invite_count or 0) >= 11:
+            return redirect_with_admin_msg("msg_operation_failed")
     user = User(
         nickname=nickname,
         steam_input=steam_input,
@@ -583,6 +591,7 @@ async def admin_invite_user(
         telegram=telegram or None,
         discord=discord or None,
         basket=Basket.INVITED.value,
+        direct_invite_stage=direct_invite_stage,
         extra_data=json.dumps(profile["raw"], ensure_ascii=False),
     )
     db.add(user)

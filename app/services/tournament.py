@@ -437,6 +437,8 @@ PLAYOFF_STAGE_SEQUENCE = [
     ("stage_final", "Final", 8, "final_22_top1"),
 ]
 FINAL_SCORING_MODE = "final_22_top1"
+DIRECT_INVITE_STAGE_2 = "stage_2"
+STAGE_2_DIRECT_INVITES_LIMIT = 11
 
 
 def get_playoff_stage_blueprint(usable_count: int) -> list[tuple[str, str, int, str]]:
@@ -483,6 +485,27 @@ def get_promoted_count_for_stage(stage: PlayoffStage) -> int:
 
 def get_stage_group_number_by_seed(seed: int) -> int:
     return ((seed - 1) // 8) + 1
+
+
+def build_stage_2_player_ids(stage_1_promoted_ids: list[int], direct_invite_ids: list[int]) -> list[int]:
+    if len(stage_1_promoted_ids) != 21:
+        raise ValueError("Во II этап должны проходить ровно 21 участник из I этапа")
+    if len(direct_invite_ids) > STAGE_2_DIRECT_INVITES_LIMIT:
+        raise ValueError("Нельзя превысить 11 прямых инвайтов во II этап")
+    if len(direct_invite_ids) < STAGE_2_DIRECT_INVITES_LIMIT:
+        raise ValueError("Для II этапа требуется ровно 11 прямых инвайтов")
+
+    promoted_set = set(stage_1_promoted_ids)
+    direct_set = set(direct_invite_ids)
+    if len(promoted_set) != len(stage_1_promoted_ids) or len(direct_set) != len(direct_invite_ids):
+        raise ValueError("В списках участников обнаружены дубликаты")
+    if promoted_set.intersection(direct_set):
+        raise ValueError("Игрок не может быть одновременно прошедшим и прямым инвайтом")
+
+    stage_2_player_ids = [*stage_1_promoted_ids, *direct_invite_ids]
+    if len(stage_2_player_ids) != 32:
+        raise ValueError("Во II этапе должно быть ровно 32 участника")
+    return stage_2_player_ids
 
 
 def split_participants_by_group(participants: list[PlayoffParticipant]) -> dict[int, list[PlayoffParticipant]]:
@@ -706,7 +729,24 @@ async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int
         group_ranked = sorted(stage_grouped[group_number], key=playoff_sort_key, reverse=True)
         top_players.extend(group_ranked[:per_group_limit])
 
-    if len(top_players) < target_size:
+    if stage.key == "stage_1_8":
+        direct_invite_users = list(
+            (
+                await db.scalars(
+                    select(User.id)
+                    .where(User.direct_invite_stage == DIRECT_INVITE_STAGE_2)
+                    .order_by(User.created_at)
+                )
+            ).all()
+        )
+        stage_2_player_ids = build_stage_2_player_ids(
+            [participant.user_id for participant in top_players],
+            direct_invite_users,
+        )
+        selected_participants_by_id = {participant.user_id: participant for participant in participants}
+        top_players = [selected_participants_by_id[player_id] for player_id in stage_2_player_ids if player_id in selected_participants_by_id]
+        invited_ids = [player_id for player_id in stage_2_player_ids if player_id not in selected_participants_by_id]
+    elif len(top_players) < target_size:
         selected_ids = {participant.user_id for participant in top_players}
         for participant in ranked:
             if participant.user_id not in selected_ids:
@@ -714,14 +754,27 @@ async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int
                 selected_ids.add(participant.user_id)
             if len(top_players) >= target_size:
                 break
+        invited_ids = []
     else:
         top_players = sorted(top_players, key=playoff_sort_key, reverse=True)[:target_size]
+        invited_ids = []
 
     await db.execute(delete(PlayoffParticipant).where(PlayoffParticipant.stage_id == next_stage.id))
-    for seed, participant in enumerate(top_players, start=1):
+    seed = 1
+    for participant in top_players:
         db.add(PlayoffParticipant(stage_id=next_stage.id, user_id=participant.user_id, seed=seed))
         participant.is_eliminated = False
-    promoted_ids = {participant.user_id for participant in top_players}
+        seed += 1
+    if stage.key == "stage_1_8":
+        for invited_id in invited_ids:
+            db.add(PlayoffParticipant(stage_id=next_stage.id, user_id=invited_id, seed=seed))
+            seed += 1
+    if stage.key == "stage_1_8":
+        promoted_ids = {participant.user_id for participant in top_players}
+        for invited_id in invited_ids:
+            promoted_ids.add(invited_id)
+    else:
+        promoted_ids = {participant.user_id for participant in top_players}
     for participant in ranked:
         participant.is_eliminated = participant.user_id not in promoted_ids
     await db.commit()

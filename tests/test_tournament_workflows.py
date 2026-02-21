@@ -1,6 +1,8 @@
 import unittest
 
 from app.services.tournament import (
+    build_stage_2_player_ids,
+    get_stage_group_number_by_seed,
     get_group_count_for_stage,
     get_playoff_stage_blueprint,
     parse_manual_draw_user_ids,
@@ -36,6 +38,30 @@ class TournamentWorkflowTests(unittest.TestCase):
         self.assertEqual(get_group_count_for_stage(32), 4)
         self.assertEqual(get_group_count_for_stage(16), 2)
         self.assertEqual(get_group_count_for_stage(8), 1)
+
+    def test_stage_2_players_formed_as_21_plus_11(self) -> None:
+        promoted = list(range(1, 22))
+        direct_invites = list(range(101, 112))
+
+        stage_2_player_ids = build_stage_2_player_ids(promoted, direct_invites)
+
+        self.assertEqual(len(stage_2_player_ids), 32)
+        self.assertEqual(get_group_count_for_stage(len(stage_2_player_ids)), 4)
+
+        group_sizes: dict[int, int] = {}
+        for seed in range(1, len(stage_2_player_ids) + 1):
+            group_number = get_stage_group_number_by_seed(seed)
+            group_sizes[group_number] = group_sizes.get(group_number, 0) + 1
+        self.assertEqual(group_sizes, {1: 8, 2: 8, 3: 8, 4: 8})
+
+    def test_stage_2_players_validation_for_limit_and_duplicates(self) -> None:
+        promoted = list(range(1, 22))
+
+        with self.assertRaises(ValueError):
+            build_stage_2_player_ids(promoted, list(range(101, 113)))
+
+        with self.assertRaises(ValueError):
+            build_stage_2_player_ids(promoted, [21, *range(101, 111)])
 
 
 if __name__ == "__main__":
