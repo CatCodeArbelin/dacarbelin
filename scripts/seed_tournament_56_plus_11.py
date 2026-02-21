@@ -28,7 +28,7 @@ def _rank_from_mmr(mmr: int) -> str:
 
 
 async def main() -> None:
-    """Создает 64 тестовых участника с рандомными никами, рангами и корзинами."""
+    """Создает 56 обычных и 11 direct invite участников."""
     os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/dac")
     os.environ.setdefault("ADMIN_KEY", "local_seed_admin_key")
 
@@ -41,13 +41,19 @@ async def main() -> None:
             )
         ).all()
         basket_counts = {name: count for name, count in basket_counts_rows}
+        existing_steam_ids = set((await db.execute(select(User.steam_id))).scalars().all())
 
-        created = 0
-        while created < 64:
-            steam_id = _random_steam_id()
-            exists = await db.scalar(select(User.id).where(User.steam_id == steam_id))
-            if exists:
-                continue
+        def next_unique_steam_id() -> str:
+            while True:
+                steam_id = _random_steam_id()
+                if steam_id in existing_steam_ids:
+                    continue
+                existing_steam_ids.add(steam_id)
+                return steam_id
+
+        regular_created = 0
+        while regular_created < 56:
+            steam_id = next_unique_steam_id()
 
             highest_mmr = random.randint(800, 4600)
             current_mmr = random.randint(600, highest_mmr)
@@ -57,7 +63,7 @@ async def main() -> None:
             basket = allocate_basket(target_basket=target_basket, basket_counts=basket_counts)
             basket_counts[basket] = basket_counts.get(basket, 0) + 1
 
-            player_index = created + 1
+            player_index = regular_created + 1
             user = User(
                 nickname=_random_nick(f"Player{player_index}"),
                 steam_input=steam_id,
@@ -70,11 +76,41 @@ async def main() -> None:
                 basket=basket,
             )
             db.add(user)
-            created += 1
+
+            regular_created += 1
+
+        direct_invites_created = 0
+        while direct_invites_created < 11:
+            steam_id = next_unique_steam_id()
+
+            highest_mmr = random.randint(800, 4600)
+            current_mmr = random.randint(600, highest_mmr)
+            highest_rank = _rank_from_mmr(highest_mmr)
+            current_rank = _rank_from_mmr(current_mmr)
+
+            invite_index = direct_invites_created + 1
+            user = User(
+                nickname=_random_nick(f"DirectInvite{invite_index}"),
+                steam_input=steam_id,
+                steam_id=steam_id,
+                game_nickname=_random_nick("InviteNick"),
+                current_rank=current_rank,
+                highest_rank=highest_rank,
+                telegram=f"@direct_invite_{invite_index}",
+                discord=f"direct_invite_{invite_index}",
+                basket="invited",
+                direct_invite_stage="stage_2",
+            )
+            db.add(user)
+            direct_invites_created += 1
 
         await db.commit()
 
-    print("Создано 64 тестовых участника.")
+    print(
+        "Сидер завершен: "
+        f"обычных участников создано {regular_created}, "
+        f"direct invites создано {direct_invites_created}."
+    )
 
 
 if __name__ == "__main__":
