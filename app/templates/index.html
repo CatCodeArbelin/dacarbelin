@@ -43,13 +43,13 @@
 
     <div id="chat" class="card bg-black neon-border-blue mt-4">
       <div class="card-body">
-        <h3>{{ tr('index_chat') }}</h3>
+        <h3 class="text-contrast-neon">{{ tr('index_chat') }}</h3>
         <form action="/chat/send" method="post" class="mb-3">
           {% if not chat_settings.is_enabled %}<div class="alert alert-warning">{{ tr('msg_chat_disabled_admin') }}</div>{% endif %}
           <input class="form-control mb-2" name="temp_nick" placeholder="{{ tr('index_temp_nick') }}" required>
           <textarea class="form-control mb-2" name="message" maxlength="{{ chat_settings.max_length }}" placeholder="{{ tr('index_message') }}" required {% if not chat_settings.is_enabled %}disabled{% endif %}></textarea>
           <button class="btn btn-primary" {% if not chat_settings.is_enabled %}disabled{% endif %}>{{ tr('index_connect_send') }}</button>
-          <div class="small text-secondary">{{ tr('index_cooldown') }}: {{ chat_settings.cooldown_seconds }} sec · {{ tr('index_max_length') }}: {{ chat_settings.max_length }}</div>
+          <div class="small text-contrast-muted">{{ tr('index_cooldown') }}: {{ chat_settings.cooldown_seconds }} sec · {{ tr('index_max_length') }}: {{ chat_settings.max_length }}</div>
         </form>
         <div class="chat-box">
           {% for msg in chat_messages %}

@@ -3,3 +3,13 @@ body { background: #08090d; }
 .neon-border-red { border: 1px solid #ff2d55 !important; box-shadow: 0 0 8px #ff2d5566; }
 .card { border-radius: 12px; }
 .chat-box { max-height: 260px; overflow-y: auto; border-top: 1px dashed #555; padding-top: 8px; }
+
+/* Semantic helpers for highly readable text on dark backgrounds */
+.text-contrast-high { color: #f5f8ff !important; }
+.text-contrast-neon { color: #f7fbff !important; text-shadow: 0 0 10px rgba(255, 255, 255, 0.24); }
+.text-contrast-muted { color: #d0d8e8 !important; }
+
+/* Bootstrap text-secondary is too dim on pure black cards. */
+.bg-black .text-secondary {
+  color: #d0d8e8 !important;
+}
