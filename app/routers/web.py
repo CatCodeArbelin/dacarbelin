@@ -261,9 +261,36 @@ async def send_chat(
 
 @router.get("/participants", response_class=HTMLResponse)
 async def participants(request: Request, basket: str = Query(Basket.QUEEN.value), db: AsyncSession = Depends(get_db)):
-    # Показываем участников по выбранной корзине.
-    users = (await db.scalars(select(User).where(User.basket == basket).order_by(User.created_at))).all()
-    return templates.TemplateResponse("participants.html", template_context(request, users=users, basket=basket))
+    # Показываем участников по паре корзин: основной состав + резерв.
+    basket_pairs = [
+        (Basket.QUEEN.value, Basket.QUEEN_RESERVE.value),
+        (Basket.KING.value, Basket.KING_RESERVE.value),
+        (Basket.ROOK.value, Basket.ROOK_RESERVE.value),
+        (Basket.BISHOP.value, Basket.BISHOP_RESERVE.value),
+        (Basket.LOW_RANK.value, Basket.LOW_RANK_RESERVE.value),
+    ]
+    basket_to_pair = {basket_name: pair for pair in basket_pairs for basket_name in pair}
+    selected_pair = basket_to_pair.get(basket, basket_pairs[0])
+    main_basket, reserve_basket = selected_pair
+
+    main_users = (
+        await db.scalars(select(User).where(User.basket == main_basket).order_by(User.created_at))
+    ).all()
+    reserve_users = (
+        await db.scalars(select(User).where(User.basket == reserve_basket).order_by(User.created_at))
+    ).all()
+
+    return templates.TemplateResponse(
+        "participants.html",
+        template_context(
+            request,
+            basket=main_basket,
+            basket_pairs=basket_pairs,
+            main_users=main_users,
+            reserve_users=reserve_users,
+            is_empty=not main_users and not reserve_users,
+        ),
+    )
 
 
 @router.get("/tournament", response_class=HTMLResponse)
