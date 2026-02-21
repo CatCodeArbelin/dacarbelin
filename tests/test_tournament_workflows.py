@@ -31,7 +31,15 @@ class TournamentWorkflowTests(unittest.TestCase):
         self.assertEqual([stage[3] for stage in stages_56], ["standard", "standard", "standard", "final_22_top1"])
 
         stages_32 = get_playoff_stage_blueprint(32)
-        self.assertEqual(stages_32, [])
+        self.assertEqual(
+            [stage[0] for stage in stages_32],
+            [
+                "stage_1_4",
+                "stage_semifinal_groups",
+                "stage_final",
+            ],
+        )
+        self.assertEqual([stage[2] for stage in stages_32], [32, 16, 8])
 
     def test_stage_group_counts_for_new_playoff_flow(self) -> None:
         self.assertEqual(get_group_count_for_stage(56), 7)
@@ -46,6 +54,8 @@ class TournamentWorkflowTests(unittest.TestCase):
         stage_2_player_ids = build_stage_2_player_ids(promoted, direct_invites)
 
         self.assertEqual(len(stage_2_player_ids), 32)
+        self.assertEqual(stage_2_player_ids[:21], promoted)
+        self.assertEqual(stage_2_player_ids[21:], direct_invites)
         self.assertEqual(get_group_count_for_stage(len(stage_2_player_ids)), 4)
 
         group_sizes: dict[int, int] = {}
