@@ -74,6 +74,23 @@ def _make_users(count: int) -> list[User]:
 
 
 class TournamentAutoDrawTests(unittest.IsolatedAsyncioTestCase):
+    async def test_create_auto_draw_accepts_exact_56_player_grid_7x8(self) -> None:
+        session = _FakeSession(users=_make_users(56))
+
+        ok, _message = await create_auto_draw(session)
+
+        self.assertTrue(ok)
+        groups = [obj for obj in session.added if isinstance(obj, TournamentGroup)]
+        members = [obj for obj in session.added if isinstance(obj, GroupMember)]
+
+        self.assertEqual(len(groups), 7)
+        self.assertEqual(len(members), 56)
+
+        members_by_group: dict[int, int] = {}
+        for member in members:
+            members_by_group[member.group_id] = members_by_group.get(member.group_id, 0) + 1
+        self.assertEqual(sorted(members_by_group.values()), [8, 8, 8, 8, 8, 8, 8])
+
     async def test_create_auto_draw_rejects_if_less_than_56_players(self) -> None:
         session = _FakeSession(users=_make_users(55))
 
