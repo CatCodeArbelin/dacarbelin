@@ -1,3 +1,5 @@
+"""Реализует основную бизнес-логику управления турниром и сеткой матчей."""
+
 import random
 from collections import defaultdict
 

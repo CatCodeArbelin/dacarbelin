@@ -1,3 +1,5 @@
+"""Определяет ORM-модель пользователя и связанные атрибуты аккаунта."""
+
 from datetime import datetime
 from enum import Enum
 

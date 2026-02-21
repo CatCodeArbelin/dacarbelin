@@ -1,3 +1,5 @@
+"""Проверяет сценарии прямых инвайтов участников между стадиями турнира."""
+
 import os
 
 from fastapi.testclient import TestClient

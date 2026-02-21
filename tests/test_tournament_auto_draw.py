@@ -1,3 +1,5 @@
+"""Проверяет автоматическую жеребьёвку и формирование пар в турнире."""
+
 import unittest
 
 from app.models.tournament import GroupMember, TournamentGroup

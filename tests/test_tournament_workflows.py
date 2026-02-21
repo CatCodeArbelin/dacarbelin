@@ -1,3 +1,5 @@
+"""Проверяет ключевые workflow-сценарии управления турниром."""
+
 import unittest
 
 from app.services.tournament import (

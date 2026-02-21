@@ -1,3 +1,5 @@
+"""Регистрирует ORM-модели в метаданных SQLAlchemy."""
+
 from app.models.chat import ChatMessage
 from app.models.settings import (
     ArchiveEntry,

@@ -1,3 +1,5 @@
+"""Содержит pytest-фикстуры и общую настройку тестового окружения."""
+
 import os
 import sys
 from pathlib import Path
