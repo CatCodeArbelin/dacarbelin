@@ -61,6 +61,34 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
+ALLOWED_USER_UPDATE_FIELDS = {"nickname", "basket", "direct_invite_stage"}
+ALLOWED_DIRECT_INVITE_STAGES = {None, "stage_2"}
+
+
+def _normalize_direct_invite_stage(raw_value: str | None) -> str | None:
+    value = (raw_value or "").strip() or None
+    if value not in ALLOWED_DIRECT_INVITE_STAGES:
+        raise ValueError("invalid direct invite stage")
+    return value
+
+
+def _validate_user_update_payload(nickname: str, basket: str, direct_invite_stage: str | None) -> dict[str, str | None]:
+    cleaned_nickname = nickname.strip()
+    if not cleaned_nickname or len(cleaned_nickname) > 120:
+        raise ValueError("invalid nickname")
+
+    allowed_baskets = {item.value for item in Basket}
+    if basket not in allowed_baskets:
+        raise ValueError("invalid basket")
+
+    normalized_stage = _normalize_direct_invite_stage(direct_invite_stage)
+    return {
+        "nickname": cleaned_nickname,
+        "basket": basket,
+        "direct_invite_stage": normalized_stage,
+    }
+
+
 def template_context(request: Request, **extra):
     lang = get_lang(request.cookies.get("lang"))
     context = {"request": request, "lang": lang, "tr": lambda key: t(lang, key)}
@@ -513,24 +541,70 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     )
 
 
+async def _update_user_allowed_fields(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    nickname: str,
+    basket: str,
+    direct_invite_stage: str | None,
+) -> RedirectResponse:
+    user = await db.get(User, user_id)
+    if not user:
+        return redirect_with_admin_msg("msg_operation_failed")
+
+    try:
+        validated_data = _validate_user_update_payload(
+            nickname=nickname,
+            basket=basket,
+            direct_invite_stage=direct_invite_stage,
+        )
+    except ValueError:
+        return redirect_with_admin_msg("msg_operation_failed")
+
+    for field_name, field_value in validated_data.items():
+        if field_name not in ALLOWED_USER_UPDATE_FIELDS:
+            continue
+        setattr(user, field_name, field_value)
+    await db.commit()
+    return redirect_with_admin_msg("msg_status_ok")
+
+
+@router.post("/admin/user/update")
+async def admin_update_user(
+    user_id: int = Form(...),
+    nickname: str = Form(...),
+    basket: str = Form(...),
+    direct_invite_stage: str | None = Form(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    # Атомарно обновляем разрешенные поля пользователя из админ-панели.
+    return await _update_user_allowed_fields(
+        db,
+        user_id=user_id,
+        nickname=nickname,
+        basket=basket,
+        direct_invite_stage=direct_invite_stage,
+    )
+
+
 @router.post("/admin/user/basket")
 async def admin_update_user_basket(
     user_id: int = Form(...),
     basket: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    # Обновляем корзину пользователя из админ-панели.
+    # Сохраняем обратную совместимость: обновление корзины делегируется общей логике.
     user = await db.get(User, user_id)
     if not user:
         return redirect_with_admin_msg("msg_operation_failed")
-
-    allowed_values = {item.value for item in Basket}
-    if basket not in allowed_values:
-        return redirect_with_admin_msg("msg_operation_failed")
-
-    user.basket = basket
-    await db.commit()
-    return redirect_with_admin_msg("msg_status_ok")
+    return await _update_user_allowed_fields(
+        db,
+        user_id=user_id,
+        nickname=user.nickname,
+        basket=basket,
+        direct_invite_stage=user.direct_invite_stage,
+    )
 
 
 @router.post("/admin/stage")

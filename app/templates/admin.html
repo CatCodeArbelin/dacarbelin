@@ -36,7 +36,7 @@
 
     <div class="card bg-black neon-border-red mt-4"><div class="card-body">
       <h4>{{ tr('admin_participants_list') }}</h4>
-      <div class="table-responsive" style="max-height: 360px; overflow:auto;">
+      <div class="table-responsive">
         <table class="table table-dark table-sm align-middle">
           <thead>
             <tr>
@@ -53,21 +53,29 @@
             {% for user in users %}
             <tr>
               <td>{{ user.id }}</td>
-              <td>{{ user.nickname }}</td>
+              <td>
+                <input class="form-control form-control-sm" form="user-update-{{ user.id }}" name="nickname" value="{{ user.nickname }}" maxlength="120" required>
+              </td>
               <td>{{ user.steam_id }}</td>
               <td>{{ user.highest_rank }}</td>
-              <td>{{ user.basket }}</td>
-              <td>{{ user.direct_invite_stage or '-' }}</td>
               <td>
-                <form action="/admin/user/basket" method="post" class="d-flex gap-2">
+                <select class="form-select form-select-sm" form="user-update-{{ user.id }}" name="basket">
+                  {% for basket in basket_values %}
+                  <option value="{{ basket }}" {% if user.basket == basket %}selected{% endif %}>{{ basket }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <select class="form-select form-select-sm" form="user-update-{{ user.id }}" name="direct_invite_stage">
+                  <option value="" {% if not user.direct_invite_stage %}selected{% endif %}>-</option>
+                  <option value="stage_2" {% if user.direct_invite_stage == 'stage_2' %}selected{% endif %}>stage_2</option>
+                </select>
+              </td>
+              <td>
+                <form id="user-update-{{ user.id }}" action="/admin/user/update" method="post" class="d-inline">
                   <input type="hidden" name="user_id" value="{{ user.id }}">
-                  <select class="form-select form-select-sm" name="basket">
-                    {% for basket in basket_values %}
-                    <option value="{{ basket }}" {% if user.basket == basket %}selected{% endif %}>{{ basket }}</option>
-                    {% endfor %}
-                  </select>
-                  <button class="btn btn-sm btn-outline-info">{{ tr('admin_save') }}</button>
                 </form>
+                <button class="btn btn-sm btn-outline-info" form="user-update-{{ user.id }}">{{ tr('admin_save') }}</button>
               </td>
             </tr>
             {% endfor %}
