@@ -13,7 +13,9 @@ app = FastAPI(title=settings.app_name)
 
 @app.middleware("http")
 async def admin_auth_middleware(request: Request, call_next):
-    if request.url.path == "/admin" and not is_admin_session(request.cookies.get(ADMIN_SESSION_COOKIE)):
+    normalized_path = request.url.path.rstrip("/") or "/"
+
+    if normalized_path == "/admin" and not is_admin_session(request.cookies.get(ADMIN_SESSION_COOKIE)):
         admin_key = request.query_params.get("admin_key")
         if admin_key and admin_key == settings.admin_key:
             response = RedirectResponse(url="/admin", status_code=303)
@@ -27,7 +29,7 @@ async def admin_auth_middleware(request: Request, call_next):
             return response
         return HTMLResponse("Forbidden", status_code=403)
 
-    if request.url.path.startswith("/admin") and request.url.path not in {"/admin/login", "/admin/logout"}:
+    if normalized_path.startswith("/admin") and normalized_path not in {"/admin/login", "/admin/logout"}:
         if not is_admin_session(request.cookies.get(ADMIN_SESSION_COOKIE)):
             if request.method == "GET":
                 return RedirectResponse(url="/admin/login", status_code=303)
