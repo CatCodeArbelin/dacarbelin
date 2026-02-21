@@ -124,7 +124,9 @@ pytest tests/test_tournament_auto_draw.py tests/test_tournament_workflows.py tes
 
 Скрипт `scripts/seed_tournament_56_plus_11.py` требует переменные окружения `DATABASE_URL` и `ADMIN_KEY`.
 
-Предпочтительный вариант (внутри контейнера `web`, где env уже подхватывается из `.env`):
+Предпочтительный вариант (внутри контейнера `web`, где env уже подхватывается из `.env`).
+
+> ⚠️ Выполняйте команду после `docker compose up --build` (или после `docker compose build web` + `docker compose up`), чтобы в контейнере уже была актуальная версия `scripts/`.
 
 ```bash
 docker compose exec web python scripts/seed_tournament_56_plus_11.py
