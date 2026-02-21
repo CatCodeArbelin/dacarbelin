@@ -435,6 +435,8 @@ PLAYOFF_STAGE_SEQUENCE = [
     ("stage_final", "Final", 8, "final_22_top1"),
 ]
 FINAL_SCORING_MODE = "final_22_top1"
+GROUP_STAGE_GAME_LIMIT = 3
+LIMITED_PLAYOFF_STAGE_KEYS = {"stage_1_8", "stage_1_4", "stage_semifinal_groups"}
 DIRECT_INVITE_STAGE_2 = "stage_2"
 STAGE_2_DIRECT_INVITES_LIMIT = 11
 
@@ -683,6 +685,11 @@ async def apply_playoff_match_results(
     )
     if not match:
         raise ValueError("Матч/группа для этапа не найдена")
+
+    if stage.key in LIMITED_PLAYOFF_STAGE_KEYS and match.game_number > GROUP_STAGE_GAME_LIMIT:
+        raise ValueError(
+            f"Для этапа {stage.title} достигнут лимит в {GROUP_STAGE_GAME_LIMIT} игры для группы {group_number}"
+        )
 
     for place, user_id in enumerate(ordered_user_ids, start=1):
         apply_points_to_playoff_participant(by_user[user_id], place, stage.scoring_mode)
