@@ -1,6 +1,6 @@
 """site content and chat settings
 
-Revision ID: 0006_site_content_and_chat_settings
+Revision ID: 0006_site_content_chat_set
 Revises: 0005_playoff_stages_and_controls
 Create Date: 2026-02-20
 """
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0006_site_content_and_chat_settings"
+revision = "0006_site_content_chat_set"
 down_revision = "0005_playoff_stages_and_controls"
 branch_labels = None
 depends_on = None
