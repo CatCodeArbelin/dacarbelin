@@ -405,6 +405,11 @@ async def participants(
 @router.get("/tournament", response_class=HTMLResponse)
 async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
     # Отдаем турнирную таблицу с текущими группами и playoff-расписанием.
+    draw_applied = await get_draw_applied(db)
+    tournament_started = await get_tournament_started(db)
+    show_groups = draw_applied and tournament_started
+    show_playoff = draw_applied and tournament_started
+
     groups = list(
         (
             await db.scalars(
@@ -428,14 +433,15 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
         group.id: sort_members_for_table(group.members, manual_tie_break_map.get(group.id))
         for group in groups
     }
-    playoff_stages = await get_playoff_stages_with_data(db)
+    playoff_stages = await get_playoff_stages_with_data(db) if show_playoff else []
     lang = get_lang(request.cookies.get("lang"))
     current_stage_label = t(lang, "tournament_group_stage")
-    active_playoff = next((stage for stage in playoff_stages if stage.is_started), None)
-    if active_playoff:
-        current_stage_label = active_playoff.title
-    elif playoff_stages:
-        current_stage_label = playoff_stages[0].title
+    if show_playoff:
+        active_playoff = next((stage for stage in playoff_stages if stage.is_started), None)
+        if active_playoff:
+            current_stage_label = active_playoff.title
+        elif playoff_stages:
+            current_stage_label = playoff_stages[0].title
     playoff_standings = {
         stage.id: sorted(stage.participants, key=lambda p: (p.points, p.wins, p.top4_finishes, -p.last_place, -p.user_id), reverse=True)
         for stage in playoff_stages
@@ -450,6 +456,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             playoff_stages=playoff_stages,
             playoff_standings=playoff_standings,
             current_stage_label=current_stage_label,
+            show_groups=show_groups,
         ),
     )
 
