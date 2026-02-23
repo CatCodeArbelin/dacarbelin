@@ -5,6 +5,7 @@ import random
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.tournament import (
     GroupGameResult,
@@ -583,18 +584,20 @@ async def generate_playoff_from_groups(db: AsyncSession) -> tuple[bool, str]:
 
 
 async def get_playoff_stages_with_data(db: AsyncSession) -> list[PlayoffStage]:
-    stages = list((await db.scalars(select(PlayoffStage).order_by(PlayoffStage.stage_order))).all())
-    for stage in stages:
-        stage.matches = list(
-            (
-                await db.scalars(
-                    select(PlayoffMatch)
-                    .where(PlayoffMatch.stage_id == stage.id)
-                    .order_by(PlayoffMatch.group_number, PlayoffMatch.game_number)
+    stages = list(
+        (
+            await db.scalars(
+                select(PlayoffStage)
+                .options(
+                    selectinload(PlayoffStage.matches),
+                    selectinload(PlayoffStage.participants),
                 )
-            ).all()
-        )
-        stage.participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage.id))).all())
+                .order_by(PlayoffStage.stage_order)
+            )
+        ).all()
+    )
+    for stage in stages:
+        stage.matches.sort(key=lambda match: (match.group_number, match.game_number))
     return stages
 
 
