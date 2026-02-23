@@ -81,7 +81,7 @@ class PlayoffStage(Base):
     stage_size: Mapped[int] = mapped_column(Integer)
     stage_order: Mapped[int] = mapped_column(Integer, index=True)
     scoring_mode: Mapped[str] = mapped_column(String(32), default="standard")
-    stage_code: Mapped[str] = mapped_column(String(20), default="playoff")
+    stage_code: Mapped[str] = mapped_column(String(50), default="playoff")
     is_started: Mapped[bool] = mapped_column(Boolean, default=False)
     final_candidate_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
