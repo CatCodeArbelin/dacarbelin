@@ -111,6 +111,13 @@ def redirect_with_admin_msg(msg_key: str, details: str | None = None) -> Redirec
     return RedirectResponse(url=f"/admin?{urlencode(params)}", status_code=303)
 
 
+def redirect_with_admin_users_msg(msg_key: str, details: str | None = None) -> RedirectResponse:
+    params: dict[str, str] = {"msg": msg_key}
+    if details:
+        params["details"] = details
+    return RedirectResponse(url=f"/admin/users?{urlencode(params)}", status_code=303)
+
+
 
 
 async def _playoff_stage_exists(db: AsyncSession, stage_id: int) -> bool:
@@ -603,14 +610,15 @@ async def admin_logout():
 
 @router.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
-    users = (await db.scalars(select(User).order_by(desc(User.created_at)).limit(300))).all()
     manual_draw_users = (
         await db.scalars(
             select(User)
             .where(User.basket != Basket.INVITED.value)
             .order_by(User.nickname.asc(), User.created_at.desc())
-        )
+    )
     ).all()
+    user_rows = (await db.execute(select(User.id, User.nickname))).all()
+    users_by_id = {user_id: nickname for user_id, nickname in user_rows}
     stages = (await db.scalars(select(TournamentStage).order_by(TournamentStage.id))).all()
     groups = list(
         (
@@ -641,12 +649,11 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                 for tied_group in tied_groups
             ]
     playoff_stages = await get_playoff_stages_with_data(db)
-    users_by_id = {user.id: user for user in users}
     group_user_choices = {
         group.id: [
             {
                 "user_id": member.user_id,
-                "nickname": (member.user.nickname if member.user else users_by_id.get(member.user_id).nickname),
+                "nickname": (member.user.nickname if member.user else users_by_id.get(member.user_id, f"#{member.user_id}")),
             }
             for member in sorted(group.members, key=lambda item: item.seat)
         ]
@@ -656,7 +663,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
         stage.id: [
             {
                 "user_id": participant.user_id,
-                "nickname": users_by_id.get(participant.user_id).nickname if users_by_id.get(participant.user_id) else f"#{participant.user_id}",
+                "nickname": users_by_id.get(participant.user_id, f"#{participant.user_id}"),
                 "points": participant.points,
                 "seed": participant.seed,
                 "group_number": get_stage_group_number_by_seed(participant.seed),
@@ -675,7 +682,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                 "participants": [
                     {
                         "user_id": participant.user_id,
-                        "nickname": users_by_id.get(participant.user_id).nickname if users_by_id.get(participant.user_id) else f"#{participant.user_id}",
+                        "nickname": users_by_id.get(participant.user_id, f"#{participant.user_id}"),
                         "points": participant.points,
                         "group_number": group_number,
                     }
@@ -715,7 +722,6 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
         "admin.html",
         template_context(
             request,
-            users=users,
             stages=stages,
             groups=groups,
             playoff_stages=playoff_stages,
@@ -732,11 +738,24 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             chat_settings=chat_settings,
             chat_messages=chat_messages,
             coin_toss_candidates=coin_toss_candidates,
-            basket_values=[basket.value for basket in Basket],
             manual_draw_users=manual_draw_users,
             group_user_choices=group_user_choices,
             playoff_stage_participants=playoff_stage_participants,
             playoff_stage_groups=playoff_stage_groups,
+        ),
+    )
+
+
+@router.get("/admin/users", response_class=HTMLResponse)
+async def admin_users_page(request: Request, db: AsyncSession = Depends(get_db)):
+    users = (await db.scalars(select(User).order_by(desc(User.created_at)).limit(300))).all()
+    return templates.TemplateResponse(
+        request,
+        "admin_users.html",
+        template_context(
+            request,
+            users=users,
+            basket_values=[basket.value for basket in Basket],
         ),
     )
 
@@ -751,7 +770,7 @@ async def _update_user_allowed_fields(
 ) -> RedirectResponse:
     user = await db.get(User, user_id)
     if not user:
-        return redirect_with_admin_msg("msg_operation_failed")
+        return redirect_with_admin_users_msg("msg_operation_failed")
 
     try:
         validated_data = _validate_user_update_payload(
@@ -760,14 +779,14 @@ async def _update_user_allowed_fields(
             direct_invite_stage=direct_invite_stage,
         )
     except ValueError:
-        return redirect_with_admin_msg("msg_operation_failed")
+        return redirect_with_admin_users_msg("msg_operation_failed")
 
     for field_name, field_value in validated_data.items():
         if field_name not in ALLOWED_USER_UPDATE_FIELDS:
             continue
         setattr(user, field_name, field_value)
     await db.commit()
-    return redirect_with_admin_msg("msg_status_ok")
+    return redirect_with_admin_users_msg("msg_status_ok")
 
 
 @router.post("/admin/user/update")
@@ -797,7 +816,7 @@ async def admin_update_user_basket(
     # Сохраняем обратную совместимость: обновление корзины делегируется общей логике.
     user = await db.get(User, user_id)
     if not user:
-        return redirect_with_admin_msg("msg_operation_failed")
+        return redirect_with_admin_users_msg("msg_operation_failed")
     return await _update_user_allowed_fields(
         db,
         user_id=user_id,
