@@ -50,6 +50,7 @@ from app.services.tournament import (
     move_group_member,
     move_user_to_stage,
     promote_top_between_stages,
+    promote_group_member_to_stage,
     remove_group_member,
     replace_stage_player,
     sort_members_for_table,
@@ -651,8 +652,13 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                 "user_id": participant.user_id,
                 "nickname": users_by_id.get(participant.user_id).nickname if users_by_id.get(participant.user_id) else f"#{participant.user_id}",
                 "points": participant.points,
+                "seed": participant.seed,
+                "group_number": get_stage_group_number_by_seed(participant.seed),
             }
-            for participant in sorted(stage.participants, key=lambda p: (p.points, p.user_id), reverse=True)
+            for participant in sorted(
+                stage.participants,
+                key=lambda p: (get_stage_group_number_by_seed(p.seed), p.seed, -p.points, p.user_id),
+            )
         ]
         for stage in playoff_stages
     }
@@ -1060,6 +1066,20 @@ async def admin_group_member_swap(
         await set_draw_applied(db, False)
         await db.commit()
         return redirect_with_admin_msg("msg_status_ok")
+    except Exception as exc:  # noqa: BLE001
+        return redirect_with_admin_msg("msg_operation_failed")
+
+
+@router.post("/admin/group/promote-manual")
+async def admin_promote_group_member_manual(
+    group_id: int = Form(...),
+    user_id: int = Form(...),
+    target_stage_id: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        await promote_group_member_to_stage(db, group_id, user_id, target_stage_id)
+        return redirect_with_admin_msg("msg_player_moved")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
 

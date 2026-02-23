@@ -671,6 +671,43 @@ async def move_user_to_stage(db: AsyncSession, from_stage_id: int, to_stage_id: 
     await db.commit()
 
 
+async def promote_group_member_to_stage(db: AsyncSession, group_id: int, user_id: int, target_stage_id: int) -> None:
+    group_member = await db.scalar(
+        select(GroupMember).where(GroupMember.group_id == group_id, GroupMember.user_id == user_id)
+    )
+    if not group_member:
+        raise ValueError("Игрок не найден в указанной группе")
+
+    target_stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.id == target_stage_id))
+    if not target_stage:
+        raise ValueError("Целевой этап не найден")
+
+    existing_participant = await db.scalar(
+        select(PlayoffParticipant).where(
+            PlayoffParticipant.stage_id == target_stage_id,
+            PlayoffParticipant.user_id == user_id,
+        )
+    )
+    if existing_participant:
+        raise ValueError("Игрок уже есть в целевом этапе")
+
+    stage_participants = list(
+        (await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == target_stage_id))).all()
+    )
+    if len(stage_participants) >= target_stage.stage_size:
+        raise ValueError("Вместимость целевого этапа превышена")
+
+    next_seed = max((participant.seed for participant in stage_participants), default=0) + 1
+    db.add(
+        PlayoffParticipant(
+            stage_id=target_stage_id,
+            user_id=user_id,
+            seed=next_seed,
+        )
+    )
+    await db.commit()
+
+
 async def replace_stage_player(db: AsyncSession, stage_id: int, from_user_id: int, to_user_id: int) -> None:
     participant = await db.scalar(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id, PlayoffParticipant.user_id == from_user_id))
     if not participant:
