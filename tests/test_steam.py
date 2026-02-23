@@ -8,16 +8,25 @@ from app.services import steam
 
 
 def test_normalize_steam_profile_url() -> None:
+    """Проверяет позитивный сценарий `test_normalize_steam_profile_url`.
+    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+    Запуск: `pytest tests/test_steam.py -q` и `pytest tests/test_steam.py -k "test_normalize_steam_profile_url" -q`."""
     result = asyncio.run(steam.normalize_steam_id("https://steamcommunity.com/profiles/76561199677719726/"))
     assert result == "76561199677719726"
 
 
 def test_normalize_steam_id2() -> None:
+    """Проверяет позитивный сценарий `test_normalize_steam_id2`.
+    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+    Запуск: `pytest tests/test_steam.py -q` и `pytest tests/test_steam.py -k "test_normalize_steam_id2" -q`."""
     result = asyncio.run(steam.normalize_steam_id("STEAM_0:1:12345"))
     assert result == str(76561197960265728 + 12345 * 2 + 1)
 
 
 def test_normalize_vanity_url_uses_resolver(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Проверяет позитивный сценарий `test_normalize_vanity_url_uses_resolver`.
+    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+    Запуск: `pytest tests/test_steam.py -q` и `pytest tests/test_steam.py -k "test_normalize_vanity_url_uses_resolver" -q`."""
     async def fake_resolve(vanity: str) -> str | None:
         return "76561190000000000" if vanity == "DieLikeZombie" else None
 
@@ -27,6 +36,9 @@ def test_normalize_vanity_url_uses_resolver(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_fetch_autochess_data_uses_steam_summary_nickname_when_name_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Проверяет позитивный сценарий `test_fetch_autochess_data_uses_steam_summary_nickname_when_name_missing`.
+    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+    Запуск: `pytest tests/test_steam.py -q` и `pytest tests/test_steam.py -k "test_fetch_autochess_data_uses_steam_summary_nickname_when_name_missing" -q`."""
     steam_id = "76561198000000000"
 
     class FakeResponse:

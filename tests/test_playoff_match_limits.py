@@ -17,6 +17,9 @@ class _ScalarResult:
 
 class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
     async def test_stage_2_group_limit_blocks_fourth_game(self) -> None:
+        """Проверяет негативный сценарий `test_stage_2_group_limit_blocks_fourth_game`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_playoff_match_limits.py -q` и `pytest tests/test_playoff_match_limits.py -k "test_stage_2_group_limit_blocks_fourth_game" -q`."""
         ordered_user_ids = [1, 2, 3, 4, 5, 6, 7, 8]
         participants = [
             PlayoffParticipant(stage_id=1, user_id=user_id, seed=user_id, points=0, wins=0, top4_finishes=0, last_place=8)
@@ -42,6 +45,9 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
         db.commit.assert_not_called()
 
     async def test_stage_3_group_limit_blocks_fourth_game(self) -> None:
+        """Проверяет негативный сценарий `test_stage_3_group_limit_blocks_fourth_game`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_playoff_match_limits.py -q` и `pytest tests/test_playoff_match_limits.py -k "test_stage_3_group_limit_blocks_fourth_game" -q`."""
         ordered_user_ids = [1, 2, 3, 4, 5, 6, 7, 8]
         participants = [
             PlayoffParticipant(stage_id=1, user_id=user_id, seed=user_id, points=0, wins=0, top4_finishes=0, last_place=8)
@@ -67,6 +73,9 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
         db.commit.assert_not_called()
 
     async def test_final_stage_has_no_three_game_limit(self) -> None:
+        """Проверяет граничный сценарий `test_final_stage_has_no_three_game_limit`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_playoff_match_limits.py -q` и `pytest tests/test_playoff_match_limits.py -k "test_final_stage_has_no_three_game_limit" -q`."""
         ordered_user_ids = [1, 2, 3, 4, 5, 6, 7, 8]
         participants = [
             PlayoffParticipant(stage_id=1, user_id=user_id, seed=user_id, points=0, wins=0, top4_finishes=0, last_place=8)

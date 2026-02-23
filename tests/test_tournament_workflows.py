@@ -13,6 +13,9 @@ from app.services.tournament import (
 
 class TournamentWorkflowTests(unittest.TestCase):
     def test_parse_manual_draw_user_ids(self) -> None:
+        """Проверяет позитивный сценарий `test_parse_manual_draw_user_ids`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_workflows.py -q` и `pytest tests/test_tournament_workflows.py -k "test_parse_manual_draw_user_ids" -q`."""
         self.assertEqual(parse_manual_draw_user_ids("1, 2,3"), [1, 2, 3])
         self.assertEqual(parse_manual_draw_user_ids(["4", " 5 ", "6"]), [4, 5, 6])
         self.assertEqual(parse_manual_draw_user_ids(""), [])
@@ -21,6 +24,9 @@ class TournamentWorkflowTests(unittest.TestCase):
             parse_manual_draw_user_ids("7,7")
 
     def test_playoff_stage_blueprint(self) -> None:
+        """Проверяет позитивный сценарий `test_playoff_stage_blueprint`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_workflows.py -q` и `pytest tests/test_tournament_workflows.py -k "test_playoff_stage_blueprint" -q`."""
         stages_56 = get_playoff_stage_blueprint(56)
         self.assertEqual(
             [stage[0] for stage in stages_56],
@@ -46,12 +52,18 @@ class TournamentWorkflowTests(unittest.TestCase):
         self.assertEqual([stage[2] for stage in stages_32], [32, 16, 8])
 
     def test_stage_group_counts_for_new_playoff_flow(self) -> None:
+        """Проверяет граничный сценарий `test_stage_group_counts_for_new_playoff_flow`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_workflows.py -q` и `pytest tests/test_tournament_workflows.py -k "test_stage_group_counts_for_new_playoff_flow" -q`."""
         self.assertEqual(get_group_count_for_stage(56), 7)
         self.assertEqual(get_group_count_for_stage(32), 4)
         self.assertEqual(get_group_count_for_stage(16), 2)
         self.assertEqual(get_group_count_for_stage(8), 1)
 
     def test_stage_2_players_formed_as_21_plus_11(self) -> None:
+        """Проверяет граничный сценарий `test_stage_2_players_formed_as_21_plus_11`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_workflows.py -q` и `pytest tests/test_tournament_workflows.py -k "test_stage_2_players_formed_as_21_plus_11" -q`."""
         promoted = list(range(1, 22))
         direct_invites = list(range(101, 112))
 
@@ -70,6 +82,9 @@ class TournamentWorkflowTests(unittest.TestCase):
 
 
     def test_stage_2_players_requires_exactly_21_promoted(self) -> None:
+        """Проверяет негативный сценарий `test_stage_2_players_requires_exactly_21_promoted`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_workflows.py -q` и `pytest tests/test_tournament_workflows.py -k "test_stage_2_players_requires_exactly_21_promoted" -q`."""
         with self.assertRaises(ValueError):
             build_stage_2_player_ids(list(range(1, 21)), list(range(101, 112)))
 
@@ -77,6 +92,9 @@ class TournamentWorkflowTests(unittest.TestCase):
             build_stage_2_player_ids(list(range(1, 23)), list(range(101, 112)))
 
     def test_stage_2_players_validation_for_limit_and_duplicates(self) -> None:
+        """Проверяет негативный сценарий `test_stage_2_players_validation_for_limit_and_duplicates`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_workflows.py -q` и `pytest tests/test_tournament_workflows.py -k "test_stage_2_players_validation_for_limit_and_duplicates" -q`."""
         promoted = list(range(1, 22))
 
         with self.assertRaises(ValueError):

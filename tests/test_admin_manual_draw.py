@@ -14,6 +14,9 @@ from app.routers import web
 
 
 def test_admin_manual_draw_accepts_user_ids_array(monkeypatch) -> None:
+    """Проверяет позитивный сценарий `test_admin_manual_draw_accepts_user_ids_array`.
+    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+    Запуск: `pytest tests/test_admin_manual_draw.py -q` и `pytest tests/test_admin_manual_draw.py -k "test_admin_manual_draw_accepts_user_ids_array" -q`."""
     captured: dict[str, int | list[int]] = {}
 
     async def fake_create_manual_draw(db, group_count: int, user_ids: list[int]) -> None:
@@ -36,6 +39,9 @@ def test_admin_manual_draw_accepts_user_ids_array(monkeypatch) -> None:
 
 
 def test_admin_auto_draw_redirect_contains_details_on_error(monkeypatch) -> None:
+    """Проверяет негативный сценарий `test_admin_auto_draw_redirect_contains_details_on_error`.
+    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+    Запуск: `pytest tests/test_admin_manual_draw.py -q` и `pytest tests/test_admin_manual_draw.py -k "test_admin_auto_draw_redirect_contains_details_on_error" -q`."""
     async def fake_create_auto_draw(db):
         return False, "Автожеребьевка недоступна: требуется минимум 56 валидных участников (формат 7x8)."
 
