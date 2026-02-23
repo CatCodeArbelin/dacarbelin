@@ -264,6 +264,23 @@
         <div class="col-md-4"><button class="btn btn-outline-info w-100">{{ tr('admin_promote_next_stage') }}</button></div>
       </form>
 
+      <h5 class="mt-4">Состав этапов плей-офф</h5>
+      {% for stage in playoff_stages %}
+      <div class="border rounded p-3 mb-2">
+        <div class="fw-bold mb-2">{{ stage.title }}</div>
+        {% set participants = playoff_stage_participants.get(stage.id, []) %}
+        {% if participants %}
+        <ul class="mb-0">
+          {% for participant in participants %}
+          <li>G{{ participant.group_number }} · #{{ participant.seed }} · {{ participant.nickname }} ({{ participant.points }} pts)</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="text-muted small">Нет участников</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+
       <h5 class="mt-4">{{ tr('admin_playoff_match_results') }}</h5>
       {% for stage in playoff_stages %}
       <div class="border rounded p-3 mb-3">
@@ -376,6 +393,13 @@
           <input type="hidden" name="group_id" value="{{ group.id }}">
           <div class="col-md-9"><select class="form-select" name="user_id" required>{% for m in group.members|sort(attribute='seat') %}<option value="{{ m.user_id }}">{{ m.user.nickname }}</option>{% endfor %}</select></div>
           <div class="col-md-3"><button class="btn btn-sm btn-outline-danger w-100">{{ tr('admin_remove') }}</button></div>
+        </form>
+
+        <form action="/admin/group/promote-manual" method="post" class="row g-2 mb-2">
+          <input type="hidden" name="group_id" value="{{ group.id }}">
+          <div class="col-md-5"><select class="form-select" name="user_id" required>{% for m in group.members|sort(attribute='seat') %}<option value="{{ m.user_id }}">{{ m.user.nickname }}</option>{% endfor %}</select></div>
+          <div class="col-md-5"><select class="form-select" name="target_stage_id" required>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
+          <div class="col-md-2"><button class="btn btn-sm btn-outline-success w-100">Назначить в следующий этап</button></div>
         </form>
 
         <form action="/admin/group/score" method="post" class="mb-2">
