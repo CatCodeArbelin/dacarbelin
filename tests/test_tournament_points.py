@@ -3,7 +3,11 @@
 import unittest
 
 from app.models.tournament import GroupMember, PlayoffParticipant, TournamentGroup
-from app.services.tournament import apply_game_results, apply_points_to_playoff_participant
+from app.services.tournament import (
+    FINAL_SCORING_MODE,
+    apply_game_results,
+    apply_points_to_playoff_participant,
+)
 
 
 class _FakeScalarsResult:
@@ -79,6 +83,29 @@ class TournamentPointsTests(unittest.IsolatedAsyncioTestCase):
                 )
 
                 apply_points_to_playoff_participant(participant, place=place, scoring_mode="standard")
+
+                self.assertEqual(participant.points, expected_points)
+
+
+    def test_apply_points_to_playoff_participant_final_stage_uses_points_by_place(self) -> None:
+        """Проверяет позитивный сценарий `test_apply_points_to_playoff_participant_final_stage_uses_points_by_place`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_points.py -q` и `pytest tests/test_tournament_points.py -k "test_apply_points_to_playoff_participant_final_stage_uses_points_by_place" -q`."""
+        place_to_points = {1: 8, 2: 6, 8: 0}
+        for place, expected_points in place_to_points.items():
+            with self.subTest(place=place):
+                participant = PlayoffParticipant(
+                    stage_id=1,
+                    user_id=1,
+                    seed=1,
+                    points=0,
+                    wins=0,
+                    top4_finishes=0,
+                    last_place=8,
+                    is_eliminated=False,
+                )
+
+                apply_points_to_playoff_participant(participant, place=place, scoring_mode=FINAL_SCORING_MODE)
 
                 self.assertEqual(participant.points, expected_points)
 

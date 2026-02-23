@@ -491,10 +491,7 @@ def playoff_sort_key(participant: PlayoffParticipant) -> tuple[int, int, int, in
 
 
 def apply_points_to_playoff_participant(participant: PlayoffParticipant, place: int, scoring_mode: str) -> None:
-    if scoring_mode == FINAL_SCORING_MODE:
-        participant.points += 8 if place == 1 else 1
-    else:
-        participant.points += POINTS_BY_PLACE[place]
+    participant.points += POINTS_BY_PLACE[place]
     if place == 1:
         participant.wins += 1
     if place <= 4:
