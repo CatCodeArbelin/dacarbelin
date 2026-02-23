@@ -1,6 +1,6 @@
 """expand playoff stage code length
 
-Revision ID: 0013_expand_playoff_stage_code_length
+Revision ID: 0013_expand_stage_code_len
 Revises: 0012_direct_invite_stage2
 Create Date: 2026-02-23
 """
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0013_expand_playoff_stage_code_length"
+revision = "0013_expand_stage_code_len"
 down_revision = "0012_direct_invite_stage2"
 branch_labels = None
 depends_on = None
