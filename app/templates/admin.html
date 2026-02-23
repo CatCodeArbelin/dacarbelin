@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>{{ tr('admin_title') }}</h2>
-{% if request.query_params.get('msg') %}<div class="alert alert-info">{{ tr(request.query_params.get('msg')) }}{% if request.query_params.get('details') %}: <span class="small">{{ request.query_params.get('details') }}</span>{% endif %}</div>{% endif %}
+{% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}{% if request.query_params.get('details') %}: <span class="small">{{ request.query_params.get('details') }}</span>{% endif %}</div>{% endif %}
 <div class="d-flex justify-content-end mb-3">
   <a class="btn btn-sm btn-outline-light" href="/admin/logout">{{ tr('admin_logout') }}</a>
 </div>

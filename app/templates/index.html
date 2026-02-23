@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-{% if request.query_params.get('msg') %}<div class="alert alert-info">{{ tr(request.query_params.get('msg')) }}</div>{% endif %}
+{% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}</div>{% endif %}
 <div class="row g-4">
   <div class="col-lg-8">
     <div class="card bg-black neon-border-red">
