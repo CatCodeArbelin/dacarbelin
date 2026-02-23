@@ -516,6 +516,28 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                 for tied_group in tied_groups
             ]
     playoff_stages = await get_playoff_stages_with_data(db)
+    users_by_id = {user.id: user for user in users}
+    group_user_choices = {
+        group.id: [
+            {
+                "user_id": member.user_id,
+                "nickname": (member.user.nickname if member.user else users_by_id.get(member.user_id).nickname),
+            }
+            for member in sorted(group.members, key=lambda item: item.seat)
+        ]
+        for group in groups
+    }
+    playoff_stage_participants = {
+        stage.id: [
+            {
+                "user_id": participant.user_id,
+                "nickname": users_by_id.get(participant.user_id).nickname if users_by_id.get(participant.user_id) else f"#{participant.user_id}",
+                "points": participant.points,
+            }
+            for participant in sorted(stage.participants, key=lambda p: (p.points, p.user_id), reverse=True)
+        ]
+        for stage in playoff_stages
+    }
     registration_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "registration_open"))
     registration_open = (registration_setting.value == "1") if registration_setting else True
     tournament_started_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_started"))
@@ -549,6 +571,8 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             coin_toss_candidates=coin_toss_candidates,
             basket_values=[basket.value for basket in Basket],
             manual_draw_users=manual_draw_users,
+            group_user_choices=group_user_choices,
+            playoff_stage_participants=playoff_stage_participants,
         ),
     )
 
@@ -798,6 +822,16 @@ async def admin_group_create(
         return redirect_with_admin_msg("msg_operation_failed")
 
 
+@router.post("/admin/draw/apply")
+async def admin_apply_draw(db: AsyncSession = Depends(get_db)):
+    groups_exist = await db.scalar(
+        select(TournamentGroup.id).where(TournamentGroup.stage == "group_stage").limit(1)
+    )
+    if not groups_exist:
+        return redirect_with_admin_msg("msg_operation_failed", details="draw_not_found")
+    return redirect_with_admin_msg("msg_status_ok")
+
+
 @router.post("/admin/group/member/add")
 async def admin_group_member_add(
     group_id: int = Form(...),
@@ -862,12 +896,16 @@ async def admin_group_member_swap(
 @router.post("/admin/group/score")
 async def admin_group_score(
     group_id: int = Form(...),
-    placements: str = Form(...),
+    placements: str = Form(default=""),
+    placements_list: list[str] | None = Form(default=None, alias="placements[]"),
     db: AsyncSession = Depends(get_db),
 ):
     """Принимает порядок мест в игре и начисляет очки участникам выбранной группы."""
     try:
-        ordered_user_ids = [int(part.strip()) for part in placements.split(",") if part.strip()]
+        if placements_list:
+            ordered_user_ids = [int(part) for part in placements_list]
+        else:
+            ordered_user_ids = [int(part.strip()) for part in placements.split(",") if part.strip()]
         await apply_game_results(db, group_id, ordered_user_ids)
         return redirect_with_admin_msg("msg_game_saved")
     except Exception as exc:  # noqa: BLE001
@@ -877,12 +915,16 @@ async def admin_group_score(
 @router.post("/admin/group/tie-break")
 async def admin_group_tie_break(
     group_id: int = Form(...),
-    tied_user_ids: str = Form(...),
+    tied_user_ids: str = Form(default=""),
+    tied_user_ids_list: list[str] | None = Form(default=None, alias="tied_user_ids[]"),
     db: AsyncSession = Depends(get_db),
 ):
     # Применяем ручную "монетку" для спорных кейсов и фиксируем результат в БД.
     try:
-        ordered_user_ids = [int(part.strip()) for part in tied_user_ids.split(",") if part.strip()]
+        if tied_user_ids_list:
+            ordered_user_ids = [int(part) for part in tied_user_ids_list]
+        else:
+            ordered_user_ids = [int(part.strip()) for part in tied_user_ids.split(",") if part.strip()]
         await apply_manual_tie_break(db, group_id, ordered_user_ids)
         return redirect_with_admin_msg("msg_manual_tie_break_saved")
     except Exception as exc:  # noqa: BLE001
@@ -983,11 +1025,15 @@ async def admin_adjust_playoff_points(
 async def admin_playoff_score(
     stage_id: int = Form(...),
     group_number: int = Form(default=1),
-    placements: str = Form(...),
+    placements: str = Form(default=""),
+    placements_list: list[str] | None = Form(default=None, alias="placements[]"),
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        ordered_user_ids = [int(part.strip()) for part in placements.split(",") if part.strip()]
+        if placements_list:
+            ordered_user_ids = [int(part) for part in placements_list]
+        else:
+            ordered_user_ids = [int(part.strip()) for part in placements.split(",") if part.strip()]
         await apply_playoff_match_results(db, stage_id, ordered_user_ids, group_number=group_number)
         return redirect_with_admin_msg("msg_playoff_game_saved")
     except Exception as exc:  # noqa: BLE001

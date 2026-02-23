@@ -1,4 +1,18 @@
-body { background: #08090d; }
+body {
+  background: #08090d;
+  color: #ffffff;
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.38);
+}
+.container, .card, .table, .alert, .form-control, .form-select, .form-check-label, .nav-link, .navbar-brand, h1, h2, h3, h4, h5, h6, p, span, li, th, td, label, small, strong, div {
+  color: #ffffff !important;
+}
+.form-control, .form-select {
+  background-color: #0f1118;
+  border-color: #2f3a57;
+}
+.form-control::placeholder { color: #b9caee !important; }
+.table-dark { --bs-table-color: #fff; }
+.list-group-item { color: #fff !important; }
 .neon-border-blue { border: 1px solid #00b7ff !important; box-shadow: 0 0 8px #00b7ff66; }
 .neon-border-red { border: 1px solid #ff2d55 !important; box-shadow: 0 0 8px #ff2d5566; }
 .card { border-radius: 12px; }
