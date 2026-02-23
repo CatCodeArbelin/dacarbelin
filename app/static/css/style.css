@@ -9,8 +9,11 @@ body {
 .form-control, .form-select {
   background-color: #0f1118;
   border-color: #2f3a57;
+  color: #e6eeff !important;
+  text-shadow: none;
+  caret-color: #8fb8ff;
 }
-.form-control::placeholder { color: #b9caee !important; }
+.form-control::placeholder { color: #9fb2d9 !important; }
 .table-dark { --bs-table-color: #fff; }
 .list-group-item { color: #fff !important; }
 .neon-border-blue { border: 1px solid #00b7ff !important; box-shadow: 0 0 8px #00b7ff66; }
