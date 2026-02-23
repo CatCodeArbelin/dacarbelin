@@ -649,6 +649,32 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
         ]
         for stage in playoff_stages
     }
+    playoff_stage_groups = {
+        stage.id: [
+            {
+                "group_number": group_number,
+                "participants": [
+                    {
+                        "user_id": participant.user_id,
+                        "nickname": users_by_id.get(participant.user_id).nickname if users_by_id.get(participant.user_id) else f"#{participant.user_id}",
+                        "points": participant.points,
+                        "group_number": group_number,
+                    }
+                    for participant in sorted(
+                        [
+                            item
+                            for item in stage.participants
+                            if get_stage_group_number_by_seed(item.seed) == group_number
+                        ],
+                        key=lambda item: (item.points, item.user_id),
+                        reverse=True,
+                    )
+                ],
+            }
+            for group_number in sorted({get_stage_group_number_by_seed(item.seed) for item in stage.participants})
+        ]
+        for stage in playoff_stages
+    }
     registration_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "registration_open"))
     registration_open = (registration_setting.value == "1") if registration_setting else True
     tournament_started_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_started"))
@@ -687,6 +713,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             manual_draw_users=manual_draw_users,
             group_user_choices=group_user_choices,
             playoff_stage_participants=playoff_stage_participants,
+            playoff_stage_groups=playoff_stage_groups,
         ),
     )
 
@@ -1167,6 +1194,45 @@ async def admin_playoff_score(
             ordered_user_ids = [int(part) for part in placements_list]
         else:
             ordered_user_ids = [int(part.strip()) for part in placements.split(",") if part.strip()]
+        await apply_playoff_match_results(db, stage_id, ordered_user_ids, group_number=group_number)
+        return redirect_with_admin_msg("msg_playoff_game_saved")
+    except Exception as exc:  # noqa: BLE001
+        return redirect_with_admin_msg("msg_operation_failed")
+
+
+@router.post("/admin/playoff/results/batch")
+async def admin_playoff_results_batch(
+    stage_id: int = Form(...),
+    group_number: int = Form(...),
+    user_ids: list[str] = Form(..., alias="user_ids[]"),
+    places: list[str] = Form(..., alias="places[]"),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        if len(user_ids) != len(places):
+            raise ValueError("Некорректное количество полей")
+
+        placements_map: dict[int, int] = {}
+        for raw_user_id, raw_place in zip(user_ids, places):
+            user_id = int(raw_user_id)
+            place = int(raw_place)
+            if place < 1 or place > 8:
+                raise ValueError("Место должно быть в диапазоне 1..8")
+            if user_id in placements_map:
+                raise ValueError("Дублирующийся участник")
+            placements_map[user_id] = place
+
+        if len(placements_map) != 8:
+            raise ValueError("Нужно передать 8 участников")
+
+        unique_places = set(placements_map.values())
+        if unique_places != set(range(1, 9)):
+            raise ValueError("Места должны быть уникальны и покрывать диапазон 1..8")
+
+        ordered_user_ids = [
+            user_id
+            for user_id, place in sorted(placements_map.items(), key=lambda item: item[1])
+        ]
         await apply_playoff_match_results(db, stage_id, ordered_user_ids, group_number=group_number)
         return redirect_with_admin_msg("msg_playoff_game_saved")
     except Exception as exc:  # noqa: BLE001
