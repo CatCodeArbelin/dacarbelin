@@ -1,6 +1,7 @@
 """Проверяет ручную жеребьевку через admin API с выбором участников из формы."""
 
 import os
+from urllib.parse import parse_qs, urlparse
 
 from fastapi.testclient import TestClient
 
@@ -32,3 +33,23 @@ def test_admin_manual_draw_accepts_user_ids_array(monkeypatch) -> None:
     assert response.status_code == 303
     assert response.headers["location"] == "/admin?msg=msg_status_ok"
     assert captured == {"group_count": 2, "user_ids": [11, 12]}
+
+
+def test_admin_auto_draw_redirect_contains_details_on_error(monkeypatch) -> None:
+    async def fake_create_auto_draw(db):
+        return False, "Автожеребьевка недоступна: требуется минимум 56 валидных участников (формат 7x8)."
+
+    monkeypatch.setattr(web, "create_auto_draw", fake_create_auto_draw)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post("/admin/draw/auto", follow_redirects=False)
+
+    assert response.status_code == 303
+    location = response.headers["location"]
+    parsed = urlparse(location)
+    query = parse_qs(parsed.query)
+
+    assert parsed.path == "/admin"
+    assert query["msg"] == ["msg_status_warn"]
+    assert query["details"] == ["Автожеребьевка недоступна: требуется минимум 56 валидных участников (формат 7x8)."]

@@ -2,6 +2,7 @@
 
 import json
 import re
+from urllib.parse import urlencode
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Form, Query, Request
@@ -101,8 +102,11 @@ def redirect_with_msg(url: str, msg_key: str, status_code: int = 303) -> Redirec
     return RedirectResponse(url=f"{url}{separator}msg={msg_key}", status_code=status_code)
 
 
-def redirect_with_admin_msg(msg_key: str) -> RedirectResponse:
-    return RedirectResponse(url=f"/admin?msg={msg_key}", status_code=303)
+def redirect_with_admin_msg(msg_key: str, details: str | None = None) -> RedirectResponse:
+    params: dict[str, str] = {"msg": msg_key}
+    if details:
+        params["details"] = details
+    return RedirectResponse(url=f"/admin?{urlencode(params)}", status_code=303)
 
 
 async def get_registration_open(db: AsyncSession) -> bool:
@@ -718,7 +722,7 @@ async def admin_invite_user(
 async def admin_auto_draw(db: AsyncSession = Depends(get_db)):
     # Запускаем автоматическую жеребьевку группового этапа.
     ok, message = await create_auto_draw(db)
-    return redirect_with_admin_msg("msg_status_ok" if ok else "msg_status_warn")
+    return redirect_with_admin_msg("msg_status_ok" if ok else "msg_status_warn", details=None if ok else message)
 
 
 

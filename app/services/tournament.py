@@ -66,7 +66,7 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
         ).all()
     )
     if len(users) < 56:
-        return False, "ДОСТУПНА ТОЛЬКО РУЧНАЯ Жеребьевка: нужно минимум 56 валидных участников (формат 7x8)"
+        return False, "Автожеребьевка недоступна: требуется минимум 56 валидных участников (формат 7x8). Доступна только ручная жеребьевка."
 
     expected_group_count = 7
 
@@ -108,8 +108,7 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
             unique_ids = {player.id for player in picked}
             if len(picked) != 8 or len(unique_ids) != 8:
                 raise ValueError(
-                    "Не удалось собрать 8 уникальных участников для группы в формате 7x8. "
-                    "Доступна только ручная жеребьевка."
+                    "Не удалось собрать 8 уникальных участников для группы в формате 7x8. Доступна только ручная жеребьевка."
                 )
 
             assigned_by_group.append(picked)
