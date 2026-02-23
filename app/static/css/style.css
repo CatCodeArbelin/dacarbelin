@@ -37,11 +37,21 @@ body {
 }
 
 /* High-contrast alert/badge overrides for dark theme (WCAG AA friendly). */
-.alert-info,
-.alert-contrast {
-  background-color: #123043 !important;
-  border-color: #2f7da8 !important;
+.alert-info {
+  background-color: #122f42 !important;
+  border-color: #3d8cb8 !important;
   color: #f1f9ff !important;
+}
+
+.alert-contrast {
+  background-color: #122f42 !important;
+  border-color: #3d8cb8 !important;
+  color: #f1f9ff !important;
+}
+
+.alert-info .alert-link,
+.alert-contrast .alert-link {
+  color: #ffffff !important;
 }
 
 .alert-success {
@@ -57,12 +67,12 @@ body {
 }
 
 .badge.bg-success {
-  background-color: #1e7a4d !important;
+  background-color: #1b7448 !important;
   color: #f6fff9 !important;
 }
 
 .badge.bg-secondary {
-  background-color: #4e576f !important;
+  background-color: #4a546d !important;
   color: #ffffff !important;
 }
 
