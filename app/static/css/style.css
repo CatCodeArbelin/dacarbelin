@@ -35,3 +35,88 @@ body {
 .bg-black .text-secondary {
   color: #d0d8e8 !important;
 }
+
+.tournament_playoff_title {
+  letter-spacing: 0.04em;
+}
+
+.playoff-bracket {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.playoff-round {
+  background: rgba(10, 12, 20, 0.9);
+  border: 1px solid #2b3f67;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.playoff-round-title {
+  font-size: 1rem;
+  margin-bottom: 12px;
+  color: #92dcff !important;
+}
+
+.playoff-round-matches {
+  display: grid;
+  gap: 10px;
+}
+
+.playoff-match-card {
+  position: relative;
+  border: 1px solid #405781;
+  border-radius: 10px;
+  padding: 10px;
+  background: linear-gradient(180deg, rgba(17, 23, 34, 0.95), rgba(9, 13, 20, 0.95));
+}
+
+.playoff-match-card::after {
+  content: "";
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  width: 12px;
+  border-top: 1px solid #5e79ab;
+}
+
+.playoff-round:last-child .playoff-match-card::after {
+  display: none;
+}
+
+.playoff-status-finished {
+  border-color: #2bb673;
+}
+
+.playoff-status-in_progress {
+  border-color: #f5b500;
+}
+
+.playoff-status-pending {
+  border-color: #5e79ab;
+}
+
+.playoff-match-header,
+.playoff-match-footer,
+.playoff-next-link {
+  font-size: 0.85rem;
+  color: #dce8ff !important;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.playoff-participants li {
+  font-size: 0.92rem;
+  border-left: 2px solid #00b7ff;
+  padding-left: 8px;
+  margin-bottom: 2px;
+}
+
+.playoff-next-link {
+  margin-top: 8px;
+  color: #9ed9ff !important;
+}
