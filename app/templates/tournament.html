@@ -27,7 +27,7 @@
     <div class="col-lg-6">
       <div class="card bg-black neon-border-blue">
         <div class="card-body">
-          <h4>{{ group.name }} · {{ tr('tournament_game') }} {{ group.current_game }} · {{ tr('tournament_schedule') }}: {{ group.schedule_text or tr('tournament_tbd') }}</h4>
+          <h4>{{ group.name }} · {{ tr('tournament_game') }} {{ 3 if group.current_game > 3 else group.current_game }} · {{ tr('tournament_schedule') }}: {{ group.schedule_text or tr('tournament_tbd') }}</h4>
           <div>{{ tr('tournament_lobby_pw') }}: <span class="text-info">{{ group.lobby_password }}</span> · {{ tr('tournament_schedule') }}: <span class="text-warning">{{ group.schedule_text or tr('tournament_tbd') }}</span></div>
           <div class="small text-contrast-muted mt-2">{{ tr('tournament_roster') }}: {% for member in group.members|sort(attribute='seat') %}#{{ member.seat }} · {{ member.user.nickname }}{% if not loop.last %}; {% endif %}{% endfor %}</div>
           <table class="table table-dark table-sm mt-3">

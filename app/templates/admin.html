@@ -328,33 +328,34 @@
         {% endfor %}
       </div>
       {% for group in groups %}
+      {% set group_locked = group.current_game > 3 %}
       <div class="border rounded p-3 mb-3">
         <div class="d-flex justify-content-between align-items-center">
-          <strong>{{ group.name }} ({{ tr('tournament_game') }} {{ group.current_game }})</strong>
+          <strong>{{ group.name }} ({{ tr('tournament_game') }} {{ 3 if group.current_game > 3 else group.current_game }})</strong>
           <form action="/admin/group/password" method="post" class="d-flex gap-2 align-items-center">
             <input type="hidden" name="group_id" value="{{ group.id }}">
-            <input class="form-control form-control-sm js-group-password" style="width:120px" name="password" value="{{ group.lobby_password }}" pattern="[0-9]{4}" inputmode="numeric" maxlength="4" title="4 digits">
-            <button type="button" class="btn btn-sm btn-outline-secondary js-generate-pin">{{ tr('admin_generate_pin') }}</button>
-            <button class="btn btn-sm btn-outline-info">{{ tr('admin_save_pw') }}</button>
+            <input class="form-control form-control-sm js-group-password" style="width:120px" name="password" value="{{ group.lobby_password }}" pattern="[0-9]{4}" inputmode="numeric" maxlength="4" title="4 digits" {% if group_locked %}disabled{% endif %}>
+            <button type="button" class="btn btn-sm btn-outline-secondary js-generate-pin" {% if group_locked %}disabled{% endif %}>{{ tr('admin_generate_pin') }}</button>
+            <button class="btn btn-sm btn-outline-info" {% if group_locked %}disabled{% endif %}>{{ tr('admin_save_pw') }}</button>
           </form>
         </div>
         <form action="/admin/group/schedule" method="post" class="row g-2 mt-2 mb-2">
           <input type="hidden" name="group_id" value="{{ group.id }}">
-          <div class="col-md-10"><input class="form-control form-control-sm" name="schedule_text" value="{{ group.schedule_text or tr('tournament_tbd') }}" placeholder="{{ tr('tournament_tbd') }}"></div>
-          <div class="col-md-2"><button class="btn btn-sm btn-outline-light w-100">{{ tr('admin_save_time') }}</button></div>
+          <div class="col-md-10"><input class="form-control form-control-sm" name="schedule_text" value="{{ group.schedule_text or tr('tournament_tbd') }}" placeholder="{{ tr('tournament_tbd') }}" {% if group_locked %}disabled{% endif %}></div>
+          <div class="col-md-2"><button class="btn btn-sm btn-outline-light w-100" {% if group_locked %}disabled{% endif %}>{{ tr('admin_save_time') }}</button></div>
         </form>
 
         
         <form action="/admin/group/member/add" method="post" class="row g-2 mb-2">
           <input type="hidden" name="group_id" value="{{ group.id }}">
-          <div class="col-md-9"><select class="form-select" name="user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
-          <div class="col-md-3"><button class="btn btn-sm btn-primary w-100">{{ tr('admin_add') }}</button></div>
+          <div class="col-md-9"><select class="form-select" name="user_id" required {% if group_locked %}disabled{% endif %}>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
+          <div class="col-md-3"><button class="btn btn-sm btn-primary w-100" {% if group_locked %}disabled{% endif %}>{{ tr('admin_add') }}</button></div>
         </form>
 
         <form action="/admin/group/member/remove" method="post" class="row g-2 mb-2">
           <input type="hidden" name="group_id" value="{{ group.id }}">
-          <div class="col-md-9"><select class="form-select" name="user_id" required>{% for m in group.members|sort(attribute='seat') %}<option value="{{ m.user_id }}">{{ m.user.nickname }}</option>{% endfor %}</select></div>
-          <div class="col-md-3"><button class="btn btn-sm btn-outline-danger w-100">{{ tr('admin_remove') }}</button></div>
+          <div class="col-md-9"><select class="form-select" name="user_id" required {% if group_locked %}disabled{% endif %}>{% for m in group.members|sort(attribute='seat') %}<option value="{{ m.user_id }}">{{ m.user.nickname }}</option>{% endfor %}</select></div>
+          <div class="col-md-3"><button class="btn btn-sm btn-outline-danger w-100" {% if group_locked %}disabled{% endif %}>{{ tr('admin_remove') }}</button></div>
         </form>
 
         <form action="/admin/group/promote-manual" method="post" class="row g-2 mb-2">
@@ -382,7 +383,7 @@
                   <td>{{ m.user.nickname }}</td>
                   <td>
                     <input type="hidden" name="user_ids[]" value="{{ m.user_id }}">
-                    <select class="form-select form-select-sm" name="places[]" required>
+                    <select class="form-select form-select-sm" name="places[]" required {% if group_locked %}disabled{% endif %}>
                       {% for place in range(1, 9) %}
                       <option value="{{ place }}" {% if place == member_index %}selected{% endif %}>{{ place }}</option>
                       {% endfor %}
@@ -393,34 +394,8 @@
               </tbody>
             </table>
           </div>
-          <button class="btn btn-sm btn-success">{{ tr('admin_save_game_result') }}</button>
+          <button class="btn btn-sm btn-success" {% if group_locked %}disabled{% endif %}>{{ tr('admin_save_game_result') }}</button>
         </form>
-        <form action="/admin/group/tie-break" method="post" class="d-flex gap-2">
-          <input type="hidden" name="group_id" value="{{ group.id }}">
-          <select class="form-select" name="tied_user_ids[]" multiple size="4">{% for m in group.members|sort(attribute='seat') %}<option value="{{ m.user_id }}">{{ m.user.nickname }}</option>{% endfor %}</select>
-          <button class="btn btn-sm btn-warning">{{ tr('admin_save_tie_break') }}</button>
-        </form>
-        <div class="small text-muted mt-1">{{ tr('admin_save_tie_break_help') }}</div>
-        <details class="mt-1 small text-muted">
-          <summary>{{ tr('admin_help_examples_title') }}</summary>
-          <div>{{ tr('admin_save_tie_break_example') }}</div>
-        </details>
-        {% if coin_toss_candidates.get(group.id) %}
-        <form action="/admin/group/coin-toss" method="post" class="d-flex gap-2 mt-2">
-          <input type="hidden" name="group_id" value="{{ group.id }}">
-          <select class="form-select" name="tied_user_ids">
-            {% for tie_case in coin_toss_candidates[group.id] %}
-            <option value="{{ tie_case }}">{{ tie_case }}</option>
-            {% endfor %}
-          </select>
-          <button class="btn btn-sm btn-outline-warning">{{ tr('admin_coin_toss') }}</button>
-        </form>
-        <div class="small text-muted mt-1">{{ tr('admin_coin_toss_help') }}</div>
-        <details class="mt-1 small text-muted">
-          <summary>{{ tr('admin_help_examples_title') }}</summary>
-          <div>{{ tr('admin_coin_toss_example') }}</div>
-        </details>
-        {% endif %}
       </div>
       {% else %}
       <div class="alert alert-secondary">{{ tr('admin_groups_not_created') }}</div>
