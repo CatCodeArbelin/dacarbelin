@@ -1067,16 +1067,36 @@ async def admin_group_member_swap(
 @router.post("/admin/group/score")
 async def admin_group_score(
     group_id: int = Form(...),
-    placements: str = Form(default=""),
-    placements_list: list[str] | None = Form(default=None, alias="placements[]"),
+    user_ids: list[str] = Form(..., alias="user_ids[]"),
+    places: list[str] = Form(..., alias="places[]"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Принимает порядок мест в игре и начисляет очки участникам выбранной группы."""
+    """Принимает распределение мест в игре и начисляет очки участникам выбранной группы."""
     try:
-        if placements_list:
-            ordered_user_ids = [int(part) for part in placements_list]
-        else:
-            ordered_user_ids = [int(part.strip()) for part in placements.split(",") if part.strip()]
+        if len(user_ids) != len(places):
+            raise ValueError("Некорректное количество полей")
+
+        placements_map: dict[int, int] = {}
+        for raw_user_id, raw_place in zip(user_ids, places):
+            user_id = int(raw_user_id)
+            place = int(raw_place)
+            if place < 1 or place > 8:
+                raise ValueError("Место должно быть в диапазоне 1..8")
+            if user_id in placements_map:
+                raise ValueError("Дублирующийся участник")
+            placements_map[user_id] = place
+
+        if len(placements_map) != 8:
+            raise ValueError("Нужно передать 8 участников")
+
+        unique_places = set(placements_map.values())
+        if unique_places != set(range(1, 9)):
+            raise ValueError("Места должны быть уникальны и покрывать диапазон 1..8")
+
+        ordered_user_ids = [
+            user_id
+            for user_id, place in sorted(placements_map.items(), key=lambda item: item[1])
+        ]
         await apply_game_results(db, group_id, ordered_user_ids)
         return redirect_with_admin_msg("msg_game_saved")
     except Exception as exc:  # noqa: BLE001

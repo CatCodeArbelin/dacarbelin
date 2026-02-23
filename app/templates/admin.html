@@ -378,9 +378,34 @@
           <div class="col-md-3"><button class="btn btn-sm btn-outline-danger w-100">{{ tr('admin_remove') }}</button></div>
         </form>
 
-        <form action="/admin/group/score" method="post" class="d-flex gap-2 mb-2">
+        <form action="/admin/group/score" method="post" class="mb-2">
           <input type="hidden" name="group_id" value="{{ group.id }}">
-          <select class="form-select" name="placements[]" multiple size="8">{% for m in group.members|sort(attribute='seat') %}<option value="{{ m.user_id }}">{{ m.user.nickname }}</option>{% endfor %}</select>
+          <div class="small text-muted mb-2">{{ tr('admin_group_score_hint') }}</div>
+          <div class="table-responsive">
+            <table class="table table-sm table-dark align-middle mb-2">
+              <thead>
+                <tr>
+                  <th>{{ tr('index_nickname') }}</th>
+                  <th style="width: 180px;">{{ tr('admin_place') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for m in group.members|sort(attribute='seat') %}
+                <tr>
+                  <td>{{ m.user.nickname }}</td>
+                  <td>
+                    <input type="hidden" name="user_ids[]" value="{{ m.user_id }}">
+                    <select class="form-select form-select-sm" name="places[]" required>
+                      {% for place in range(1, 9) %}
+                      <option value="{{ place }}" {% if place == loop.parent.index %}selected{% endif %}>{{ place }}</option>
+                      {% endfor %}
+                    </select>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
           <button class="btn btn-sm btn-success">{{ tr('admin_save_game_result') }}</button>
         </form>
         <form action="/admin/group/tie-break" method="post" class="d-flex gap-2">
