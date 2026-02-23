@@ -177,6 +177,11 @@ async def get_or_create_chat_settings(db: AsyncSession) -> ChatSetting:
     return row
 
 
+def validate_chat_message_length(message: str, max_length: int) -> None:
+    if len(message) > max_length:
+        raise ValueError("msg_message_too_long")
+
+
 async def get_or_create_rules_content(db: AsyncSession) -> RulesContent:
     row = await db.scalar(select(RulesContent).where(RulesContent.id == 1))
     if row:
@@ -319,8 +324,10 @@ async def send_chat(
     if not chat_settings.is_enabled:
         return redirect_with_msg("/", "msg_chat_disabled")
 
-    if len(message) > chat_settings.max_length:
-        return redirect_with_msg("/", "msg_message_too_long")
+    try:
+        validate_chat_message_length(message=message, max_length=chat_settings.max_length)
+    except ValueError as exc:
+        return redirect_with_msg("/", str(exc))
 
     ip = request.client.host if request.client else "unknown"
     last_msg = await db.scalar(
@@ -687,6 +694,9 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     rules_content = await get_or_create_rules_content(db)
     archive_entries = (await db.scalars(select(ArchiveEntry).order_by(ArchiveEntry.sort_order, ArchiveEntry.id))).all()
     chat_settings = await get_or_create_chat_settings(db)
+    chat_messages = (
+        await db.scalars(select(ChatMessage).order_by(desc(ChatMessage.id)).limit(50))
+    ).all()
     await db.commit()
     return templates.TemplateResponse(
         request,
@@ -708,6 +718,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             rules_content=rules_content,
             archive_entries=archive_entries,
             chat_settings=chat_settings,
+            chat_messages=chat_messages,
             coin_toss_candidates=coin_toss_candidates,
             basket_values=[basket.value for basket in Basket],
             manual_draw_users=manual_draw_users,
@@ -1375,3 +1386,40 @@ async def admin_save_chat_settings(
     row.is_enabled = is_enabled
     await db.commit()
     return redirect_with_admin_msg("msg_chat_settings_saved")
+
+
+@router.post("/admin/chat/message/update")
+async def admin_update_chat_message(
+    message_id: int = Form(...),
+    temp_nick: str = Form(...),
+    message: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    chat_message = await db.get(ChatMessage, message_id)
+    if not chat_message:
+        return redirect_with_admin_msg("msg_admin_chat_message_not_found")
+
+    chat_settings = await get_chat_settings(db)
+    try:
+        validate_chat_message_length(message=message, max_length=chat_settings.max_length)
+    except ValueError as exc:
+        return redirect_with_admin_msg(str(exc))
+
+    chat_message.temp_nick = temp_nick[:120]
+    chat_message.message = message
+    await db.commit()
+    return redirect_with_admin_msg("msg_admin_chat_message_saved")
+
+
+@router.post("/admin/chat/message/delete")
+async def admin_delete_chat_message(
+    message_id: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    chat_message = await db.get(ChatMessage, message_id)
+    if not chat_message:
+        return redirect_with_admin_msg("msg_admin_chat_message_not_found")
+
+    await db.delete(chat_message)
+    await db.commit()
+    return redirect_with_admin_msg("msg_admin_chat_message_deleted")
