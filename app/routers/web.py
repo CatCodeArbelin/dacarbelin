@@ -164,6 +164,7 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
     tournament_started = await get_tournament_started(db)
     chat_settings = await get_chat_settings(db)
     return templates.TemplateResponse(
+        request,
         "index.html",
         template_context(
             request,
@@ -347,6 +348,7 @@ async def participants(
     )
 
     return templates.TemplateResponse(
+        request,
         "participants.html",
         template_context(
             request,
@@ -400,6 +402,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
         for stage in playoff_stages
     }
     return templates.TemplateResponse(
+        request,
         "tournament.html",
         template_context(
             request,
@@ -420,6 +423,7 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
     prize_pool_entries = (await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all()
     donors = (await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all()
     return templates.TemplateResponse(
+        request,
         "donate.html",
         template_context(
             request,
@@ -436,21 +440,21 @@ async def rules_page(request: Request, db: AsyncSession = Depends(get_db)):
     # Отдаем страницу правил.
     rules_content = await get_or_create_rules_content(db)
     await db.commit()
-    return templates.TemplateResponse("rules.html", template_context(request, rules_content=rules_content))
+    return templates.TemplateResponse(request, "rules.html", template_context(request, rules_content=rules_content))
 
 
 @router.get("/archive", response_class=HTMLResponse)
 async def archive_page(request: Request, db: AsyncSession = Depends(get_db)):
     # Отдаем страницу архива.
     archive_entries = (await db.scalars(select(ArchiveEntry).where(ArchiveEntry.is_published.is_(True)).order_by(ArchiveEntry.sort_order, ArchiveEntry.id))).all()
-    return templates.TemplateResponse("archive.html", template_context(request, archive_entries=archive_entries))
+    return templates.TemplateResponse(request, "archive.html", template_context(request, archive_entries=archive_entries))
 
 
 @router.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
     if is_admin_session(request.cookies.get(ADMIN_SESSION_COOKIE)):
         return RedirectResponse(url="/admin", status_code=303)
-    return templates.TemplateResponse("admin_login.html", template_context(request))
+    return templates.TemplateResponse(request, "admin_login.html", template_context(request))
 
 
 @router.post("/admin/login")
@@ -551,6 +555,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     chat_settings = await get_or_create_chat_settings(db)
     await db.commit()
     return templates.TemplateResponse(
+        request,
         "admin.html",
         template_context(
             request,
