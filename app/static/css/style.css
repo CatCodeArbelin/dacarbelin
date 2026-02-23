@@ -36,6 +36,36 @@ body {
   color: #d0d8e8 !important;
 }
 
+/* High-contrast alert/badge overrides for dark theme (WCAG AA friendly). */
+.alert-info,
+.alert-contrast {
+  background-color: #123043 !important;
+  border-color: #2f7da8 !important;
+  color: #f1f9ff !important;
+}
+
+.alert-success {
+  background-color: #123322 !important;
+  border-color: #2f9c66 !important;
+  color: #effff4 !important;
+}
+
+.alert-secondary {
+  background-color: #1d2330 !important;
+  border-color: #465168 !important;
+  color: #f4f7ff !important;
+}
+
+.badge.bg-success {
+  background-color: #1e7a4d !important;
+  color: #f6fff9 !important;
+}
+
+.badge.bg-secondary {
+  background-color: #4e576f !important;
+  color: #ffffff !important;
+}
+
 .tournament_playoff_title {
   letter-spacing: 0.04em;
 }
