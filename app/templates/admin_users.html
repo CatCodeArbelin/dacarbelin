@@ -19,6 +19,7 @@
           <th>{{ tr('participants_highest') }}</th>
           <th>Basket</th>
           <th>{{ tr('tournament_pts') }}</th>
+          <th>Ручные очки</th>
           <th>Direct invite</th>
           <th>{{ tr('admin_save') }}</th>
         </tr>
@@ -40,6 +41,9 @@
             </select>
           </td>
           <td>{{ points_by_user.get(user.id, 0) }}</td>
+          <td>
+            <input class="form-control form-control-sm" form="user-update-{{ user.id }}" type="number" min="0" name="manual_points" value="{{ points_by_user.get(user.id, 0) }}">
+          </td>
           <td>
             <select class="form-select form-select-sm" form="user-update-{{ user.id }}" name="direct_invite_stage">
               <option value="" {% if not user.direct_invite_stage %}selected{% endif %}>-</option>

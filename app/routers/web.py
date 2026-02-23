@@ -753,6 +753,7 @@ async def _update_user_allowed_fields(
     nickname: str,
     basket: str,
     direct_invite_stage: str | None,
+    manual_points: int | None = None,
 ) -> RedirectResponse:
     user = await db.get(User, user_id)
     if not user:
@@ -771,6 +772,17 @@ async def _update_user_allowed_fields(
         if field_name not in ALLOWED_USER_UPDATE_FIELDS:
             continue
         setattr(user, field_name, field_value)
+
+    if manual_points is not None:
+        normalized_points = max(0, int(manual_points))
+        group_members = list((await db.scalars(select(GroupMember).where(GroupMember.user_id == user_id))).all())
+        for member in group_members:
+            member.total_points = normalized_points
+
+        playoff_participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.user_id == user_id))).all())
+        for participant in playoff_participants:
+            participant.points = normalized_points
+
     await db.commit()
     return redirect_with_admin_users_msg("msg_status_ok")
 
@@ -781,6 +793,7 @@ async def admin_update_user(
     nickname: str = Form(...),
     basket: str = Form(...),
     direct_invite_stage: str | None = Form(default=None),
+    manual_points: int | None = Form(default=None),
     db: AsyncSession = Depends(get_db),
 ):
     # Атомарно обновляем разрешенные поля пользователя из админ-панели.
@@ -790,6 +803,7 @@ async def admin_update_user(
         nickname=nickname,
         basket=basket,
         direct_invite_stage=direct_invite_stage,
+        manual_points=manual_points,
     )
 
 
@@ -809,6 +823,7 @@ async def admin_update_user_basket(
         nickname=user.nickname,
         basket=basket,
         direct_invite_stage=user.direct_invite_stage,
+        manual_points=None,
     )
 
 

@@ -1,8 +1,9 @@
 """Реализует основную бизнес-логику управления турниром и сеткой матчей."""
 
 from collections import defaultdict
+import random
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.tournament import (
@@ -536,10 +537,20 @@ async def generate_playoff_from_groups(db: AsyncSession) -> tuple[bool, str]:
     if not groups:
         return False, "Сначала требуется сформировать групповой этап"
 
-    if any(group.current_game <= GROUP_STAGE_GAME_LIMIT for group in groups):
+    group_ids = [group.id for group in groups]
+    group_games_played_rows = (
+        await db.execute(
+            select(GroupGameResult.group_id, func.count(func.distinct(GroupGameResult.game_number)))
+            .where(GroupGameResult.group_id.in_(group_ids))
+            .group_by(GroupGameResult.group_id)
+        )
+    ).all()
+    games_played_by_group = {int(group_id): int(games_count or 0) for group_id, games_count in group_games_played_rows}
+
+    if any(games_played_by_group.get(group_id, 0) < GROUP_STAGE_GAME_LIMIT for group_id in group_ids):
         return False, "Продвижение возможно только после 3 игр в каждой группе"
 
-    members = list((await db.scalars(select(GroupMember).where(GroupMember.group_id.in_([g.id for g in groups])))).all())
+    members = list((await db.scalars(select(GroupMember).where(GroupMember.group_id.in_(group_ids)))).all())
     by_group: dict[int, list[GroupMember]] = defaultdict(list)
     for member in members:
         by_group[member.group_id].append(member)
