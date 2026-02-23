@@ -2,6 +2,11 @@
 
 import unittest
 
+from fastapi.testclient import TestClient
+
+from app.db.session import get_db
+from app.main import app
+from app.routers import web
 from app.services.tournament import (
     build_stage_2_player_ids,
     get_stage_group_number_by_seed,
@@ -96,7 +101,6 @@ class TournamentWorkflowTests(unittest.TestCase):
             group_sizes[group_number] = group_sizes.get(group_number, 0) + 1
         self.assertEqual(group_sizes, {1: 8, 2: 8, 3: 8, 4: 8})
 
-
     def test_stage_2_players_requires_exactly_21_promoted(self) -> None:
         """Проверяет негативный сценарий `test_stage_2_players_requires_exactly_21_promoted`.
         Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
@@ -118,6 +122,66 @@ class TournamentWorkflowTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             build_stage_2_player_ids(promoted, [21, *range(101, 111)])
+
+
+class _FakeScalarResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def all(self):
+        return self._rows
+
+
+class _FakeTournamentGroup:
+    id = 1
+    members = []
+
+
+class _FakeTournamentPageDB:
+    def __init__(self) -> None:
+        self._calls = 0
+
+    async def scalars(self, statement):
+        self._calls += 1
+        if self._calls == 1:
+            return _FakeScalarResult([_FakeTournamentGroup()])
+        return _FakeScalarResult([])
+
+
+def test_tournament_page_hides_groups_before_start(monkeypatch) -> None:
+    """Проверяет негативный сценарий `test_tournament_page_hides_groups_before_start`.
+    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+    Запуск: `pytest tests/test_tournament_workflows.py -q` и `pytest tests/test_tournament_workflows.py -k "test_tournament_page_hides_groups_before_start" -q`."""
+
+    fake_db = _FakeTournamentPageDB()
+
+    async def override_get_db():
+        yield fake_db
+
+    async def fake_get_draw_applied(db):
+        return True
+
+    async def fake_get_tournament_started(db):
+        return False
+
+    async def fake_get_playoff_stages_with_data(db):
+        raise AssertionError("Playoff data must stay hidden before tournament start")
+
+    monkeypatch.setattr(web, "get_draw_applied", fake_get_draw_applied)
+    monkeypatch.setattr(web, "get_tournament_started", fake_get_tournament_started)
+    monkeypatch.setattr(web, "get_playoff_stages_with_data", fake_get_playoff_stages_with_data)
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            response = client.get("/tournament")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert "Groups are prepared and will be shown after tournament start" in response.text
+    assert "tournament_group_stage_title" not in response.text
+    assert "Current playoff stage / bracket" not in response.text
 
 
 if __name__ == "__main__":

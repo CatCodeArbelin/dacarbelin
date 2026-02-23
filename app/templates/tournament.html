@@ -20,7 +20,7 @@
   </strong>
 </div>
 
-{% if groups %}
+{% if show_groups and groups %}
   <h3 class="mt-4">{{ tr('tournament_group_stage_title') }}</h3>
   <div class="row g-3">
     {% for group in groups %}
@@ -54,6 +54,8 @@
     </div>
     {% endfor %}
   </div>
+{% elif groups %}
+<div class="alert alert-secondary">{{ tr('tournament_wait_start') }}</div>
 {% else %}
 <div class="alert alert-secondary">{{ tr('tournament_no_draw') }}</div>
 {% endif %}
