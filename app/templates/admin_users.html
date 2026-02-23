@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ tr('admin_users_title') }}</h2>
+{% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}{% if request.query_params.get('details') %}: <span class="small">{{ request.query_params.get('details') }}</span>{% endif %}</div>{% endif %}
+<div class="d-flex justify-content-end align-items-center gap-2 mb-3">
+  <a class="btn btn-sm btn-outline-secondary" href="/admin">{{ tr('admin_back_to_panel') }}</a>
+  <a class="btn btn-sm btn-outline-light" href="/admin/logout">{{ tr('admin_logout') }}</a>
+</div>
+
+<div class="card bg-black neon-border-red"><div class="card-body">
+  <h4>{{ tr('admin_participants_list') }}</h4>
+  <div class="table-responsive">
+    <table class="table table-dark table-sm align-middle">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>{{ tr('participants_nick') }}</th>
+          <th>Steam ID</th>
+          <th>{{ tr('participants_highest') }}</th>
+          <th>Basket</th>
+          <th>Direct invite</th>
+          <th>{{ tr('admin_save') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td>{{ user.id }}</td>
+          <td>
+            <input class="form-control form-control-sm" form="user-update-{{ user.id }}" name="nickname" value="{{ user.nickname }}" maxlength="120" required>
+          </td>
+          <td>{{ user.steam_id }}</td>
+          <td>{{ user.highest_rank }}</td>
+          <td>
+            <select class="form-select form-select-sm" form="user-update-{{ user.id }}" name="basket">
+              {% for basket in basket_values %}
+              <option value="{{ basket }}" {% if user.basket == basket %}selected{% endif %}>{{ basket }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td>
+            <select class="form-select form-select-sm" form="user-update-{{ user.id }}" name="direct_invite_stage">
+              <option value="" {% if not user.direct_invite_stage %}selected{% endif %}>-</option>
+              <option value="stage_2" {% if user.direct_invite_stage == 'stage_2' %}selected{% endif %}>stage_2</option>
+            </select>
+          </td>
+          <td>
+            <form id="user-update-{{ user.id }}" action="/admin/user/update" method="post" class="d-inline">
+              <input type="hidden" name="user_id" value="{{ user.id }}">
+            </form>
+            <button class="btn btn-sm btn-outline-info" form="user-update-{{ user.id }}">{{ tr('admin_save') }}</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div></div>
+{% endblock %}
