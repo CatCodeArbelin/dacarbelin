@@ -123,6 +123,26 @@ def _make_users_with_invited() -> list[User]:
     return users
 
 
+class _FailingAddSession(_FakeSession):
+    def __init__(self, users, fail_on_add_index: int | None = None, fail_on_flush: bool = False, fail_exception: type[Exception] = ValueError):
+        super().__init__(users)
+        self._fail_on_add_index = fail_on_add_index
+        self._fail_on_flush = fail_on_flush
+        self._add_calls = 0
+        self._fail_exception = fail_exception
+
+    def add(self, obj):
+        self._add_calls += 1
+        super().add(obj)
+        if self._fail_on_add_index is not None and self._add_calls == self._fail_on_add_index:
+            raise self._fail_exception("Synthetic add failure")
+
+    async def flush(self):
+        if self._fail_on_flush:
+            raise self._fail_exception("Synthetic flush failure")
+        await super().flush()
+
+
 class TournamentAutoDrawTests(unittest.IsolatedAsyncioTestCase):
     async def test_create_auto_draw_accepts_exact_56_player_grid_7x8(self) -> None:
         """Проверяет граничный сценарий `test_create_auto_draw_accepts_exact_56_player_grid_7x8`.
@@ -216,6 +236,32 @@ class TournamentAutoDrawTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(members), 56)
         self.assertTrue(invited_ids.isdisjoint(member_ids))
+
+    async def test_create_auto_draw_rolls_back_when_add_fails_after_partial_assignments(self) -> None:
+        """Проверяет негативный сценарий `test_create_auto_draw_rolls_back_when_add_fails_after_partial_assignments`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_auto_draw.py -q` и `pytest tests/test_tournament_auto_draw.py -k "test_create_auto_draw_rolls_back_when_add_fails_after_partial_assignments" -q`."""
+        session = _FailingAddSession(users=_make_users(56), fail_on_add_index=10)
+
+        ok, message = await create_auto_draw(session)
+
+        self.assertFalse(ok)
+        self.assertIn("Synthetic add failure", message)
+        self.assertTrue(session.rolled_back)
+        self.assertFalse(session.committed)
+
+    async def test_create_auto_draw_rolls_back_with_status_when_flush_fails_after_groups_created(self) -> None:
+        """Проверяет негативный сценарий `test_create_auto_draw_rolls_back_with_status_when_flush_fails_after_groups_created`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_auto_draw.py -q` и `pytest tests/test_tournament_auto_draw.py -k "test_create_auto_draw_rolls_back_with_status_when_flush_fails_after_groups_created" -q`."""
+        session = _FailingAddSession(users=_make_users(56), fail_on_flush=True)
+
+        ok, message = await create_auto_draw(session)
+
+        self.assertFalse(ok)
+        self.assertIn("Synthetic flush failure", message)
+        self.assertTrue(session.rolled_back)
+        self.assertFalse(session.committed)
 
 
 if __name__ == "__main__":

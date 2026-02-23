@@ -23,6 +23,22 @@ class TournamentWorkflowTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_manual_draw_user_ids("7,7")
 
+    def test_parse_manual_draw_user_ids_invalid_inputs(self) -> None:
+        """Проверяет негативный сценарий `test_parse_manual_draw_user_ids_invalid_inputs`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_workflows.py -q` и `pytest tests/test_tournament_workflows.py -k "test_parse_manual_draw_user_ids_invalid_inputs" -q`."""
+        with self.assertRaises(ValueError) as none_ctx:
+            parse_manual_draw_user_ids(None)
+        self.assertEqual(str(none_ctx.exception), "Список ID участников обязателен")
+
+        with self.assertRaises(ValueError) as letters_ctx:
+            parse_manual_draw_user_ids("1,a,3")
+        self.assertEqual(str(letters_ctx.exception), "ID участников должны быть целыми числами")
+
+        with self.assertRaises(ValueError) as mixed_ctx:
+            parse_manual_draw_user_ids(["10", "x", 12])
+        self.assertEqual(str(mixed_ctx.exception), "ID участников должны быть целыми числами")
+
     def test_playoff_stage_blueprint(self) -> None:
         """Проверяет позитивный сценарий `test_playoff_stage_blueprint`.
         Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.

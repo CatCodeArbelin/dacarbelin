@@ -98,3 +98,118 @@ def test_fetch_autochess_data_uses_steam_summary_nickname_when_name_missing(monk
     result = asyncio.run(steam.fetch_autochess_data(steam_id))
 
     assert result["game_nickname"] == "Readable Steam Nick"
+
+
+def test_fetch_autochess_data_falls_back_to_steam_id_when_summary_players_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Проверяет граничный сценарий `test_fetch_autochess_data_falls_back_to_steam_id_when_summary_players_empty`.
+    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+    Запуск: `pytest tests/test_steam.py -q` и `pytest tests/test_steam.py -k "test_fetch_autochess_data_falls_back_to_steam_id_when_summary_players_empty" -q`."""
+    steam_id = "76561198000000000"
+
+    class FakeResponse:
+        def __init__(self, status_code: int, payload: dict | None = None, text: str = "") -> None:
+            self.status_code = status_code
+            self._payload = payload or {}
+            self.text = text
+
+        def json(self) -> dict:
+            return self._payload
+
+        def raise_for_status(self) -> None:
+            if self.status_code >= 400:
+                raise RuntimeError("HTTP error")
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def get(self, url: str, params: dict | None = None) -> FakeResponse:
+            if "autochess.ppbizon.com" in url:
+                return FakeResponse(
+                    status_code=200,
+                    payload={
+                        "user_info": {
+                            steam_id: {
+                                "steam_id": steam_id,
+                                "mmr_s15": 1900,
+                                "max_mmr_s15": 2100,
+                            }
+                        }
+                    },
+                )
+
+            if "GetPlayerSummaries" in url:
+                return FakeResponse(status_code=200, payload={"response": {"players": []}})
+
+            if f"steamcommunity.com/profiles/{steam_id}/?xml=1" in url:
+                return FakeResponse(status_code=404, text="")
+
+            raise AssertionError(f"Unexpected URL: {url}")
+
+    monkeypatch.setattr(steam.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(steam.settings, "steam_api_key", "test-key")
+
+    result = asyncio.run(steam.fetch_autochess_data(steam_id))
+
+    assert result["game_nickname"] == steam_id
+
+
+def test_fetch_autochess_data_propagates_summary_request_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Проверяет негативный сценарий `test_fetch_autochess_data_propagates_summary_request_error`.
+    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+    Запуск: `pytest tests/test_steam.py -q` и `pytest tests/test_steam.py -k "test_fetch_autochess_data_propagates_summary_request_error" -q`."""
+    steam_id = "76561198000000000"
+
+    class FakeResponse:
+        def __init__(self, status_code: int, payload: dict) -> None:
+            self.status_code = status_code
+            self._payload = payload
+
+        def json(self) -> dict:
+            return self._payload
+
+        def raise_for_status(self) -> None:
+            if self.status_code >= 400:
+                raise RuntimeError("HTTP error")
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def get(self, url: str, params: dict | None = None) -> FakeResponse:
+            if "autochess.ppbizon.com" in url:
+                return FakeResponse(
+                    status_code=200,
+                    payload={
+                        "user_info": {
+                            steam_id: {
+                                "steam_id": steam_id,
+                                "mmr_s15": 1900,
+                                "max_mmr_s15": 2100,
+                            }
+                        }
+                    },
+                )
+
+            if "GetPlayerSummaries" in url:
+                raise RuntimeError("Steam summary API unavailable")
+
+            raise AssertionError(f"Unexpected URL: {url}")
+
+    monkeypatch.setattr(steam.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(steam.settings, "steam_api_key", "test-key")
+
+    with pytest.raises(RuntimeError, match="Steam summary API unavailable"):
+        asyncio.run(steam.fetch_autochess_data(steam_id))
