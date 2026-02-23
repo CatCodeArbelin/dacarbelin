@@ -31,6 +31,9 @@ class _FakeDB:
 
 
 def test_participants_direct_invites_shows_stage_2_user() -> None:
+    """Проверяет позитивный сценарий `test_participants_direct_invites_shows_stage_2_user`.
+    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+    Запуск: `pytest tests/test_participants_direct_invites.py -q` и `pytest tests/test_participants_direct_invites.py -k "test_participants_direct_invites_shows_stage_2_user" -q`."""
     stage_2_user = User(
         nickname="stage2_user",
         steam_input="stage2_input",
@@ -63,6 +66,9 @@ def test_participants_direct_invites_shows_stage_2_user() -> None:
 
 
 def test_participants_direct_invites_excludes_non_stage_2_invites() -> None:
+    """Проверяет негативный сценарий `test_participants_direct_invites_excludes_non_stage_2_invites`.
+    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+    Запуск: `pytest tests/test_participants_direct_invites.py -q` и `pytest tests/test_participants_direct_invites.py -k "test_participants_direct_invites_excludes_non_stage_2_invites" -q`."""
     stage_2_user = User(
         nickname="visible_invite",
         steam_input="stage2_input_visible",

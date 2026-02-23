@@ -125,6 +125,9 @@ def _make_users_with_invited() -> list[User]:
 
 class TournamentAutoDrawTests(unittest.IsolatedAsyncioTestCase):
     async def test_create_auto_draw_accepts_exact_56_player_grid_7x8(self) -> None:
+        """Проверяет граничный сценарий `test_create_auto_draw_accepts_exact_56_player_grid_7x8`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_auto_draw.py -q` и `pytest tests/test_tournament_auto_draw.py -k "test_create_auto_draw_accepts_exact_56_player_grid_7x8" -q`."""
         session = _FakeSession(users=_make_users(56))
 
         ok, _message = await create_auto_draw(session)
@@ -142,6 +145,9 @@ class TournamentAutoDrawTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sorted(members_by_group.values()), [8, 8, 8, 8, 8, 8, 8])
 
     async def test_create_auto_draw_rejects_if_less_than_56_players(self) -> None:
+        """Проверяет негативный сценарий `test_create_auto_draw_rejects_if_less_than_56_players`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_auto_draw.py -q` и `pytest tests/test_tournament_auto_draw.py -k "test_create_auto_draw_rejects_if_less_than_56_players" -q`."""
         session = _FakeSession(users=_make_users(55))
 
         ok, message = await create_auto_draw(session)
@@ -152,6 +158,9 @@ class TournamentAutoDrawTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(session.committed)
 
     async def test_create_auto_draw_creates_exactly_7_groups_and_56_members(self) -> None:
+        """Проверяет граничный сценарий `test_create_auto_draw_creates_exactly_7_groups_and_56_members`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_auto_draw.py -q` и `pytest tests/test_tournament_auto_draw.py -k "test_create_auto_draw_creates_exactly_7_groups_and_56_members" -q`."""
         session = _FakeSession(users=_make_users(56))
 
         ok, _message = await create_auto_draw(session)
@@ -164,6 +173,9 @@ class TournamentAutoDrawTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(session.committed)
 
     async def test_create_auto_draw_with_more_than_56_still_assigns_56(self) -> None:
+        """Проверяет граничный сценарий `test_create_auto_draw_with_more_than_56_still_assigns_56`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_auto_draw.py -q` и `pytest tests/test_tournament_auto_draw.py -k "test_create_auto_draw_with_more_than_56_still_assigns_56" -q`."""
         session = _FakeSession(users=_make_users(60))
 
         ok, _message = await create_auto_draw(session)
@@ -175,6 +187,9 @@ class TournamentAutoDrawTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(members), 56)
 
     async def test_create_auto_draw_accepts_reserve_baskets_for_7x8(self) -> None:
+        """Проверяет позитивный сценарий `test_create_auto_draw_accepts_reserve_baskets_for_7x8`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_auto_draw.py -q` и `pytest tests/test_tournament_auto_draw.py -k "test_create_auto_draw_accepts_reserve_baskets_for_7x8" -q`."""
         session = _FakeSession(users=_make_users_with_reserve_mix())
 
         ok, _message = await create_auto_draw(session)
@@ -187,6 +202,9 @@ class TournamentAutoDrawTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(session.committed)
 
     async def test_create_auto_draw_excludes_invited_from_group_stage(self) -> None:
+        """Проверяет негативный сценарий `test_create_auto_draw_excludes_invited_from_group_stage`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_auto_draw.py -q` и `pytest tests/test_tournament_auto_draw.py -k "test_create_auto_draw_excludes_invited_from_group_stage" -q`."""
         session = _FakeSession(users=_make_users_with_invited())
 
         ok, _message = await create_auto_draw(session)

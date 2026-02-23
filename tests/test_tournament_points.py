@@ -42,6 +42,9 @@ class _FakeSession:
 
 class TournamentPointsTests(unittest.IsolatedAsyncioTestCase):
     async def test_apply_game_results_uses_points_by_place(self) -> None:
+        """Проверяет позитивный сценарий `test_apply_game_results_uses_points_by_place`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_points.py -q` и `pytest tests/test_tournament_points.py -k "test_apply_game_results_uses_points_by_place" -q`."""
         group = TournamentGroup(id=1, name="Group A", lobby_password="1234", schedule_text="TBD", current_game=1)
         members = [
             GroupMember(group_id=1, user_id=i, seat=i, total_points=0, first_places=0, top4_finishes=0, eighth_places=0, last_game_place=8)
@@ -58,6 +61,9 @@ class TournamentPointsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(points_by_place[8], 0)
 
     def test_apply_points_to_playoff_participant_standard_stage(self) -> None:
+        """Проверяет позитивный сценарий `test_apply_points_to_playoff_participant_standard_stage`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_points.py -q` и `pytest tests/test_tournament_points.py -k "test_apply_points_to_playoff_participant_standard_stage" -q`."""
         place_to_points = {1: 8, 2: 6, 8: 0}
         for place, expected_points in place_to_points.items():
             with self.subTest(place=place):

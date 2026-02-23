@@ -14,6 +14,9 @@ from app.main import app
 
 
 def test_admin_key_auth_works_for_admin_path_without_trailing_slash() -> None:
+    """Проверяет позитивный сценарий `test_admin_key_auth_works_for_admin_path_without_trailing_slash`.
+    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+    Запуск: `pytest tests/test_admin_middleware.py -q` и `pytest tests/test_admin_middleware.py -k "test_admin_key_auth_works_for_admin_path_without_trailing_slash" -q`."""
     client = TestClient(app)
 
     response = client.get("/admin?admin_key=test_admin", follow_redirects=False)
@@ -24,6 +27,9 @@ def test_admin_key_auth_works_for_admin_path_without_trailing_slash() -> None:
 
 
 def test_admin_key_auth_works_for_admin_path_with_trailing_slash() -> None:
+    """Проверяет позитивный сценарий `test_admin_key_auth_works_for_admin_path_with_trailing_slash`.
+    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+    Запуск: `pytest tests/test_admin_middleware.py -q` и `pytest tests/test_admin_middleware.py -k "test_admin_key_auth_works_for_admin_path_with_trailing_slash" -q`."""
     client = TestClient(app)
 
     response = client.get("/admin/?admin_key=test_admin", follow_redirects=False)

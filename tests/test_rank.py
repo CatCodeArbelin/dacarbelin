@@ -7,10 +7,16 @@ from app.services.rank import mmr_to_rank
 
 class MmrToRankTests(unittest.TestCase):
     def test_queen_rank_formatting(self) -> None:
+        """Проверяет позитивный сценарий `test_queen_rank_formatting`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_rank.py -q` и `pytest tests/test_rank.py -k "test_queen_rank_formatting" -q`."""
         self.assertEqual(mmr_to_rank(3380, queen_rank=42), "Queen#42")
         self.assertEqual(mmr_to_rank(3600, queen_rank=None), "Queen")
 
     def test_threshold_boundaries_across_all_leagues(self) -> None:
+        """Проверяет граничный сценарий `test_threshold_boundaries_across_all_leagues`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_rank.py -q` и `pytest tests/test_rank.py -k "test_threshold_boundaries_across_all_leagues" -q`."""
         # exact threshold, threshold-1 and midpoints for each league
         cases: list[tuple[int, str]] = [
             # Queen / King
