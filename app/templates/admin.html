@@ -160,7 +160,14 @@
       <p class="small text-contrast-muted">{{ score_hint }}</p>
       <form action="/admin/draw/manual" method="post" class="row g-2 mb-3">
         <div class="col-md-3"><input class="form-control" type="number" min="1" max="8" name="group_count" value="8" required></div>
-        <div class="col-md-7"><input class="form-control" name="user_ids" placeholder="user_id,user_id,... (optional)"></div>
+        <div class="col-md-7">
+          <select class="form-select" name="user_ids[]" multiple size="8">
+            {% for user in manual_draw_users %}
+            <option value="{{ user.id }}">{{ user.nickname }} (+ {{ user.steam_id }})</option>
+            {% endfor %}
+          </select>
+          <div class="form-text text-contrast-muted">Если никого не выбрать, жеребьевка пройдет по всем доступным участникам.</div>
+        </div>
         <div class="col-md-2"><button class="btn btn-outline-danger w-100">Manual draw</button></div>
       </form>
 

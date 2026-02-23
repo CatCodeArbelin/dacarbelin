@@ -14,7 +14,9 @@ from app.services.tournament import (
 class TournamentWorkflowTests(unittest.TestCase):
     def test_parse_manual_draw_user_ids(self) -> None:
         self.assertEqual(parse_manual_draw_user_ids("1, 2,3"), [1, 2, 3])
+        self.assertEqual(parse_manual_draw_user_ids(["4", " 5 ", "6"]), [4, 5, 6])
         self.assertEqual(parse_manual_draw_user_ids(""), [])
+        self.assertEqual(parse_manual_draw_user_ids([]), [])
         with self.assertRaises(ValueError):
             parse_manual_draw_user_ids("7,7")
 

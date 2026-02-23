@@ -231,10 +231,19 @@ async def create_manual_group(db: AsyncSession, name: str, lobby_password: str) 
 
 
 
-def parse_manual_draw_user_ids(raw_user_ids: str) -> list[int]:
-    if not raw_user_ids.strip():
+def parse_manual_draw_user_ids(raw_user_ids: str | list[str] | tuple[str, ...] | None) -> list[int]:
+    if raw_user_ids is None:
         return []
-    parsed = [int(part.strip()) for part in raw_user_ids.split(",") if part.strip()]
+
+    if isinstance(raw_user_ids, str):
+        parts = [part.strip() for part in raw_user_ids.split(",") if part.strip()]
+    else:
+        parts = [str(part).strip() for part in raw_user_ids if str(part).strip()]
+
+    if not parts:
+        return []
+
+    parsed = [int(part) for part in parts]
     if len(parsed) != len(set(parsed)):
         raise ValueError("ID участников в ручной жеребьевке должны быть уникальны")
     return parsed
