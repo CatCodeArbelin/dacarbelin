@@ -191,11 +191,16 @@
       </form>
 
       <div class="d-flex flex-column gap-2 mb-3">
+        <div>
+          <span class="badge {% if draw_applied %}bg-success{% else %}bg-warning text-dark{% endif %}">
+            {% if draw_applied %}Жеребьевка применена{% else %}Жеребьевка не применена{% endif %}
+          </span>
+        </div>
         <form action="/admin/draw/apply" method="post">
           <button class="btn btn-success w-100">Применить жеребьевку</button>
         </form>
         <form action="/admin/tournament/start" method="post">
-          <button class="btn btn-danger w-100" {% if tournament_started %}disabled{% endif %}>Начать турнир</button>
+          <button class="btn btn-danger w-100" {% if tournament_started or not draw_applied %}disabled{% endif %}>Начать турнир</button>
         </form>
       </div>
 
