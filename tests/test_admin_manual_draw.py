@@ -1,0 +1,34 @@
+"""Проверяет ручную жеребьевку через admin API с выбором участников из формы."""
+
+import os
+
+from fastapi.testclient import TestClient
+
+os.environ["DATABASE_URL"] = "postgresql+asyncpg://user:pass@localhost/test_db"
+os.environ.setdefault("ADMIN_KEY", "test_admin")
+
+from app.core.admin_session import ADMIN_SESSION_COOKIE, create_admin_session_cookie
+from app.main import app
+from app.routers import web
+
+
+def test_admin_manual_draw_accepts_user_ids_array(monkeypatch) -> None:
+    captured: dict[str, int | list[int]] = {}
+
+    async def fake_create_manual_draw(db, group_count: int, user_ids: list[int]) -> None:
+        captured["group_count"] = group_count
+        captured["user_ids"] = user_ids
+
+    monkeypatch.setattr(web, "create_manual_draw", fake_create_manual_draw)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/draw/manual",
+            data={"group_count": "2", "user_ids[]": ["11", "12"]},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_status_ok"
+    assert captured == {"group_count": 2, "user_ids": [11, 12]}

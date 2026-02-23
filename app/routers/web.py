@@ -475,6 +475,13 @@ async def admin_logout():
 @router.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     users = (await db.scalars(select(User).order_by(desc(User.created_at)).limit(300))).all()
+    manual_draw_users = (
+        await db.scalars(
+            select(User)
+            .where(User.basket != Basket.INVITED.value)
+            .order_by(User.nickname.asc(), User.created_at.desc())
+        )
+    ).all()
     stages = (await db.scalars(select(TournamentStage).order_by(TournamentStage.id))).all()
     groups = list(
         (
@@ -537,6 +544,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             chat_settings=chat_settings,
             coin_toss_candidates=coin_toss_candidates,
             basket_values=[basket.value for basket in Basket],
+            manual_draw_users=manual_draw_users,
         ),
     )
 
@@ -719,10 +727,11 @@ async def admin_auto_draw(db: AsyncSession = Depends(get_db)):
 async def admin_manual_draw(
     group_count: int = Form(...),
     user_ids: str = Form(default=""),
+    user_ids_list: list[str] | None = Form(default=None, alias="user_ids[]"),
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        parsed_user_ids = parse_manual_draw_user_ids(user_ids)
+        parsed_user_ids = parse_manual_draw_user_ids(user_ids_list if user_ids_list else user_ids)
         await create_manual_draw(db, group_count=group_count, user_ids=parsed_user_ids)
         return redirect_with_admin_msg("msg_status_ok")
     except Exception:  # noqa: BLE001
