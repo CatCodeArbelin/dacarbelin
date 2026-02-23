@@ -120,6 +120,45 @@ async def get_tournament_started(db: AsyncSession) -> bool:
     return (record.value == "1") if record else False
 
 
+async def get_draw_applied(db: AsyncSession) -> bool:
+    record = await db.scalar(select(SiteSetting).where(SiteSetting.key == "draw_applied"))
+    return (record.value == "1") if record else False
+
+
+async def set_draw_applied(db: AsyncSession, value: bool) -> None:
+    record = await db.scalar(select(SiteSetting).where(SiteSetting.key == "draw_applied"))
+    if not record:
+        record = SiteSetting(key="draw_applied", value="0")
+        db.add(record)
+    record.value = "1" if value else "0"
+
+
+async def validate_group_draw_integrity(db: AsyncSession) -> tuple[bool, str | None]:
+    groups = list((await db.scalars(select(TournamentGroup).where(TournamentGroup.stage == "group_stage"))).all())
+    if not groups:
+        return False, "draw_not_found"
+
+    group_ids = [group.id for group in groups]
+    members = list((await db.scalars(select(GroupMember).where(GroupMember.group_id.in_(group_ids)))).all())
+    by_group: dict[int, list[GroupMember]] = {}
+    all_user_ids: list[int] = []
+    for member in members:
+        by_group.setdefault(member.group_id, []).append(member)
+        all_user_ids.append(member.user_id)
+
+    if len(all_user_ids) != len(set(all_user_ids)):
+        return False, "draw_duplicates_found"
+
+    for group in groups:
+        group_members = by_group.get(group.id, [])
+        if not group_members:
+            return False, "draw_empty_group"
+        if len(group_members) != 8:
+            return False, "draw_group_size_invalid"
+
+    return True, None
+
+
 async def get_chat_settings(db: AsyncSession) -> ChatSetting:
     row = await db.scalar(select(ChatSetting).where(ChatSetting.id == 1))
     if row:
@@ -546,6 +585,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     registration_open = (registration_setting.value == "1") if registration_setting else True
     tournament_started_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_started"))
     tournament_started = (tournament_started_setting.value == "1") if tournament_started_setting else False
+    draw_applied = await get_draw_applied(db)
     donation_links = (await db.scalars(select(DonationLink).order_by(DonationLink.sort_order, DonationLink.id))).all()
     donation_methods = (await db.scalars(select(DonationMethod).order_by(DonationMethod.method_type, DonationMethod.sort_order, DonationMethod.id))).all()
     prize_pool_entries = (await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all()
@@ -566,6 +606,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             score_hint="user_id1,user_id2,...,user_id8",
             registration_open=registration_open,
             tournament_started=tournament_started,
+            draw_applied=draw_applied,
             donation_links=donation_links,
             donation_methods=donation_methods,
             prize_pool_entries=prize_pool_entries,
@@ -687,6 +728,10 @@ async def admin_registration_toggle(
 
 @router.post("/admin/tournament/start")
 async def admin_start_tournament(db: AsyncSession = Depends(get_db)):
+    draw_applied = await get_draw_applied(db)
+    if not draw_applied:
+        return redirect_with_admin_msg("msg_operation_failed", details="draw_not_applied")
+
     tournament_started_row = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_started"))
     if not tournament_started_row:
         tournament_started_row = SiteSetting(key="tournament_started", value="0")
@@ -751,6 +796,9 @@ async def admin_invite_user(
 async def admin_auto_draw(db: AsyncSession = Depends(get_db)):
     # Запускаем автоматическую жеребьевку группового этапа.
     ok, message = await create_auto_draw(db)
+    if ok:
+        await set_draw_applied(db, False)
+        await db.commit()
     return redirect_with_admin_msg("msg_status_ok" if ok else "msg_status_warn", details=None if ok else message)
 
 
@@ -766,6 +814,8 @@ async def admin_manual_draw(
     try:
         parsed_user_ids = parse_manual_draw_user_ids(user_ids_list if user_ids_list else user_ids)
         await create_manual_draw(db, group_count=group_count, user_ids=parsed_user_ids)
+        await set_draw_applied(db, False)
+        await db.commit()
         return redirect_with_admin_msg("msg_status_ok")
     except Exception:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
@@ -822,6 +872,8 @@ async def admin_group_create(
 ):
     try:
         await create_manual_group(db, name=name, lobby_password=lobby_password)
+        await set_draw_applied(db, False)
+        await db.commit()
         return redirect_with_admin_msg("msg_status_ok")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
@@ -829,11 +881,11 @@ async def admin_group_create(
 
 @router.post("/admin/draw/apply")
 async def admin_apply_draw(db: AsyncSession = Depends(get_db)):
-    groups_exist = await db.scalar(
-        select(TournamentGroup.id).where(TournamentGroup.stage == "group_stage").limit(1)
-    )
-    if not groups_exist:
-        return redirect_with_admin_msg("msg_operation_failed", details="draw_not_found")
+    is_valid, details = await validate_group_draw_integrity(db)
+    if not is_valid:
+        return redirect_with_admin_msg("msg_operation_failed", details=details)
+    await set_draw_applied(db, True)
+    await db.commit()
     return redirect_with_admin_msg("msg_status_ok")
 
 
@@ -845,6 +897,8 @@ async def admin_group_member_add(
 ):
     try:
         await add_group_member(db, group_id=group_id, user_id=user_id)
+        await set_draw_applied(db, False)
+        await db.commit()
         return redirect_with_admin_msg("msg_status_ok")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
@@ -858,6 +912,8 @@ async def admin_group_member_remove(
 ):
     try:
         await remove_group_member(db, group_id=group_id, user_id=user_id)
+        await set_draw_applied(db, False)
+        await db.commit()
         return redirect_with_admin_msg("msg_status_ok")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
@@ -872,6 +928,8 @@ async def admin_group_member_move(
 ):
     try:
         await move_group_member(db, from_group_id=from_group_id, to_group_id=to_group_id, user_id=user_id)
+        await set_draw_applied(db, False)
+        await db.commit()
         return redirect_with_admin_msg("msg_status_ok")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
@@ -893,6 +951,8 @@ async def admin_group_member_swap(
             second_group_id=second_group_id,
             second_user_id=second_user_id,
         )
+        await set_draw_applied(db, False)
+        await db.commit()
         return redirect_with_admin_msg("msg_status_ok")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
