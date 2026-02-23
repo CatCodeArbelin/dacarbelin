@@ -130,3 +130,108 @@ def test_admin_manual_draw_resets_draw_applied(monkeypatch) -> None:
     assert response.status_code == 303
     assert response.headers["location"] == "/admin?msg=msg_status_ok"
     assert state == {"set_false": True, "committed": True}
+
+
+def test_admin_group_score_builds_ordered_user_ids_from_places(monkeypatch) -> None:
+    """Проверяет, что admin/group/score сортирует участников по местам перед вызовом сервиса."""
+    captured: dict[str, int | list[int]] = {}
+
+    async def fake_apply_game_results(db, group_id: int, ordered_user_ids: list[int]) -> None:
+        captured["group_id"] = group_id
+        captured["ordered_user_ids"] = ordered_user_ids
+
+    monkeypatch.setattr(web, "apply_game_results", fake_apply_game_results)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/group/score",
+            data={
+                "group_id": "7",
+                "user_ids[]": ["101", "102", "103", "104", "105", "106", "107", "108"],
+                "places[]": ["2", "1", "3", "4", "5", "6", "7", "8"],
+            },
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_game_saved"
+    assert captured == {"group_id": 7, "ordered_user_ids": [102, 101, 103, 104, 105, 106, 107, 108]}
+
+
+def test_admin_group_score_rejects_duplicate_places() -> None:
+    """Негативный кейс: повторяющееся место."""
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/group/score",
+            data={
+                "group_id": "7",
+                "user_ids[]": ["101", "102", "103", "104", "105", "106", "107", "108"],
+                "places[]": ["1", "1", "3", "4", "5", "6", "7", "8"],
+            },
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_operation_failed"
+
+
+def test_admin_group_score_rejects_not_all_places() -> None:
+    """Негативный кейс: неполное покрытие диапазона мест 1..8."""
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/group/score",
+            data={
+                "group_id": "7",
+                "user_ids[]": ["101", "102", "103", "104", "105", "106", "107", "108"],
+                "places[]": ["1", "2", "3", "4", "5", "6", "7", "7"],
+            },
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_operation_failed"
+
+
+def test_admin_group_score_rejects_less_than_eight_participants() -> None:
+    """Негативный кейс: передано меньше 8 участников."""
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/group/score",
+            data={
+                "group_id": "7",
+                "user_ids[]": ["101", "102", "103", "104", "105", "106", "107"],
+                "places[]": ["1", "2", "3", "4", "5", "6", "7"],
+            },
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_operation_failed"
+
+
+def test_admin_group_score_rejects_player_not_in_group(monkeypatch) -> None:
+    """Негативный кейс: сервис отклоняет игрока, которого нет в группе."""
+
+    async def fake_apply_game_results(db, group_id: int, ordered_user_ids: list[int]) -> None:
+        raise ValueError("В результатах есть игрок, которого нет в группе")
+
+    monkeypatch.setattr(web, "apply_game_results", fake_apply_game_results)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/group/score",
+            data={
+                "group_id": "7",
+                "user_ids[]": ["101", "102", "103", "104", "105", "106", "107", "108"],
+                "places[]": ["1", "2", "3", "4", "5", "6", "7", "8"],
+            },
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_operation_failed"
