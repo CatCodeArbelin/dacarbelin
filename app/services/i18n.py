@@ -3,11 +3,13 @@
 TRANSLATIONS = {
     "en": {
         "title": "DAC Tournament",
+        "nav_home": "Home",
         "nav_participants": "Participants",
         "nav_tournament": "Tournament",
         "nav_donate": "Donate",
         "nav_rules": "Rules",
         "nav_archive": "Archive",
+        "nav_admin": "Admin",
         "register": "Registration",
         "submit": "Submit",
         "already_registered": "You are already registered",
@@ -232,11 +234,13 @@ TRANSLATIONS = {
     },
     "ru": {
         "title": "DAC Турнир",
+        "nav_home": "Главная страница",
         "nav_participants": "Участники",
         "nav_tournament": "Турнир",
         "nav_donate": "Донаты",
         "nav_rules": "Правила",
         "nav_archive": "Архив",
+        "nav_admin": "Админка",
         "register": "Регистрация",
         "submit": "Отправить",
         "already_registered": "Вы уже зарегистрированы",
