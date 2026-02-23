@@ -21,11 +21,23 @@ POINTS_BY_PLACE = {1: 8, 2: 6, 3: 5, 4: 4, 5: 3, 6: 2, 7: 1, 8: 0}
 PRIMARY_BASKETS = [
     Basket.QUEEN_TOP.value,
     Basket.QUEEN.value,
+    Basket.QUEEN_RESERVE.value,
     Basket.KING.value,
+    Basket.KING_RESERVE.value,
     Basket.ROOK.value,
+    Basket.ROOK_RESERVE.value,
     Basket.BISHOP.value,
+    Basket.BISHOP_RESERVE.value,
     Basket.LOW_RANK.value,
+    Basket.LOW_RANK_RESERVE.value,
 ]
+
+PRIMARY_DRAW_BASKETS_WITH_RESERVE = {
+    Basket.QUEEN.value: Basket.QUEEN_RESERVE.value,
+    Basket.KING.value: Basket.KING_RESERVE.value,
+    Basket.ROOK.value: Basket.ROOK_RESERVE.value,
+    Basket.BISHOP.value: Basket.BISHOP_RESERVE.value,
+}
 
 
 def generate_password() -> str:
@@ -70,16 +82,21 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
         assigned_by_group: list[list[User]] = []
         for _ in range(expected_group_count):
             picked: list[User] = []
-            for basket in [Basket.QUEEN.value, Basket.KING.value, Basket.ROOK.value, Basket.BISHOP.value]:
-                if by_basket[basket]:
-                    picked.append(by_basket[basket].pop())
-                if by_basket[basket]:
-                    picked.append(by_basket[basket].pop())
+            for basket, reserve_basket in PRIMARY_DRAW_BASKETS_WITH_RESERVE.items():
+                for _ in range(2):
+                    source_basket = basket
+                    if not by_basket[source_basket] and by_basket[reserve_basket]:
+                        source_basket = reserve_basket
+
+                    if by_basket[source_basket]:
+                        picked.append(by_basket[source_basket].pop())
                 if len(picked) >= 8:
                     break
 
             fallback_pool: list[User] = []
             for basket in PRIMARY_BASKETS:
+                if basket == Basket.INVITED.value:
+                    continue
                 fallback_pool.extend(by_basket[basket])
             random.shuffle(fallback_pool)
             while len(picked) < 8 and fallback_pool:

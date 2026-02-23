@@ -75,6 +75,54 @@ def _make_users(count: int) -> list[User]:
     ]
 
 
+def _make_users_with_reserve_mix() -> list[User]:
+    baskets = [
+        Basket.QUEEN.value,
+        Basket.QUEEN_RESERVE.value,
+        Basket.KING.value,
+        Basket.KING_RESERVE.value,
+        Basket.ROOK.value,
+        Basket.ROOK_RESERVE.value,
+        Basket.BISHOP.value,
+        Basket.BISHOP_RESERVE.value,
+        Basket.LOW_RANK.value,
+        Basket.LOW_RANK_RESERVE.value,
+    ]
+    return [
+        User(
+            id=idx,
+            nickname=f"u{idx}",
+            steam_input=f"steam_{idx}",
+            steam_id=f"sid_{idx}",
+            game_nickname=f"g{idx}",
+            current_rank="Rook",
+            highest_rank="Queen",
+            basket=baskets[(idx - 1) % len(baskets)],
+        )
+        for idx in range(1, 57)
+    ]
+
+
+def _make_users_with_invited() -> list[User]:
+    users = _make_users(56)
+    users.extend(
+        [
+            User(
+                id=1000 + idx,
+                nickname=f"inv{idx}",
+                steam_input=f"inv_steam_{idx}",
+                steam_id=f"inv_sid_{idx}",
+                game_nickname=f"inv_g{idx}",
+                current_rank="Queen",
+                highest_rank="Queen",
+                basket=Basket.INVITED.value,
+            )
+            for idx in range(1, 5)
+        ]
+    )
+    return users
+
+
 class TournamentAutoDrawTests(unittest.IsolatedAsyncioTestCase):
     async def test_create_auto_draw_accepts_exact_56_player_grid_7x8(self) -> None:
         session = _FakeSession(users=_make_users(56))
@@ -125,6 +173,31 @@ class TournamentAutoDrawTests(unittest.IsolatedAsyncioTestCase):
         members = [obj for obj in session.added if isinstance(obj, GroupMember)]
         self.assertEqual(len(groups), 7)
         self.assertEqual(len(members), 56)
+
+    async def test_create_auto_draw_accepts_reserve_baskets_for_7x8(self) -> None:
+        session = _FakeSession(users=_make_users_with_reserve_mix())
+
+        ok, _message = await create_auto_draw(session)
+
+        self.assertTrue(ok)
+        groups = [obj for obj in session.added if isinstance(obj, TournamentGroup)]
+        members = [obj for obj in session.added if isinstance(obj, GroupMember)]
+        self.assertEqual(len(groups), 7)
+        self.assertEqual(len(members), 56)
+        self.assertTrue(session.committed)
+
+    async def test_create_auto_draw_excludes_invited_from_group_stage(self) -> None:
+        session = _FakeSession(users=_make_users_with_invited())
+
+        ok, _message = await create_auto_draw(session)
+
+        self.assertTrue(ok)
+        members = [obj for obj in session.added if isinstance(obj, GroupMember)]
+        invited_ids = {user.id for user in session._users if user.basket == Basket.INVITED.value}
+        member_ids = {member.user_id for member in members}
+
+        self.assertEqual(len(members), 56)
+        self.assertTrue(invited_ids.isdisjoint(member_ids))
 
 
 if __name__ == "__main__":
