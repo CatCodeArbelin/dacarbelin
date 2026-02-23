@@ -235,3 +235,59 @@ def test_admin_group_score_rejects_player_not_in_group(monkeypatch) -> None:
 
     assert response.status_code == 303
     assert response.headers["location"] == "/admin?msg=msg_operation_failed"
+
+
+def test_admin_playoff_start_returns_friendly_error_for_invalid_stage(monkeypatch) -> None:
+    """Негативный кейс: invalid stage_id для запуска стадии playoff."""
+
+    async def fake_playoff_stage_exists(db, stage_id: int) -> bool:
+        return False
+
+    monkeypatch.setattr(web, "_playoff_stage_exists", fake_playoff_stage_exists)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post("/admin/playoff/start", data={"stage_id": "999"}, follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_invalid_playoff_stage"
+
+
+def test_admin_playoff_move_returns_friendly_error_for_invalid_stage(monkeypatch) -> None:
+    """Негативный кейс: invalid from/to stage_id для ручного переноса в playoff."""
+
+    async def fake_playoff_stage_exists(db, stage_id: int) -> bool:
+        return False
+
+    monkeypatch.setattr(web, "_playoff_stage_exists", fake_playoff_stage_exists)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/playoff/move",
+            data={"from_stage_id": "999", "to_stage_id": "998", "user_id": "11"},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_invalid_playoff_stage"
+
+
+def test_admin_group_promote_manual_returns_friendly_error_for_invalid_stage(monkeypatch) -> None:
+    """Негативный кейс: invalid target_stage_id при ручном переводе из группы."""
+
+    async def fake_playoff_stage_exists(db, stage_id: int) -> bool:
+        return False
+
+    monkeypatch.setattr(web, "_playoff_stage_exists", fake_playoff_stage_exists)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/group/promote-manual",
+            data={"group_id": "1", "user_id": "11", "target_stage_id": "999"},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_invalid_playoff_stage"
