@@ -203,6 +203,7 @@
 
       <form action="/admin/playoff/generate" method="post" class="mb-3">
         <button class="btn btn-outline-warning">{{ tr('admin_generate_playoff') }}</button>
+        <div class="small text-muted mt-1">{{ tr('admin_generate_playoff_help') }}</div>
       </form>
 
       {% set has_playoff_stages = playoff_stages|length > 0 %}
@@ -396,6 +397,11 @@
           <select class="form-select" name="tied_user_ids[]" multiple size="4">{% for m in group.members|sort(attribute='seat') %}<option value="{{ m.user_id }}">{{ m.user.nickname }}</option>{% endfor %}</select>
           <button class="btn btn-sm btn-warning">{{ tr('admin_save_tie_break') }}</button>
         </form>
+        <div class="small text-muted mt-1">{{ tr('admin_save_tie_break_help') }}</div>
+        <details class="mt-1 small text-muted">
+          <summary>{{ tr('admin_help_examples_title') }}</summary>
+          <div>{{ tr('admin_save_tie_break_example') }}</div>
+        </details>
         {% if coin_toss_candidates.get(group.id) %}
         <form action="/admin/group/coin-toss" method="post" class="d-flex gap-2 mt-2">
           <input type="hidden" name="group_id" value="{{ group.id }}">
@@ -406,6 +412,11 @@
           </select>
           <button class="btn btn-sm btn-outline-warning">{{ tr('admin_coin_toss') }}</button>
         </form>
+        <div class="small text-muted mt-1">{{ tr('admin_coin_toss_help') }}</div>
+        <details class="mt-1 small text-muted">
+          <summary>{{ tr('admin_help_examples_title') }}</summary>
+          <div>{{ tr('admin_coin_toss_example') }}</div>
+        </details>
         {% endif %}
       </div>
       {% else %}
