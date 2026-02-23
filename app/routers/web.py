@@ -65,7 +65,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 ALLOWED_USER_UPDATE_FIELDS = {"nickname", "basket", "direct_invite_stage"}
-ALLOWED_DIRECT_INVITE_STAGES = {None, "stage_2"}
+ALLOWED_DIRECT_INVITE_STAGES = {None, "stage_2", "stage_1_8", "stage_1_4", "stage_semifinal_groups", "stage_final"}
 
 
 def _normalize_direct_invite_stage(raw_value: str | None) -> str | None:
@@ -429,8 +429,8 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
     # Отдаем турнирную таблицу с текущими группами и playoff-расписанием.
     draw_applied = await get_draw_applied(db)
     tournament_started = await get_tournament_started(db)
-    show_groups = draw_applied and tournament_started
-    show_playoff = draw_applied and tournament_started
+    show_groups = tournament_started
+    show_playoff = tournament_started
 
     groups = list(
         (
@@ -749,6 +749,21 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
 @router.get("/admin/users", response_class=HTMLResponse)
 async def admin_users_page(request: Request, db: AsyncSession = Depends(get_db)):
     users = (await db.scalars(select(User).order_by(desc(User.created_at)).limit(300))).all()
+    allowed_direct_invite_stages = [
+        "stage_2",
+        "stage_1_8",
+        "stage_1_4",
+        "stage_semifinal_groups",
+        "stage_final",
+    ]
+
+    group_points_rows = (await db.execute(select(GroupMember.user_id, func.max(GroupMember.total_points)).group_by(GroupMember.user_id))).all()
+    playoff_points_rows = (await db.execute(select(PlayoffParticipant.user_id, func.max(PlayoffParticipant.points)).group_by(PlayoffParticipant.user_id))).all()
+    points_by_user: dict[int, int] = {int(user_id): int(points or 0) for user_id, points in group_points_rows}
+    for user_id, points in playoff_points_rows:
+        normalized_user_id = int(user_id)
+        points_by_user[normalized_user_id] = max(points_by_user.get(normalized_user_id, 0), int(points or 0))
+
     return templates.TemplateResponse(
         request,
         "admin_users.html",
@@ -756,6 +771,8 @@ async def admin_users_page(request: Request, db: AsyncSession = Depends(get_db))
             request,
             users=users,
             basket_values=[basket.value for basket in Basket],
+            points_by_user=points_by_user,
+            allowed_direct_invite_stages=allowed_direct_invite_stages,
         ),
     )
 
@@ -1034,7 +1051,6 @@ async def admin_group_member_add(
 ):
     try:
         await add_group_member(db, group_id=group_id, user_id=user_id)
-        await set_draw_applied(db, False)
         await db.commit()
         return redirect_with_admin_msg("msg_status_ok")
     except Exception as exc:  # noqa: BLE001
@@ -1049,7 +1065,6 @@ async def admin_group_member_remove(
 ):
     try:
         await remove_group_member(db, group_id=group_id, user_id=user_id)
-        await set_draw_applied(db, False)
         await db.commit()
         return redirect_with_admin_msg("msg_status_ok")
     except Exception as exc:  # noqa: BLE001
@@ -1065,7 +1080,6 @@ async def admin_group_member_move(
 ):
     try:
         await move_group_member(db, from_group_id=from_group_id, to_group_id=to_group_id, user_id=user_id)
-        await set_draw_applied(db, False)
         await db.commit()
         return redirect_with_admin_msg("msg_status_ok")
     except Exception as exc:  # noqa: BLE001
@@ -1088,7 +1102,6 @@ async def admin_group_member_swap(
             second_group_id=second_group_id,
             second_user_id=second_user_id,
         )
-        await set_draw_applied(db, False)
         await db.commit()
         return redirect_with_admin_msg("msg_status_ok")
     except Exception as exc:  # noqa: BLE001
@@ -1145,6 +1158,7 @@ async def admin_group_score(
             for user_id, place in sorted(placements_map.items(), key=lambda item: item[1])
         ]
         await apply_game_results(db, group_id, ordered_user_ids)
+        await generate_playoff_from_groups(db)
         return redirect_with_admin_msg("msg_game_saved")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
@@ -1189,7 +1203,7 @@ async def admin_generate_playoff(
     db: AsyncSession = Depends(get_db),
 ):
     ok, message = await generate_playoff_from_groups(db)
-    return redirect_with_admin_msg("msg_status_ok" if ok else "msg_status_warn")
+    return redirect_with_admin_msg("msg_status_ok" if ok else "msg_status_warn", details=None if ok else message)
 
 
 @router.post("/admin/playoff/start")
