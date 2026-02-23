@@ -375,13 +375,14 @@
               </thead>
               <tbody>
                 {% for m in group.members|sort(attribute='seat') %}
+                {% set member_index = loop.index %}
                 <tr>
                   <td>{{ m.user.nickname }}</td>
                   <td>
                     <input type="hidden" name="user_ids[]" value="{{ m.user_id }}">
                     <select class="form-select form-select-sm" name="places[]" required>
                       {% for place in range(1, 9) %}
-                      <option value="{{ place }}" {% if place == loop.parent.index %}selected{% endif %}>{{ place }}</option>
+                      <option value="{{ place }}" {% if place == member_index %}selected{% endif %}>{{ place }}</option>
                       {% endfor %}
                     </select>
                   </td>
