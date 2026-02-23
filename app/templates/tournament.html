@@ -61,59 +61,113 @@
 {% endif %}
 
 {% if playoff_stages %}
-  <h3 class="mt-5">{{ tr('tournament_playoff') }}</h3>
-  {% for stage in playoff_stages %}
-  <div class="card bg-black neon-border-red mb-3">
-    <div class="card-body">
-      <div class="d-flex justify-content-between align-items-center">
-        <h4>
-          {% if stage.key == 'stage_1_8' %}
-            {{ tr('tournament_stage_1_8_label') }}
-          {% elif stage.key == 'stage_1_4' %}
-            {{ tr('tournament_stage_1_4_label') }}
-          {% elif stage.key == 'stage_semifinal_groups' %}
-            {{ tr('tournament_stage_semifinal_groups_label') }}
-          {% elif stage.key == 'stage_final' %}
-            {{ tr('tournament_stage_final_label') }}
-          {% else %}
-            {{ stage.title }}
-          {% endif %}
-        </h4>
-        <span class="badge {{ 'bg-success' if stage.is_started else 'bg-secondary' }}">{{ tr('tournament_started') if stage.is_started else tr('tournament_pending') }}</span>
-      </div>
-      <p class="small text-contrast-muted mb-1">{{ tr('tournament_scoring_mode') }}: {{ stage.scoring_mode }}{% if stage.scoring_mode == 'final_22_top1' %} ({{ tr('tournament_final_22_hint') }}){% endif %}</p>
-      <p class="small text-contrast-muted">{{ tr('tournament_matches') }}: {{ stage.matches|length }} · {{ tr('tournament_players') }}: {{ stage.participants|length }}</p>
-      <div class="row g-3">
-        <div class="col-lg-6">
-          <h6>{{ tr('tournament_standings') }}</h6>
-          <table class="table table-dark table-sm">
-            <tr><th>#</th><th>{{ tr('tournament_user_id') }}</th><th>{{ tr('tournament_pts') }}</th><th>{{ tr('tournament_wins_short') }}</th><th>{{ tr('tournament_top4') }}</th><th>{{ tr('tournament_status') }}</th></tr>
-            {% for participant in playoff_standings[stage.id] %}
-            <tr>
-              <td>{{ loop.index }}</td>
-              <td>{{ participant.user_id }}</td>
-              <td>{{ participant.points }}</td>
-              <td>{{ participant.wins }}</td>
-              <td>{{ participant.top4_finishes }}</td>
-              <td>{{ tr('tournament_status_out') if participant.is_eliminated else tr('tournament_status_in') }}</td>
-            </tr>
-            {% endfor %}
-          </table>
-        </div>
-        <div class="col-lg-6">
-          <h6>{{ tr('tournament_schedule_status') }}</h6>
-          <ul class="list-group list-group-flush">
-            {% for match in stage.matches %}
-            <li class="list-group-item bg-transparent text-light d-flex justify-content-between">
-              <span>{{ tr('tournament_group') }} {{ match.group_number }} · {{ tr('tournament_game') }} {{ match.game_number }} · {{ tr('tournament_pw') }} {{ match.lobby_password }} · {{ tr('tournament_schedule') }} {{ match.schedule_text or tr('tournament_tbd') }}</span>
-              <span>{{ match.state }}{% if match.winner_user_id %} · {{ tr('tournament_winner') }} {{ match.winner_user_id }}{% endif %}</span>
-            </li>
+  <h3 class="mt-5 tournament_playoff_title">{{ tr('tournament_playoff') }}</h3>
+  {% if playoff_bracket_rounds %}
+  <section class="playoff-bracket mt-3">
+    {% for round in playoff_bracket_rounds %}
+    <div class="playoff-round">
+      <h4 class="playoff-round-title">
+        {% if round.key == 'stage_1_8' %}
+          {{ tr('tournament_stage_1_8_label') }}
+        {% elif round.key == 'stage_1_4' %}
+          {{ tr('tournament_stage_1_4_label') }}
+        {% elif round.key == 'stage_semifinal_groups' %}
+          {{ tr('tournament_stage_semifinal_groups_label') }}
+        {% elif round.key == 'stage_final' %}
+          {{ tr('tournament_stage_final_label') }}
+        {% else %}
+          {{ round.title }}
+        {% endif %}
+      </h4>
+      <div class="playoff-round-matches">
+        {% for match in round.matches %}
+        <article class="playoff-match-card playoff-status-{{ match.state }}">
+          <div class="playoff-match-header">
+            <span>{{ tr('tournament_group') }} {{ match.group_number }}</span>
+            <span>{{ tr('tournament_game') }} {{ match.game_number }}</span>
+          </div>
+          <ul class="playoff-participants list-unstyled mb-2">
+            {% for participant in match.participants %}
+            <li>#{{ participant.user_id }} · {{ participant.nickname }}</li>
             {% endfor %}
           </ul>
+          <div class="playoff-match-footer">
+            <div>{{ tr('tournament_status') }}: <strong>{{ match.state }}</strong></div>
+            <div>
+              {{ tr('tournament_winner') }}:
+              {% if match.winner_user_id %}
+                #{{ match.winner_user_id }} · {{ match.winner_nickname }}
+              {% else %}
+                —
+              {% endif %}
+            </div>
+          </div>
+          {% if match.next_group_number %}
+          <div class="playoff-next-link">→ {{ tr('tournament_group') }} {{ match.next_group_number }}</div>
+          {% endif %}
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <details class="mt-4">
+    <summary>{{ tr('tournament_schedule_status') }} / {{ tr('tournament_standings') }} (fallback)</summary>
+    {% for stage in playoff_stages %}
+    <div class="card bg-black neon-border-red mb-3 mt-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <h4>
+            {% if stage.key == 'stage_1_8' %}
+              {{ tr('tournament_stage_1_8_label') }}
+            {% elif stage.key == 'stage_1_4' %}
+              {{ tr('tournament_stage_1_4_label') }}
+            {% elif stage.key == 'stage_semifinal_groups' %}
+              {{ tr('tournament_stage_semifinal_groups_label') }}
+            {% elif stage.key == 'stage_final' %}
+              {{ tr('tournament_stage_final_label') }}
+            {% else %}
+              {{ stage.title }}
+            {% endif %}
+          </h4>
+          <span class="badge {{ 'bg-success' if stage.is_started else 'bg-secondary' }}">{{ tr('tournament_started') if stage.is_started else tr('tournament_pending') }}</span>
+        </div>
+        <p class="small text-contrast-muted mb-1">{{ tr('tournament_scoring_mode') }}: {{ stage.scoring_mode }}{% if stage.scoring_mode == 'final_22_top1' %} ({{ tr('tournament_final_22_hint') }}){% endif %}</p>
+        <p class="small text-contrast-muted">{{ tr('tournament_matches') }}: {{ stage.matches|length }} · {{ tr('tournament_players') }}: {{ stage.participants|length }}</p>
+        <div class="row g-3">
+          <div class="col-lg-6">
+            <h6>{{ tr('tournament_standings') }}</h6>
+            <table class="table table-dark table-sm">
+              <tr><th>#</th><th>{{ tr('tournament_user_id') }}</th><th>{{ tr('tournament_pts') }}</th><th>{{ tr('tournament_wins_short') }}</th><th>{{ tr('tournament_top4') }}</th><th>{{ tr('tournament_status') }}</th></tr>
+              {% for participant in playoff_standings[stage.id] %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ participant.user_id }}</td>
+                <td>{{ participant.points }}</td>
+                <td>{{ participant.wins }}</td>
+                <td>{{ participant.top4_finishes }}</td>
+                <td>{{ tr('tournament_status_out') if participant.is_eliminated else tr('tournament_status_in') }}</td>
+              </tr>
+              {% endfor %}
+            </table>
+          </div>
+          <div class="col-lg-6">
+            <h6>{{ tr('tournament_schedule_status') }}</h6>
+            <ul class="list-group list-group-flush">
+              {% for match in stage.matches %}
+              <li class="list-group-item bg-transparent text-light d-flex justify-content-between">
+                <span>{{ tr('tournament_group') }} {{ match.group_number }} · {{ tr('tournament_game') }} {{ match.game_number }} · {{ tr('tournament_pw') }} {{ match.lobby_password }} · {{ tr('tournament_schedule') }} {{ match.schedule_text or tr('tournament_tbd') }}</span>
+                <span>{{ match.state }}{% if match.winner_user_id %} · {{ tr('tournament_winner') }} {{ match.winner_user_id }}{% endif %}</span>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-  {% endfor %}
+    {% endfor %}
+  </details>
 {% endif %}
 {% endblock %}
