@@ -27,7 +27,7 @@ from app.models.settings import (
     SiteSetting,
     TournamentStage,
 )
-from app.models.tournament import GroupManualTieBreak, GroupMember, TournamentGroup
+from app.models.tournament import GroupManualTieBreak, GroupMember, PlayoffStage, TournamentGroup
 from app.models.user import Basket, User
 from app.services.basket_allocator import allocate_basket
 from app.services.i18n import get_lang, t
@@ -109,6 +109,12 @@ def redirect_with_admin_msg(msg_key: str, details: str | None = None) -> Redirec
     if details:
         params["details"] = details
     return RedirectResponse(url=f"/admin?{urlencode(params)}", status_code=303)
+
+
+
+
+async def _playoff_stage_exists(db: AsyncSession, stage_id: int) -> bool:
+    return await db.scalar(select(PlayoffStage.id).where(PlayoffStage.id == stage_id)) is not None
 
 
 async def get_registration_open(db: AsyncSession) -> bool:
@@ -1077,6 +1083,8 @@ async def admin_promote_group_member_manual(
     target_stage_id: int = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
+    if not await _playoff_stage_exists(db, target_stage_id):
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         await promote_group_member_to_stage(db, group_id, user_id, target_stage_id)
         return redirect_with_admin_msg("msg_player_moved")
@@ -1170,6 +1178,8 @@ async def admin_start_playoff(
     stage_id: int = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
+    if not await _playoff_stage_exists(db, stage_id):
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         await start_playoff_stage(db, stage_id)
         return redirect_with_admin_msg("msg_playoff_stage_started")
@@ -1183,6 +1193,8 @@ async def admin_promote_playoff(
     top_n: int = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
+    if not await _playoff_stage_exists(db, stage_id):
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         await promote_top_between_stages(db, stage_id, top_n)
         return redirect_with_admin_msg("msg_players_promoted")
@@ -1197,6 +1209,8 @@ async def admin_move_playoff_player(
     user_id: int = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
+    if not await _playoff_stage_exists(db, from_stage_id) or not await _playoff_stage_exists(db, to_stage_id):
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         await move_user_to_stage(db, from_stage_id, to_stage_id, user_id)
         return redirect_with_admin_msg("msg_player_moved")
@@ -1211,6 +1225,8 @@ async def admin_replace_playoff_player(
     to_user_id: int = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
+    if not await _playoff_stage_exists(db, stage_id):
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         await replace_stage_player(db, stage_id, from_user_id, to_user_id)
         return redirect_with_admin_msg("msg_player_replaced")
@@ -1225,6 +1241,8 @@ async def admin_adjust_playoff_points(
     points_delta: int = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
+    if not await _playoff_stage_exists(db, stage_id):
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         await adjust_stage_points(db, stage_id, user_id, points_delta)
         return redirect_with_admin_msg("msg_points_adjusted")
@@ -1240,6 +1258,8 @@ async def admin_playoff_score(
     placements_list: list[str] | None = Form(default=None, alias="placements[]"),
     db: AsyncSession = Depends(get_db),
 ):
+    if not await _playoff_stage_exists(db, stage_id):
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         if placements_list:
             ordered_user_ids = [int(part) for part in placements_list]
@@ -1259,6 +1279,8 @@ async def admin_playoff_results_batch(
     places: list[str] = Form(..., alias="places[]"),
     db: AsyncSession = Depends(get_db),
 ):
+    if not await _playoff_stage_exists(db, stage_id):
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         if len(user_ids) != len(places):
             raise ValueError("Некорректное количество полей")
@@ -1300,6 +1322,8 @@ async def admin_playoff_override(
     note: str = Form(default=""),
     db: AsyncSession = Depends(get_db),
 ):
+    if not await _playoff_stage_exists(db, stage_id):
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         await override_playoff_match_winner(db, stage_id, group_number, winner_user_id, note=note)
         return redirect_with_admin_msg("msg_status_ok")
