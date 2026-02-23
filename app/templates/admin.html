@@ -3,7 +3,9 @@
 <h2>{{ tr('admin_title') }}</h2>
 {% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}{% if request.query_params.get('details') %}: <span class="small">{{ request.query_params.get('details') }}</span>{% endif %}</div>{% endif %}
 <div class="d-flex justify-content-end align-items-center gap-2 mb-3">
-  <a class="btn btn-sm btn-outline-info" href="/admin/users">{{ tr('admin_manage_users') }}</a>
+  <a class="btn btn-sm btn-outline-info" href="/admin/users">Список участников</a>
+  <a class="btn btn-sm btn-outline-primary" href="/participants" target="_blank">Публичный список</a>
+  <a class="btn btn-sm btn-outline-warning" href="/tournament" target="_blank">Турнирная страница</a>
   <a class="btn btn-sm btn-outline-light" href="/admin/logout">{{ tr('admin_logout') }}</a>
 </div>
 <div class="row g-4">
@@ -202,7 +204,7 @@
       </div>
 
       <form action="/admin/playoff/generate" method="post" class="mb-3">
-        <button class="btn btn-outline-warning">{{ tr('admin_generate_playoff') }}</button>
+        <button class="btn btn-outline-warning" {% if not tournament_started %}disabled{% endif %}>{{ tr('admin_generate_playoff') }}</button>
         <div class="small text-muted mt-1">{{ tr('admin_generate_playoff_help') }}</div>
       </form>
 
@@ -212,6 +214,7 @@
       <div class="alert alert-warning">
         {{ tr('admin_playoff_stages_empty_hint_title') }}<br>
         {{ tr('admin_playoff_stages_empty_hint_steps') }}
+        {% if not tournament_started %}<br><span class="small">Турнир ещё не запущен.</span>{% endif %}
       </div>
       {% endif %}
       <form action="/admin/playoff/start" method="post" class="row g-2 mb-2">
@@ -341,8 +344,7 @@
           <div class="col-md-2"><button class="btn btn-sm btn-outline-light w-100">{{ tr('admin_save_time') }}</button></div>
         </form>
 
-        <div class="small text-info my-2">Состав: {% for m in group.members|sort(attribute='seat') %}#{{ m.seat }} {{ m.user.nickname }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
-
+        
         <form action="/admin/group/member/add" method="post" class="row g-2 mb-2">
           <input type="hidden" name="group_id" value="{{ group.id }}">
           <div class="col-md-9"><select class="form-select" name="user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>

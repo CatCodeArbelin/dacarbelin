@@ -69,6 +69,17 @@ body {
   color: #f4f7ff !important;
 }
 
+.alert-warning {
+  background-color: #f5d64a !important;
+  border-color: #e3b506 !important;
+  color: #1b1b1b !important;
+  text-shadow: none !important;
+}
+
+.alert-warning * {
+  color: #1b1b1b !important;
+}
+
 .badge.bg-success {
   background-color: #1b7448 !important;
   color: #f6fff9 !important;

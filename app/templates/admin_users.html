@@ -18,6 +18,7 @@
           <th>Steam ID</th>
           <th>{{ tr('participants_highest') }}</th>
           <th>Basket</th>
+          <th>{{ tr('tournament_pts') }}</th>
           <th>Direct invite</th>
           <th>{{ tr('admin_save') }}</th>
         </tr>
@@ -38,10 +39,13 @@
               {% endfor %}
             </select>
           </td>
+          <td>{{ points_by_user.get(user.id, 0) }}</td>
           <td>
             <select class="form-select form-select-sm" form="user-update-{{ user.id }}" name="direct_invite_stage">
               <option value="" {% if not user.direct_invite_stage %}selected{% endif %}>-</option>
-              <option value="stage_2" {% if user.direct_invite_stage == 'stage_2' %}selected{% endif %}>stage_2</option>
+              {% for stage_key in allowed_direct_invite_stages %}
+              <option value="{{ stage_key }}" {% if user.direct_invite_stage == stage_key %}selected{% endif %}>{{ stage_key }}</option>
+              {% endfor %}
             </select>
           </td>
           <td>
