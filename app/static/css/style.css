@@ -1,4 +1,17 @@
-body { background: #08090d; }
+body {
+  background: #08090d;
+  color: #ffffff !important;
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.28);
+}
+
+body, .card, .table, .table td, .table th, .form-label, .form-text, .nav-link, p, li, span, label, h1, h2, h3, h4, h5, h6 {
+  color: #ffffff !important;
+}
+
+a, .btn-link {
+  color: #dff7ff !important;
+}
+
 .neon-border-blue { border: 1px solid #00b7ff !important; box-shadow: 0 0 8px #00b7ff66; }
 .neon-border-red { border: 1px solid #ff2d55 !important; box-shadow: 0 0 8px #ff2d5566; }
 .card { border-radius: 12px; }
@@ -12,12 +25,18 @@ body { background: #08090d; }
     0 0 14px rgba(0, 183, 255, 0.55);
 }
 
-/* Semantic helpers for highly readable text on dark backgrounds */
 .text-contrast-high { color: #f5f8ff !important; }
 .text-contrast-neon { color: #f7fbff !important; text-shadow: 0 0 10px rgba(255, 255, 255, 0.24); }
 .text-contrast-muted { color: #d0d8e8 !important; }
 
-/* Bootstrap text-secondary is too dim on pure black cards. */
-.bg-black .text-secondary {
+.bg-black .text-secondary,
+.text-muted,
+.small {
   color: #d0d8e8 !important;
+}
+
+.form-control, .form-select {
+  background-color: #0f1118 !important;
+  color: #ffffff !important;
+  border-color: #3e4f6a !important;
 }

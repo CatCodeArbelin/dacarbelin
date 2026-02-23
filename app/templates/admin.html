@@ -13,9 +13,6 @@
         <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="registration_open" {% if registration_open %}checked{% endif %}><label class="form-check-label">{{ tr('admin_registration_open') }}</label></div>
         <button class="btn btn-danger">{{ tr('admin_save') }}</button>
       </form>
-      <hr>
-      <button class="btn btn-warning" type="button" data-bs-toggle="modal" data-bs-target="#startTournamentModal" {% if tournament_started %}disabled{% endif %}>{{ tr('admin_start_tournament') }}</button>
-      {% if tournament_started %}<div class="small text-success mt-2">{{ tr('admin_tournament_already_started') }}</div>{% endif %}
     </div></div>
     <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
       <h4>{{ tr('admin_manual_invited_add') }}</h4>
@@ -87,7 +84,7 @@
       <h4>{{ tr('admin_stages_editor') }}</h4>
       <form action="/admin/stage" method="post" class="row g-2">
         <div class="col-6"><input class="form-control" name="key" placeholder="{{ tr('admin_key') }}"></div>
-        <div class="col-6"><input class="form-control" name="date_text" placeholder="{{ tr('admin_date') }}"></div>
+        <div class="col-6"><input class="form-control" name="date_text" placeholder="{{ tr('admin_date_text') }}"></div>
         <div class="col-6"><input class="form-control" name="title_ru" placeholder="{{ tr('admin_title_ru') }}"></div>
         <div class="col-6"><input class="form-control" name="title_en" placeholder="{{ tr('admin_title_en') }}"></div>
         <div class="col-12 form-check"><input class="form-check-input" name="is_active" type="checkbox"><label class="form-check-label">{{ tr('admin_active') }}</label></div>
@@ -154,10 +151,9 @@
 
     <div class="card bg-black neon-border-red mt-4"><div class="card-body">
       <h4>{{ tr('admin_draw_controls') }}</h4>
-      <form action="/admin/draw/auto" method="post" class="mb-3">
+      <form action="/admin/draw/auto" method="post" class="mb-2">
         <button class="btn btn-danger">{{ tr('admin_auto_draw') }}</button>
       </form>
-      <p class="small text-contrast-muted">{{ score_hint }}</p>
       <form action="/admin/draw/manual" method="post" class="row g-2 mb-3">
         <div class="col-md-3"><input class="form-control" type="number" min="1" max="8" name="group_count" value="8" required></div>
         <div class="col-md-7">
@@ -170,6 +166,30 @@
         </div>
         <div class="col-md-2"><button class="btn btn-outline-danger w-100">Manual draw</button></div>
       </form>
+      <form action="/admin/draw/apply" method="post" class="mb-3">
+        <button class="btn btn-outline-light">{{ tr('admin_apply_draw') }}</button>
+      </form>
+      <form action="/admin/tournament/start" method="post" class="mb-3">
+        <button class="btn btn-warning" {% if tournament_started %}disabled{% endif %}>{{ tr('admin_start_tournament') }}</button>
+      </form>
+      {% if tournament_started %}<div class="small text-success mb-3">{{ tr('admin_tournament_already_started') }}</div>{% endif %}
+
+      <div class="row g-3 mb-3">
+        {% for group in groups %}
+        <div class="col-md-6">
+          <div class="border rounded p-2 h-100">
+            <div class="fw-semibold">{{ group.name }}</div>
+            <ul class="small mb-2">
+              {% for member in group.members|sort(attribute='user.nickname') %}
+              <li>{{ member.user.nickname }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+        {% else %}
+        <div class="col-12"><div class="alert alert-secondary">{{ tr('admin_groups_not_created') }}</div></div>
+        {% endfor %}
+      </div>
 
       <h5 class="mt-3">{{ tr('admin_group_manual_controls') }}</h5>
       <form action="/admin/group/create" method="post" class="row g-2 mb-3">
@@ -179,17 +199,50 @@
       </form>
 
       <form action="/admin/group/member/move" method="post" class="row g-2 mb-2">
-        <div class="col-md-3"><input class="form-control" type="number" name="from_group_id" placeholder="{{ tr('admin_group_id_from') }}" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="to_group_id" placeholder="{{ tr('admin_group_id_to') }}" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="user_id" placeholder="{{ tr('admin_user_id_placeholder') }}" required></div>
-        <div class="col-md-3"><button class="btn btn-outline-warning w-100">{{ tr('admin_move') }}</button></div>
+        <div class="col-md-4">
+          <select class="form-select" name="from_group_id" required>
+            <option value="">{{ tr('admin_group_id_from') }}</option>
+            {% for group in groups %}<option value="{{ group.id }}">{{ group.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <select class="form-select" name="to_group_id" required>
+            <option value="">{{ tr('admin_group_id_to') }}</option>
+            {% for group in groups %}<option value="{{ group.id }}">{{ group.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <select class="form-select" name="user_id" required>
+            <option value="">{{ tr('admin_user_id_placeholder') }}</option>
+            {% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12"><button class="btn btn-outline-warning w-100">{{ tr('admin_move') }}</button></div>
       </form>
 
       <form action="/admin/group/member/swap" method="post" class="row g-2 mb-3">
-        <div class="col-md-3"><input class="form-control" type="number" name="first_group_id" placeholder="{{ tr('admin_group_1') }}" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="first_user_id" placeholder="{{ tr('admin_user_1') }}" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="second_group_id" placeholder="{{ tr('admin_group_2') }}" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="second_user_id" placeholder="{{ tr('admin_user_2') }}" required></div>
+        <div class="col-md-3">
+          <select class="form-select js-group-picker" name="first_group_id" data-target-user="first-user" required>
+            <option value="">{{ tr('admin_group_1') }}</option>
+            {% for group in groups %}<option value="{{ group.id }}">{{ group.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <select class="form-select js-group-user-select" id="first-user" name="first_user_id" required>
+            <option value="">{{ tr('admin_user_1') }}</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <select class="form-select js-group-picker" name="second_group_id" data-target-user="second-user" required>
+            <option value="">{{ tr('admin_group_2') }}</option>
+            {% for group in groups %}<option value="{{ group.id }}">{{ group.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <select class="form-select js-group-user-select" id="second-user" name="second_user_id" required>
+            <option value="">{{ tr('admin_user_2') }}</option>
+          </select>
+        </div>
         <div class="col-12"><button class="btn btn-outline-light">{{ tr('admin_swap_participants') }}</button></div>
       </form>
 
@@ -199,44 +252,74 @@
 
       <h5 class="mt-3">{{ tr('admin_playoff_override') }}</h5>
       <form action="/admin/playoff/start" method="post" class="row g-2 mb-2">
-        <div class="col-md-4"><input class="form-control" type="number" name="stage_id" placeholder="{{ tr('admin_stage_id') }}" required></div>
-        <div class="col-md-8"><button class="btn btn-outline-success w-100">{{ tr('admin_start_stage') }}</button></div>
+        <div class="col-md-8">
+          <select class="form-select" name="stage_id" required>
+            <option value="">{{ tr('admin_stage_id') }}</option>
+            {% for stage in playoff_stage_options %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4"><button class="btn btn-outline-success w-100">{{ tr('admin_start_stage') }}</button></div>
       </form>
       <form action="/admin/playoff/promote" method="post" class="row g-2 mb-2">
-        <div class="col-md-4"><input class="form-control" type="number" name="stage_id" placeholder="{{ tr('admin_from_stage_id') }}" required></div>
-        <div class="col-md-4"><input class="form-control" type="number" name="top_n" placeholder="{{ tr('admin_top_n') }}" value="4" required></div>
-        <div class="col-md-4"><button class="btn btn-outline-info w-100">{{ tr('admin_promote_override') }}</button></div>
+        <div class="col-md-6">
+          <select class="form-select" name="stage_id" required>
+            <option value="">{{ tr('admin_from_stage_id') }}</option>
+            {% for stage in playoff_stage_options if stage.top_n %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3"><input class="form-control" type="number" name="top_n" placeholder="{{ tr('admin_top_n') }}" value="4" required></div>
+        <div class="col-md-3"><button class="btn btn-outline-info w-100">{{ tr('admin_promote_override') }}</button></div>
       </form>
       <form action="/admin/playoff/move" method="post" class="row g-2 mb-2">
-        <div class="col-md-3"><input class="form-control" type="number" name="from_stage_id" placeholder="{{ tr('admin_from_stage') }}" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="to_stage_id" placeholder="{{ tr('admin_to_stage') }}" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="user_id" placeholder="{{ tr('admin_user_id_en') }}" required></div>
-        <div class="col-md-3"><button class="btn btn-outline-warning w-100">{{ tr('admin_manual_transfer') }}</button></div>
+        <div class="col-md-4">
+          <select class="form-select" name="from_stage_id" required>
+            <option value="">{{ tr('admin_from_stage') }}</option>
+            {% for stage in playoff_stage_options %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <select class="form-select" name="to_stage_id" required>
+            <option value="">{{ tr('admin_to_stage') }}</option>
+            {% for stage in playoff_stage_options %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <select class="form-select" name="user_id" required>
+            <option value="">{{ tr('admin_user_id_en') }}</option>
+            {% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12"><button class="btn btn-outline-warning w-100">{{ tr('admin_manual_transfer') }}</button></div>
       </form>
       <form action="/admin/playoff/replace" method="post" class="row g-2 mb-2">
-        <div class="col-md-3"><input class="form-control" type="number" name="stage_id" placeholder="{{ tr('admin_stage_id') }}" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="from_user_id" placeholder="{{ tr('admin_from_user') }}" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="to_user_id" placeholder="{{ tr('admin_to_user') }}" required></div>
-        <div class="col-md-3"><button class="btn btn-outline-danger w-100">{{ tr('admin_replace_participant') }}</button></div>
+        <div class="col-md-4">
+          <select class="form-select" name="stage_id" required>
+            <option value="">{{ tr('admin_stage_id') }}</option>
+            {% for stage in playoff_stage_options %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4"><select class="form-select" name="from_user_id" required><option value="">{{ tr('admin_from_user') }}</option>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
+        <div class="col-md-4"><select class="form-select" name="to_user_id" required><option value="">{{ tr('admin_to_user') }}</option>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
+        <div class="col-12"><button class="btn btn-outline-danger w-100">{{ tr('admin_replace_participant') }}</button></div>
       </form>
       <form action="/admin/playoff/points" method="post" class="row g-2 mb-2">
-        <div class="col-md-3"><input class="form-control" type="number" name="stage_id" placeholder="{{ tr('admin_stage_id') }}" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="user_id" placeholder="{{ tr('admin_user_id_en') }}" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="points_delta" placeholder="{{ tr('admin_points_delta') }}" required></div>
-        <div class="col-md-3"><button class="btn btn-outline-secondary w-100">{{ tr('admin_adjust_points') }}</button></div>
+        <div class="col-md-4"><select class="form-select" name="stage_id" required><option value="">{{ tr('admin_stage_id') }}</option>{% for stage in playoff_stage_options %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
+        <div class="col-md-4"><select class="form-select" name="user_id" required><option value="">{{ tr('admin_user_id_en') }}</option>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
+        <div class="col-md-4"><input class="form-control" type="number" name="points_delta" placeholder="{{ tr('admin_points_delta') }}" required></div>
+        <div class="col-12"><button class="btn btn-outline-secondary w-100">{{ tr('admin_adjust_points') }}</button></div>
       </form>
       <form action="/admin/playoff/score" method="post" class="row g-2 mb-3">
-        <div class="col-md-2"><input class="form-control" type="number" name="stage_id" placeholder="{{ tr('admin_stage') }}" required></div>
+        <div class="col-md-4"><select class="form-select" name="stage_id" required><option value="">{{ tr('admin_stage') }}</option>{% for stage in playoff_stage_options %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
         <div class="col-md-2"><input class="form-control" type="number" name="group_number" placeholder="{{ tr('admin_group') }}" value="1"></div>
         <div class="col-md-6"><input class="form-control" name="placements" placeholder="8,5,12,..."></div>
-        <div class="col-md-2"><button class="btn btn-success w-100">{{ tr('admin_save_playoff_game') }}</button></div>
+        <div class="col-md-12"><button class="btn btn-success w-100">{{ tr('admin_save_playoff_game') }}</button></div>
       </form>
       <form action="/admin/playoff/override" method="post" class="row g-2 mb-3">
-        <div class="col-md-2"><input class="form-control" type="number" name="stage_id" placeholder="stage_id" required></div>
+        <div class="col-md-4"><select class="form-select" name="stage_id" required><option value="">{{ tr('admin_stage_id') }}</option>{% for stage in playoff_stage_options %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
         <div class="col-md-2"><input class="form-control" type="number" name="group_number" value="1" required></div>
-        <div class="col-md-3"><input class="form-control" type="number" name="winner_user_id" placeholder="winner_user_id" required></div>
+        <div class="col-md-3"><select class="form-select" name="winner_user_id" required><option value="">winner</option>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
         <div class="col-md-3"><input class="form-control" name="note" placeholder="override note"></div>
-        <div class="col-md-2"><button class="btn btn-outline-light w-100">Set winner</button></div>
+        <div class="col-12"><button class="btn btn-outline-light w-100">Set winner</button></div>
       </form>
 
       {% for group in groups %}
@@ -252,22 +335,33 @@
         </div>
         <form action="/admin/group/schedule" method="post" class="row g-2 mt-2 mb-2">
           <input type="hidden" name="group_id" value="{{ group.id }}">
-          <div class="col-md-4"><input class="form-control form-control-sm" type="datetime-local" name="scheduled_at" value="{{ group.scheduled_at.strftime('%Y-%m-%dT%H:%M') if group.scheduled_at else '' }}"></div>
-          <div class="col-md-6"><input class="form-control form-control-sm" name="schedule_text" value="{{ group.schedule_text or tr('tournament_tbd') }}" placeholder="{{ tr('tournament_tbd') }}"></div>
+          <div class="col-md-10"><input class="form-control form-control-sm" name="schedule_text" value="{{ group.schedule_text or tr('tournament_tbd') }}" placeholder="{{ tr('tournament_tbd') }}"></div>
           <div class="col-md-2"><button class="btn btn-sm btn-outline-light w-100">{{ tr('admin_save_time') }}</button></div>
         </form>
 
-        <div class="small text-info my-2">{{ tr('admin_group_ids') }}: {% for m in group.members %}{{ m.user_id }}{% if not loop.last %}, {% endif %}{% endfor %}</div>
-
         <form action="/admin/group/member/add" method="post" class="row g-2 mb-2">
           <input type="hidden" name="group_id" value="{{ group.id }}">
-          <div class="col-md-9"><input class="form-control" type="number" name="user_id" placeholder="{{ tr('admin_user_id_add') }}" required></div>
+          <div class="col-md-9">
+            <select class="form-select" name="user_id" required>
+              <option value="">{{ tr('admin_user_id_add') }}</option>
+              {% for user in manual_draw_users %}
+              <option value="{{ user.id }}">{{ user.nickname }}</option>
+              {% endfor %}
+            </select>
+          </div>
           <div class="col-md-3"><button class="btn btn-sm btn-primary w-100">{{ tr('admin_add') }}</button></div>
         </form>
 
         <form action="/admin/group/member/remove" method="post" class="row g-2 mb-2">
           <input type="hidden" name="group_id" value="{{ group.id }}">
-          <div class="col-md-9"><input class="form-control" type="number" name="user_id" placeholder="{{ tr('admin_user_id_remove') }}" required></div>
+          <div class="col-md-9">
+            <select class="form-select" name="user_id" required>
+              <option value="">{{ tr('admin_user_id_remove') }}</option>
+              {% for option in group_user_options.get(group.id, []) %}
+              <option value="{{ option.id }}">{{ option.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
           <div class="col-md-3"><button class="btn btn-sm btn-outline-danger w-100">{{ tr('admin_remove') }}</button></div>
         </form>
 
@@ -300,24 +394,6 @@
   </div>
 </div>
 
-<div class="modal fade" id="startTournamentModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content bg-dark text-light">
-      <div class="modal-header border-secondary">
-        <h5 class="modal-title">{{ tr('admin_start_tournament') }}</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">{{ tr('admin_confirm_start_tournament') }}</div>
-      <div class="modal-footer border-secondary">
-        <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">{{ tr('admin_no') }}</button>
-        <form action="/admin/tournament/start" method="post">
-          <button class="btn btn-danger" type="submit">{{ tr('admin_yes') }}</button>
-        </form>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script>
 document.querySelectorAll('.js-generate-pin').forEach((button) => {
   button.addEventListener('click', () => {
@@ -325,6 +401,24 @@ document.querySelectorAll('.js-generate-pin').forEach((button) => {
     const input = form?.querySelector('.js-group-password');
     if (!input) return;
     input.value = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+  });
+});
+
+const groupUserOptions = {{ group_user_options | tojson }};
+document.querySelectorAll('.js-group-picker').forEach((select) => {
+  select.addEventListener('change', () => {
+    const targetId = select.dataset.targetUser;
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    const options = groupUserOptions[Number(select.value)] || [];
+    const placeholder = target.querySelector('option')?.textContent || 'Select user';
+    target.innerHTML = `<option value="">${placeholder}</option>`;
+    options.forEach((option) => {
+      const el = document.createElement('option');
+      el.value = option.id;
+      el.textContent = option.label;
+      target.appendChild(el);
+    });
   });
 });
 </script>

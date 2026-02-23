@@ -527,6 +527,32 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     rules_content = await get_or_create_rules_content(db)
     archive_entries = (await db.scalars(select(ArchiveEntry).order_by(ArchiveEntry.sort_order, ArchiveEntry.id))).all()
     chat_settings = await get_or_create_chat_settings(db)
+    user_label_map = {user.id: user.nickname for user in users}
+    group_user_options: dict[int, list[dict[str, int | str]]] = {
+        group.id: [
+            {"id": member.user_id, "label": f"{member.user.nickname} (ID {member.user_id})"}
+            for member in sorted(group.members, key=lambda item: item.user.nickname.lower())
+        ]
+        for group in groups
+    }
+    playoff_stage_options: list[dict[str, object]] = []
+    for stage in playoff_stages:
+        participants = sorted(stage.participants, key=lambda participant: participant.seed)
+        playoff_stage_options.append(
+            {
+                "id": stage.id,
+                "title": stage.title,
+                "top_n": 3 if stage.key == "stage_1_8" else (4 if stage.key in {"stage_1_4", "stage_semifinal_groups"} else None),
+                "players": [
+                    {
+                        "id": participant.user_id,
+                        "label": f"{user_label_map.get(participant.user_id, f'User #{participant.user_id}')} (ID {participant.user_id})",
+                    }
+                    for participant in participants
+                ],
+            }
+        )
+
     await db.commit()
     return templates.TemplateResponse(
         "admin.html",
@@ -549,6 +575,8 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             coin_toss_candidates=coin_toss_candidates,
             basket_values=[basket.value for basket in Basket],
             manual_draw_users=manual_draw_users,
+            group_user_options=group_user_options,
+            playoff_stage_options=playoff_stage_options,
         ),
     )
 
@@ -740,6 +768,18 @@ async def admin_manual_draw(
         return redirect_with_admin_msg("msg_status_ok")
     except Exception:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
+
+
+@router.post("/admin/draw/apply")
+async def admin_apply_draw(
+    db: AsyncSession = Depends(get_db),
+):
+    groups_count = await db.scalar(
+        select(func.count(TournamentGroup.id)).where(TournamentGroup.stage == "group_stage")
+    )
+    if not groups_count:
+        return redirect_with_admin_msg("msg_operation_failed")
+    return redirect_with_admin_msg("msg_status_ok")
 
 @router.post("/admin/group/password")
 async def admin_group_password(
