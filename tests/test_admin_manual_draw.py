@@ -140,7 +140,11 @@ def test_admin_group_score_builds_ordered_user_ids_from_places(monkeypatch) -> N
         captured["group_id"] = group_id
         captured["ordered_user_ids"] = ordered_user_ids
 
+    async def fake_generate_playoff_from_groups(db):
+        return True, "ok"
+
     monkeypatch.setattr(web, "apply_game_results", fake_apply_game_results)
+    monkeypatch.setattr(web, "generate_playoff_from_groups", fake_generate_playoff_from_groups)
 
     with TestClient(app) as client:
         client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
