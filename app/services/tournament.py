@@ -1,6 +1,5 @@
 """Реализует основную бизнес-логику управления турниром и сеткой матчей."""
 
-import random
 from collections import defaultdict
 
 from sqlalchemy import delete, select
@@ -8,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.tournament import (
     GroupGameResult,
-    GroupManualTieBreak,
     GroupMember,
     PlayoffMatch,
     PlayoffParticipant,
@@ -345,12 +343,8 @@ async def swap_group_members(
     await db.commit()
 
 
-def sort_members_for_table(
-    members: list[GroupMember],
-    manual_tie_break_priorities: dict[int, int] | None = None,
-) -> list[GroupMember]:
-    # Сортируем таблицу по очкам и tie-break правилам. Финальный ключ — user_id для стабильности.
-    manual_tie_break_priorities = manual_tie_break_priorities or {}
+def sort_members_for_table(members: list[GroupMember]) -> list[GroupMember]:
+    # Сортируем таблицу по очкам и стабильным правилам. Финальный ключ — user_id для детерминированности.
     return sorted(
         members,
         key=lambda m: (
@@ -359,68 +353,9 @@ def sort_members_for_table(
             -m.top4_finishes,
             m.eighth_places,
             m.last_game_place,
-            -manual_tie_break_priorities.get(m.user_id, -1),
             m.user_id,
         ),
     )
-
-
-def get_fully_tied_member_groups(members: list[GroupMember]) -> list[list[GroupMember]]:
-    # Группируем только полностью равные кейсы, где ручной tie-break/coin toss действительно допустим.
-    by_metrics: dict[tuple[int, int, int, int, int], list[GroupMember]] = defaultdict(list)
-    for member in members:
-        by_metrics[
-            (
-                member.total_points,
-                member.first_places,
-                member.top4_finishes,
-                member.eighth_places,
-                member.last_game_place,
-            )
-        ].append(member)
-
-    tied_groups: list[list[GroupMember]] = []
-    for same_stats_members in by_metrics.values():
-        if len(same_stats_members) > 1:
-            tied_groups.append(sorted(same_stats_members, key=lambda member: member.user_id))
-    return tied_groups
-
-
-async def apply_manual_tie_break(db: AsyncSession, group_id: int, ordered_user_ids: list[int]) -> None:
-    # Фиксируем ручной тай-брейк только для игроков с полностью равными метриками.
-    if len(ordered_user_ids) < 2 or len(ordered_user_ids) != len(set(ordered_user_ids)):
-        raise ValueError("Нужно передать минимум 2 уникальных user_id")
-
-    members = list((await db.scalars(select(GroupMember).where(GroupMember.group_id == group_id))).all())
-    members_by_user = {member.user_id: member for member in members}
-    if not members:
-        raise ValueError("Group not found")
-
-    for user_id in ordered_user_ids:
-        if user_id not in members_by_user:
-            raise ValueError("В тай-брейке есть игрок, которого нет в группе")
-
-    metric_key = lambda m: (m.total_points, m.first_places, m.top4_finishes, m.eighth_places, m.last_game_place)
-    first_metrics = metric_key(members_by_user[ordered_user_ids[0]])
-    for user_id in ordered_user_ids[1:]:
-        if metric_key(members_by_user[user_id]) != first_metrics:
-            raise ValueError("Ручной тай-брейк разрешен только для полностью равных игроков")
-
-    await db.execute(delete(GroupManualTieBreak).where(GroupManualTieBreak.group_id == group_id))
-    for priority, user_id in enumerate(reversed(ordered_user_ids), start=1):
-        db.add(GroupManualTieBreak(group_id=group_id, user_id=user_id, priority=priority))
-
-    await db.commit()
-
-
-async def apply_coin_toss_tie_break(db: AsyncSession, group_id: int, tied_user_ids: list[int]) -> None:
-    # Делаем случайный порядок только среди действительно равных участников и сохраняем его в БД.
-    if len(tied_user_ids) < 2:
-        raise ValueError("Нужно передать минимум 2 user_id")
-
-    shuffled_user_ids = list(tied_user_ids)
-    random.shuffle(shuffled_user_ids)
-    await apply_manual_tie_break(db, group_id, shuffled_user_ids)
 
 
 async def apply_game_results(db: AsyncSession, group_id: int, ordered_user_ids: list[int]) -> None:
@@ -454,7 +389,7 @@ async def apply_game_results(db: AsyncSession, group_id: int, ordered_user_ids: 
         member.eighth_places += 1 if place == 8 else 0
         member.last_game_place = place
 
-    if group.current_game < 3:
+    if group.current_game <= GROUP_STAGE_GAME_LIMIT:
         group.current_game += 1
     await db.commit()
 
@@ -522,8 +457,12 @@ def build_stage_2_player_ids(stage_1_promoted_ids: list[int], direct_invite_ids:
         raise ValueError("Во II этап должны проходить ровно 21 участник из I этапа")
     if len(direct_invite_ids) > STAGE_2_DIRECT_INVITES_LIMIT:
         raise ValueError("Нельзя превысить 11 прямых инвайтов во II этап")
-    if len(direct_invite_ids) < STAGE_2_DIRECT_INVITES_LIMIT:
-        raise ValueError("Для II этапа требуется ровно 11 прямых инвайтов")
+
+    required_invites = 32 - len(stage_1_promoted_ids)
+    if len(direct_invite_ids) < required_invites:
+        raise ValueError(f"Для II этапа требуется минимум {required_invites} прямых инвайтов")
+
+    direct_invite_ids = direct_invite_ids[:required_invites]
 
     promoted_set = set(stage_1_promoted_ids)
     direct_set = set(direct_invite_ids)
@@ -597,7 +536,7 @@ async def generate_playoff_from_groups(db: AsyncSession) -> tuple[bool, str]:
     if not groups:
         return False, "Сначала требуется сформировать групповой этап"
 
-    if any(group.current_game < 3 for group in groups):
+    if any(group.current_game <= GROUP_STAGE_GAME_LIMIT for group in groups):
         return False, "Продвижение возможно только после 3 игр в каждой группе"
 
     members = list((await db.scalars(select(GroupMember).where(GroupMember.group_id.in_([g.id for g in groups])))).all())
