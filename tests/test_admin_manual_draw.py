@@ -1,12 +1,7 @@
 """Проверяет ручную жеребьевку через admin API с выбором участников из формы."""
-
-import os
 from urllib.parse import parse_qs, urlparse
 
 from fastapi.testclient import TestClient
-
-os.environ["DATABASE_URL"] = "postgresql+asyncpg://user:pass@localhost/test_db"
-os.environ.setdefault("ADMIN_KEY", "test_admin")
 
 from app.core.admin_session import ADMIN_SESSION_COOKIE, create_admin_session_cookie
 from app.main import app

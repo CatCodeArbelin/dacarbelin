@@ -1,11 +1,6 @@
 """Проверяет сценарии прямых инвайтов участников между стадиями турнира."""
 
-import os
-
 from fastapi.testclient import TestClient
-
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/test_db")
-os.environ.setdefault("ADMIN_KEY", "test_admin")
 
 from app.db.session import get_db
 from app.main import app
