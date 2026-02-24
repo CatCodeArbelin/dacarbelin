@@ -54,6 +54,12 @@
         <div class="col-12 form-check"><input class="form-check-input" name="is_enabled" type="checkbox" {% if chat_settings.is_enabled %}checked{% endif %}><label class="form-check-label">{{ tr('admin_chat_enabled') }}</label></div>
         <div class="col-12"><button class="btn btn-primary">{{ tr('admin_save_chat_settings') }}</button></div>
       </form>
+      <hr>
+      <h5>{{ tr('admin_chat_send_as_admin') }}</h5>
+      <form action="/admin/chat/send" method="post" class="row g-2">
+        <div class="col-12"><textarea class="form-control" name="message" rows="3" maxlength="{{ chat_settings.max_length }}" placeholder="{{ tr('admin_chat_admin_message_placeholder') }}" required></textarea></div>
+        <div class="col-12"><button class="btn btn-outline-warning">{{ tr('admin_chat_send') }}</button></div>
+      </form>
     </div></div>
 
 

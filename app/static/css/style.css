@@ -7,13 +7,18 @@ body {
   color: #ffffff !important;
 }
 .form-control, .form-select {
-  background-color: #0f1118;
+  background-color: #f9fbff;
   border-color: #2f3a57;
-  color: #e6eeff !important;
+  color: #000000 !important;
   text-shadow: none;
-  caret-color: #8fb8ff;
+  caret-color: #000000;
 }
-.form-control::placeholder { color: #9fb2d9 !important; }
+.form-control::placeholder { color: #5f5f5f !important; }
+.form-control:focus,
+.form-select:focus {
+  color: #000000 !important;
+  background-color: #ffffff;
+}
 .table-dark { --bs-table-color: #fff; }
 .list-group-item { color: #fff !important; }
 .neon-border-blue { border: 1px solid #00b7ff !important; box-shadow: 0 0 8px #00b7ff66; }
@@ -78,6 +83,29 @@ body {
 
 .alert-warning * {
   color: #1b1b1b !important;
+}
+
+.bg-warning,
+.bg-warning *,
+.bg-white,
+.bg-white *,
+.text-bg-warning,
+.text-bg-warning *,
+.text-bg-light,
+.text-bg-light *,
+.alert-light,
+.alert-light * {
+  color: #000000 !important;
+  text-shadow: none !important;
+}
+
+.chat-nick {
+  color: var(--nick-color, #66d9ff) !important;
+}
+
+.chat-nick-admin {
+  color: #ff79d1 !important;
+  font-style: italic;
 }
 
 .badge.bg-success {
