@@ -143,6 +143,7 @@ def build_bracket_columns(
     stage_columns: list[BracketColumnVM] = [
         {"key": "group_stage", "title": "I этап", "matches": []},
         {"key": "stage_2", "title": "II этап (32)", "matches": []},
+        {"key": "stage_1_4", "title": "III этап (16)", "matches": []},
         {"key": "stage_final", "title": "Финал (8)", "matches": []},
     ]
 
@@ -195,6 +196,18 @@ def build_bracket_columns(
                         }
                     )
                 column["matches"] = preview_matches_vm
+            if column["key"] == "stage_1_4":
+                column["matches"] = [
+                    {
+                        "group_label": get_stage_group_label("stage_1_4", group_number),
+                        "game_number": 1,
+                        "schedule_text": "TBD",
+                        "lobby_password": "TBD",
+                        "participants": [],
+                        "state": "pending",
+                    }
+                    for group_number in range(1, 3)
+                ]
             continue
 
         participants_by_group = _participants_for_playoff_members(stage.participants, user_by_id)

@@ -38,8 +38,8 @@
         <th>Ник</th>
         <th>Очки</th>
         <th>Top1</th>
-        <th>Top4</th>
-        <th>Games</th>
+        <th>Top2-3-4</th>
+        <th>Top8</th>
       </tr>
     </thead>
     <tbody>
@@ -49,8 +49,8 @@
         <td>{{ participant.display_nickname }}</td>
         <td>{{ participant[points_key] }}</td>
         <td>{{ participant[wins_key] }}</td>
-        <td>{{ participant.top4_finishes }}</td>
-        <td>{{ participant[games_key] }}</td>
+        <td>{{ participant.top4_finishes - participant[wins_key] }}</td>
+        <td>{{ participant.top8_finishes }}</td>
       </tr>
       {% endfor %}
     </tbody>
