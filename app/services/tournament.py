@@ -491,6 +491,27 @@ def build_stage_2_player_ids(stage_1_promoted_ids: list[int], direct_invite_ids:
     return stage_2_player_ids
 
 
+def build_stage_2_direct_invite_preview(
+    direct_invite_ids: list[int],
+    *,
+    promoted_count: int = 21,
+) -> list[dict[str, int]]:
+    """Строит preview по прямым инвайтам во II этап с теми же seed, что и при генерации этапа."""
+    required_invites = max(0, 32 - promoted_count)
+    seed_start = promoted_count + 1
+    preview: list[dict[str, int]] = []
+    for index, user_id in enumerate(direct_invite_ids[:required_invites]):
+        seed = seed_start + index
+        preview.append(
+            {
+                "user_id": user_id,
+                "seed": seed,
+                "group_number": get_stage_group_number_by_seed(seed),
+            }
+        )
+    return preview
+
+
 def split_participants_by_group(participants: list[PlayoffParticipant]) -> dict[int, list[PlayoffParticipant]]:
     grouped: dict[int, list[PlayoffParticipant]] = defaultdict(list)
     for participant in participants:

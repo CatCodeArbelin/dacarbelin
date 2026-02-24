@@ -46,6 +46,7 @@ from app.services.tournament import (
     create_manual_draw,
     create_manual_group,
     generate_playoff_from_groups,
+    build_stage_2_direct_invite_preview,
     get_playoff_stages_with_data,
     override_playoff_match_winner,
     parse_manual_draw_user_ids,
@@ -471,6 +472,16 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
     }
     playoff_stages = await get_playoff_stages_with_data(db) if show_playoff else []
 
+    direct_invite_ids = list(
+        (
+            await db.scalars(
+                select(User.id)
+                .where(User.direct_invite_stage == "stage_2")
+                .order_by(User.created_at)
+            )
+        ).all()
+    )
+
     users = list((await db.scalars(select(User))).all())
     user_by_id = {user.id: user for user in users}
     stage_by_key = {stage.key: stage for stage in playoff_stages}
@@ -487,13 +498,16 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
 
     group_matches_vm: list[dict[str, object]] = []
     for group in groups:
+        raw_group_name = str(getattr(group, "name", "")).strip()
+        fallback_label = str(getattr(group, "id", "?")).strip()
+        group_name = raw_group_name or fallback_label
         group_matches_vm.append(
             {
-                "group_label": get_stage_group_label('stage_1_8', int(group.name)) if str(group.name).isdigit() else str(group.name).replace('Group ', '').strip(),
-                "label": f"Group {get_stage_group_label('stage_1_8', int(group.name))}" if str(group.name).isdigit() else f"Group {str(group.name).replace('Group ', '').strip()}",
-                "game_number": 3 if group.current_game > 3 else group.current_game,
-                "schedule_text": _normalize_schedule(group.schedule_text),
-                "lobby_password": group.lobby_password,
+                "group_label": get_stage_group_label('stage_1_8', int(group_name)) if group_name.isdigit() else group_name.replace('Group ', '').strip(),
+                "label": f"Group {get_stage_group_label('stage_1_8', int(group_name))}" if group_name.isdigit() else f"Group {group_name.replace('Group ', '').strip()}",
+                "game_number": 3 if getattr(group, "current_game", 1) > 3 else getattr(group, "current_game", 1),
+                "schedule_text": _normalize_schedule(getattr(group, "schedule_text", "TBD")),
+                "lobby_password": getattr(group, "lobby_password", "TBD"),
                 "participants": [
                     {
                         "user_id": member.user_id,
@@ -501,7 +515,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
                     }
                     for member in sort_members_for_table(group.members)
                 ],
-                "state": "started" if group.is_started else "pending",
+                "state": "started" if getattr(group, "is_started", False) else "pending",
             }
         )
     bracket_columns[0]["matches"] = sorted(group_matches_vm, key=lambda item: item["label"])
@@ -509,6 +523,34 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
     for column in bracket_columns[1:]:
         stage = stage_by_key.get(column["key"])
         if not stage:
+            if column["key"] == "stage_1_8":
+                preview_direct_invites = build_stage_2_direct_invite_preview(direct_invite_ids)
+                participants_by_group: dict[int, list[dict[str, object]]] = {}
+                for invited in preview_direct_invites:
+                    user = user_by_id.get(invited["user_id"])
+                    participants_by_group.setdefault(invited["group_number"], []).append(
+                        {
+                            "user_id": invited["user_id"],
+                            "nickname": _display_nickname(user, str(invited["user_id"])),
+                            "is_direct_invite_preview": True,
+                        }
+                    )
+
+                preview_matches_vm: list[dict[str, object]] = []
+                for group_number in sorted(participants_by_group):
+                    preview_matches_vm.append(
+                        {
+                            "group_label": get_stage_group_label("stage_1_8", group_number),
+                            "label": f"Group {get_stage_group_label('stage_1_8', group_number)}",
+                            "game_number": 1,
+                            "schedule_text": "TBD",
+                            "lobby_password": "TBD",
+                            "participants": participants_by_group[group_number],
+                            "state": "pending",
+                            "is_preview": True,
+                        }
+                    )
+                column["matches"] = preview_matches_vm
             continue
 
         participants_by_group: dict[int, list[dict[str, object]]] = {}
@@ -519,6 +561,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
                 {
                     "user_id": participant.user_id,
                     "nickname": _display_nickname(user, str(participant.user_id)),
+                    "is_direct_invite_preview": False,
                 }
             )
 
@@ -575,6 +618,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             playoff_standings=playoff_standings,
             current_stage_label=current_stage_label,
             show_groups=show_groups,
+            has_stage_2_playoff=stage_by_key.get("stage_1_8") is not None,
         ),
     )
 
