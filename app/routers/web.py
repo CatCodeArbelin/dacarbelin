@@ -659,17 +659,23 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     user_rows = (await db.execute(select(User.id, User.nickname))).all()
     users_by_id = {user_id: nickname for user_id, nickname in user_rows}
     stages = (await db.scalars(select(TournamentStage).order_by(TournamentStage.id))).all()
-    groups = list(
-        (
-            await db.scalars(
-                select(TournamentGroup)
-                .where(TournamentGroup.stage == "group_stage")
-                .options(selectinload(TournamentGroup.members).selectinload(GroupMember.user))
-                .order_by(TournamentGroup.name)
-            )
-        ).all()
-    )
     playoff_stages = await get_playoff_stages_with_data(db)
+    active_playoff_stage = next((stage for stage in playoff_stages if stage.is_started), None)
+    show_group_stage_controls = bool(active_playoff_stage and active_playoff_stage.key == "stage_1_8")
+    groups = (
+        list(
+            (
+                await db.scalars(
+                    select(TournamentGroup)
+                    .where(TournamentGroup.stage == "group_stage")
+                    .options(selectinload(TournamentGroup.members).selectinload(GroupMember.user))
+                    .order_by(TournamentGroup.name)
+                )
+            ).all()
+        )
+        if show_group_stage_controls
+        else []
+    )
     group_user_choices = {
         group.id: [
             {
@@ -784,6 +790,8 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             group_user_choices=group_user_choices,
             playoff_stage_participants=playoff_stage_participants,
             playoff_stage_groups=playoff_stage_groups,
+            active_playoff_stage=active_playoff_stage,
+            show_group_stage_controls=show_group_stage_controls,
         ),
     )
 

@@ -328,6 +328,7 @@
       </details>
 
 
+      {% if show_group_stage_controls %}
       <h5 class="mt-4">Результат жеребьевки</h5>
       <div class="row g-2 mb-3">
         {% for group in groups %}
@@ -416,6 +417,7 @@
       {% else %}
       <div class="alert alert-secondary">{{ tr('admin_groups_not_created') }}</div>
       {% endfor %}
+      {% endif %}
     </div></div>
   </div>
 </div>
