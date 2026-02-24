@@ -59,6 +59,7 @@ from app.services.tournament import (
     adjust_stage_points,
     get_stage_group_number_by_seed,
     get_stage_group_label,
+    shuffle_stage_2_participants,
 )
 
 router = APIRouter()
@@ -1537,6 +1538,15 @@ async def admin_promote_playoff(
     db: AsyncSession = Depends(get_db),
 ):
     return redirect_with_admin_msg("msg_operation_failed", details="use_group_finish_flow")
+
+
+@router.post("/admin/playoff/stage-2/shuffle")
+async def admin_shuffle_stage_2(db: AsyncSession = Depends(get_db)):
+    try:
+        await shuffle_stage_2_participants(db)
+        return redirect_with_admin_msg("msg_status_ok", details="stage_2_shuffled")
+    except Exception:  # noqa: BLE001
+        return redirect_with_admin_msg("msg_operation_failed", details="stage_2_shuffle_forbidden")
 
 
 @router.post("/admin/playoff/move")
