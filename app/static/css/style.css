@@ -258,3 +258,22 @@ body {
 .table-row-eliminated th {
   background-color: #4a1e24 !important;
 }
+
+.admin-wide-section {
+  width: 100%;
+}
+
+.admin-group-grid {
+  width: 100%;
+}
+
+.admin-password-form {
+  justify-content: flex-start;
+}
+
+@media (min-width: 992px) {
+  .admin-password-form {
+    width: auto !important;
+    justify-content: flex-end;
+  }
+}
