@@ -76,6 +76,17 @@ CHAT_NICK_COLORS = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff6
 FORBIDDEN_CHAT_NICKS = {"@admin"}
 
 
+def build_stage_display_order(active_key: str, stage_order_keys: list[str]) -> list[str]:
+    if active_key not in stage_order_keys:
+        return stage_order_keys
+
+    active_index = stage_order_keys.index(active_key)
+    after_active = stage_order_keys[active_index + 1 :]
+    before_active = list(reversed(stage_order_keys[:active_index]))
+    return [active_key, *after_active, *before_active]
+
+
+
 def _normalize_direct_invite_stage(raw_value: str | None) -> str | None:
     value = (raw_value or "").strip() or None
     if value not in ALLOWED_DIRECT_INVITE_STAGES:
@@ -684,7 +695,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
         active_playoff = next((stage for stage in playoff_stages if stage.is_started), None)
         if active_playoff:
             active_key = active_playoff.key
-    ordered_keys = [active_key] + [key for key in stage_order_keys if key != active_key]
+    ordered_keys = build_stage_display_order(active_key, stage_order_keys)
     columns_by_key = {column["key"]: column for column in bracket_columns}
     ordered_stage_columns = [columns_by_key[key] for key in ordered_keys if key in columns_by_key]
 
@@ -1454,11 +1465,8 @@ async def admin_group_score(
 
 
 @router.post("/admin/playoff/generate")
-async def admin_generate_playoff(
-    db: AsyncSession = Depends(get_db),
-):
-    ok, message = await generate_playoff_from_groups(db)
-    return redirect_with_admin_msg("msg_status_ok" if ok else "msg_status_warn", details=None if ok else message)
+async def admin_generate_playoff(db: AsyncSession = Depends(get_db)):
+    return redirect_with_admin_msg("msg_operation_failed", details="use_group_finish_flow")
 
 
 @router.post("/admin/playoff/start")
@@ -1466,13 +1474,7 @@ async def admin_start_playoff(
     stage_id: int = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if not await _playoff_stage_exists(db, stage_id):
-        return redirect_with_admin_msg("msg_invalid_playoff_stage")
-    try:
-        await start_playoff_stage(db, stage_id)
-        return redirect_with_admin_msg("msg_playoff_stage_started")
-    except Exception as exc:  # noqa: BLE001
-        return redirect_with_admin_msg("msg_operation_failed")
+    return redirect_with_admin_msg("msg_operation_failed", details="use_group_finish_flow")
 
 
 @router.post("/admin/playoff/promote")
@@ -1481,13 +1483,7 @@ async def admin_promote_playoff(
     top_n: int = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if not await _playoff_stage_exists(db, stage_id):
-        return redirect_with_admin_msg("msg_invalid_playoff_stage")
-    try:
-        await promote_top_between_stages(db, stage_id, top_n)
-        return redirect_with_admin_msg("msg_players_promoted")
-    except Exception as exc:  # noqa: BLE001
-        return redirect_with_admin_msg("msg_operation_failed")
+    return redirect_with_admin_msg("msg_operation_failed", details="use_group_finish_flow")
 
 
 @router.post("/admin/playoff/move")

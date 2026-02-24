@@ -50,7 +50,7 @@
               </thead>
               <tbody>
                 {% for member in table %}
-                <tr class="{% if member.status == "promoted" %}table-success{% elif member.status == "eliminated" %}table-danger{% endif %}">
+                <tr class="{% if member.status == "promoted" %}table-row-promoted{% elif member.status == "eliminated" %}table-row-eliminated{% endif %}">
                   <td>{{ loop.index }}</td>
                   <td>{{ member.display_nickname }}</td>
                   <td>{{ member.total_points }}</td>
@@ -113,7 +113,7 @@
           </thead>
           <tbody>
             {% for participant in stage.participants %}
-            <tr class="{% if participant.status == "promoted" %}table-success{% elif participant.status == "eliminated" %}table-danger{% endif %}">
+            <tr class="{% if participant.status == "promoted" %}table-row-promoted{% elif participant.status == "eliminated" %}table-row-eliminated{% endif %}">
               <td>{{ loop.index }}</td>
               <td>{{ participant.display_nickname }}</td>
               <td>{{ participant.points }}</td>
