@@ -771,24 +771,7 @@ async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int
         group_ranked = sorted(stage_grouped[group_number], key=playoff_sort_key, reverse=True)
         top_players.extend(group_ranked[:top_n])
 
-    if stage.key in {"stage_2", "stage_1_8"}:
-        direct_invite_users = list(
-            (
-                await db.scalars(
-                    select(User.id)
-                    .where(User.direct_invite_stage == DIRECT_INVITE_STAGE_2)
-                    .order_by(User.created_at)
-                )
-            ).all()
-        )
-        stage_2_player_ids = build_stage_2_player_ids(
-            [participant.user_id for participant in top_players],
-            direct_invite_users,
-        )
-        selected_participants_by_id = {participant.user_id: participant for participant in participants}
-        top_players = [selected_participants_by_id[player_id] for player_id in stage_2_player_ids if player_id in selected_participants_by_id]
-        invited_ids = [player_id for player_id in stage_2_player_ids if player_id not in selected_participants_by_id]
-    elif len(top_players) < target_size:
+    if len(top_players) < target_size:
         selected_ids = {participant.user_id for participant in top_players}
         for participant in ranked:
             if participant.user_id not in selected_ids:
@@ -796,27 +779,28 @@ async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int
                 selected_ids.add(participant.user_id)
             if len(top_players) >= target_size:
                 break
-        invited_ids = []
     else:
         top_players = sorted(top_players, key=playoff_sort_key, reverse=True)[:target_size]
-        invited_ids = []
 
     await db.execute(delete(PlayoffParticipant).where(PlayoffParticipant.stage_id == next_stage.id))
     seed = 1
     for participant in top_players:
-        db.add(PlayoffParticipant(stage_id=next_stage.id, user_id=participant.user_id, seed=seed))
+        db.add(
+            PlayoffParticipant(
+                stage_id=next_stage.id,
+                user_id=participant.user_id,
+                seed=seed,
+                points=0,
+                wins=0,
+                top4_finishes=0,
+                top8_finishes=0,
+                last_place=8,
+                is_eliminated=False,
+            )
+        )
         participant.is_eliminated = False
         seed += 1
-    if stage.key in {"stage_2", "stage_1_8"}:
-        for invited_id in invited_ids:
-            db.add(PlayoffParticipant(stage_id=next_stage.id, user_id=invited_id, seed=seed))
-            seed += 1
-    if stage.key in {"stage_2", "stage_1_8"}:
-        promoted_ids = {participant.user_id for participant in top_players}
-        for invited_id in invited_ids:
-            promoted_ids.add(invited_id)
-    else:
-        promoted_ids = {participant.user_id for participant in top_players}
+    promoted_ids = {participant.user_id for participant in top_players}
     for participant in ranked:
         participant.is_eliminated = participant.user_id not in promoted_ids
     await db.commit()
