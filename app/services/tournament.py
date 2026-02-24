@@ -454,6 +454,14 @@ def get_stage_group_number_by_seed(seed: int) -> int:
     return ((seed - 1) // 8) + 1
 
 
+def get_stage_group_label(stage_key: str, group_number: int) -> str:
+    if stage_key in {"stage_1_8", "stage_1_4", "stage_semifinal_groups"}:
+        return chr(ord("A") + max(group_number - 1, 0))
+    if stage_key == "stage_final":
+        return "Final"
+    return str(group_number)
+
+
 def build_stage_2_player_ids(stage_1_promoted_ids: list[int], direct_invite_ids: list[int]) -> list[int]:
     if len(stage_1_promoted_ids) != 21:
         raise ValueError("Во II этап должны проходить ровно 21 участник из I этапа")

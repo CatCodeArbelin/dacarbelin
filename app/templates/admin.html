@@ -247,7 +247,7 @@
         {% if participants %}
         <ul class="mb-0">
           {% for participant in participants %}
-          <li>G{{ participant.group_number }} · #{{ participant.seed }} · {{ participant.nickname }} ({{ participant.points }} pts)</li>
+          <li>{{ participant.group_label }} · #{{ participant.seed }} · {{ participant.nickname }} ({{ participant.points }} pts)</li>
           {% endfor %}
         </ul>
         {% else %}
@@ -264,7 +264,7 @@
         <form action="/admin/playoff/results/batch" method="post" class="mb-3">
           <input type="hidden" name="stage_id" value="{{ stage.id }}">
           <input type="hidden" name="group_number" value="{{ group.group_number }}">
-          <div class="small text-contrast-muted mb-2">{{ tr('admin_group') }} {{ group.group_number }}</div>
+          <div class="small text-contrast-muted mb-2">{{ tr('admin_group') }} {{ group.group_label }}</div>
           <div class="table-responsive">
             <table class="table table-dark table-sm align-middle mb-2">
               <thead>
@@ -280,7 +280,7 @@
                 <tr>
                   <td>{{ participant.nickname }}<input type="hidden" name="user_ids[]" value="{{ participant.user_id }}"></td>
                   <td>{{ participant.points }}</td>
-                  <td>{{ participant.group_number }}</td>
+                  <td>{{ participant.group_label }}</td>
                   <td><input class="form-control form-control-sm" type="number" min="1" max="8" name="places[]" value="{{ loop.index }}" required></td>
                 </tr>
                 {% endfor %}

@@ -35,7 +35,7 @@
       {% for match in column.matches %}
       <article class="playoff-match-card playoff-status-{{ match.state }}">
         <div class="playoff-match-header d-block">
-          <div>{{ match.label }} · {{ tr('tournament_game') }} {{ match.game_number }} · {{ tr('tournament_schedule') }}: {{ match.schedule_text or tr('tournament_tbd') }}</div>
+          <div>Group {{ match.group_label }} · {{ tr('tournament_game') }} {{ match.game_number }} · {{ tr('tournament_schedule') }}: {{ match.schedule_text or tr('tournament_tbd') }}</div>
           <div>{{ tr('tournament_lobby_pw') }}: <span class="text-info">{{ match.lobby_password }}</span></div>
         </div>
         <ul class="playoff-participants list-unstyled mb-0 mt-2">
