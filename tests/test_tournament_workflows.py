@@ -17,7 +17,7 @@ from app.services.tournament import (
     get_playoff_stage_blueprint,
     parse_manual_draw_user_ids,
 )
-from app.services.tournament_view import resolve_current_stage_label
+from app.services.tournament_view import build_bracket_columns, resolve_current_stage_label
 
 
 class TournamentWorkflowTests(unittest.TestCase):
@@ -263,8 +263,31 @@ def test_get_stage_group_numbers_limits_stage_2_to_real_groups() -> None:
     assert web.get_stage_group_numbers("stage_2") == [1, 2, 3, 4]
     assert web.get_stage_group_numbers("stage_2", stage_size=32, participants_count=32) == [1, 2, 3, 4]
     assert web.get_stage_group_numbers("stage_2", stage_size=32, participants_count=26) == [1, 2, 3, 4]
-    assert web.get_stage_group_numbers("stage_2", stage_size=32, participants_count=24) == [1, 2, 3]
+    assert web.get_stage_group_numbers("stage_2", stage_size=32, participants_count=24) == [1, 2, 3, 4]
 
+
+def test_build_bracket_columns_adds_placeholders_for_missing_stage_groups() -> None:
+    stage = SimpleNamespace(
+        key="stage_2",
+        stage_size=32,
+        participants=[],
+        matches=[],
+    )
+
+    columns = build_bracket_columns(
+        groups=[],
+        playoff_stages=[stage],
+        user_by_id={},
+        direct_invite_ids=[],
+    )
+
+    stage_2_column = next(column for column in columns if column["key"] == "stage_2")
+    assert [match["group_label"] for match in stage_2_column["matches"]] == ["A", "B", "C", "D"]
+    assert all(match["game_number"] == 1 for match in stage_2_column["matches"])
+    assert all(match["schedule_text"] == "TBD" for match in stage_2_column["matches"])
+    assert all(match["lobby_password"] == "TBD" for match in stage_2_column["matches"])
+    assert all(match["participants"] == [] for match in stage_2_column["matches"])
+    assert all(match["state"] == "pending" for match in stage_2_column["matches"])
 
 def test_deprecated_manual_playoff_routes_redirect_to_group_finish_flow() -> None:
     with TestClient(app) as client:

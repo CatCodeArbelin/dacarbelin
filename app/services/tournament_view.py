@@ -196,8 +196,30 @@ def build_bracket_columns(
             continue
 
         participants_by_group = _participants_for_playoff_members(stage.participants, user_by_id)
+        matches_by_group = {match.group_number: match for match in sorted(stage.matches, key=lambda item: item.group_number)}
+
+        stage_group_numbers = sorted({*participants_by_group.keys(), *matches_by_group.keys()})
+        if stage.key in {"stage_2", "stage_1_8", "stage_1_4"}:
+            stage_size = getattr(stage, "stage_size", None) or 0
+            if stage_size:
+                stage_group_numbers = list(range(1, max(stage_size // 8, 0) + 1))
+
         matches_vm: list[BracketMatchVM] = []
-        for match in sorted(stage.matches, key=lambda item: item.group_number):
+        for group_number in stage_group_numbers:
+            match = matches_by_group.get(group_number)
+            if match is None:
+                matches_vm.append(
+                    {
+                        "group_label": get_stage_group_label(stage.key, group_number),
+                        "game_number": 1,
+                        "schedule_text": "TBD",
+                        "lobby_password": "TBD",
+                        "participants": [],
+                        "state": "pending",
+                    }
+                )
+                continue
+
             matches_vm.append(
                 {
                     "group_label": get_stage_group_label(stage.key, match.group_number),
