@@ -34,7 +34,6 @@ class BracketParticipantVM(TypedDict):
 
 class BracketMatchVM(TypedDict, total=False):
     group_label: str
-    label: str
     game_number: int
     schedule_text: str
     lobby_password: str
@@ -141,7 +140,7 @@ def build_bracket_columns(
     direct_invite_ids: list[int],
 ) -> list[BracketColumnVM]:
     stage_by_key = {stage.key: stage for stage in playoff_stages}
-    bracket_columns: list[BracketColumnVM] = [
+    stage_columns: list[BracketColumnVM] = [
         {"key": "group_stage", "title": "I этап", "matches": []},
         {"key": "stage_2", "title": "II этап (32)", "matches": []},
         {"key": "stage_final", "title": "Финал (8)", "matches": []},
@@ -155,7 +154,6 @@ def build_bracket_columns(
         group_matches_vm.append(
             {
                 "group_label": get_stage_group_label("stage_2", int(group_name)) if group_name.isdigit() else group_name.replace("Group ", "").strip(),
-                "label": f"Group {get_stage_group_label('stage_2', int(group_name))}" if group_name.isdigit() else f"Group {group_name.replace('Group ', '').strip()}",
                 "game_number": 3 if getattr(group, "current_game", 1) > 3 else getattr(group, "current_game", 1),
                 "schedule_text": _normalize_schedule(getattr(group, "schedule_text", "TBD")),
                 "lobby_password": getattr(group, "lobby_password", "TBD"),
@@ -163,9 +161,9 @@ def build_bracket_columns(
                 "state": "started" if getattr(group, "is_started", False) else "pending",
             }
         )
-    bracket_columns[0]["matches"] = sorted(group_matches_vm, key=lambda item: item["label"])
+    stage_columns[0]["matches"] = sorted(group_matches_vm, key=lambda item: item["group_label"])
 
-    for column in bracket_columns[1:]:
+    for column in stage_columns[1:]:
         stage = stage_by_key.get(column["key"])
         if not stage:
             if column["key"] == "stage_2":
@@ -186,7 +184,6 @@ def build_bracket_columns(
                     preview_matches_vm.append(
                         {
                             "group_label": get_stage_group_label("stage_2", group_number),
-                            "label": f"Group {get_stage_group_label('stage_2', group_number)}",
                             "game_number": 1,
                             "schedule_text": "TBD",
                             "lobby_password": "TBD",
@@ -204,7 +201,6 @@ def build_bracket_columns(
             matches_vm.append(
                 {
                     "group_label": get_stage_group_label(stage.key, match.group_number),
-                    "label": f"Group {get_stage_group_label(stage.key, match.group_number)}",
                     "game_number": match.game_number,
                     "schedule_text": _normalize_schedule(match.schedule_text),
                     "lobby_password": match.lobby_password,
@@ -214,7 +210,7 @@ def build_bracket_columns(
             )
         column["matches"] = matches_vm
 
-    return bracket_columns
+    return stage_columns
 
 
 def build_playoff_standings(
