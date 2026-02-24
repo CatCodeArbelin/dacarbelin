@@ -353,6 +353,7 @@ def sort_members_for_table(members: list[GroupMember]) -> list[GroupMember]:
             -m.total_points,
             -m.first_places,
             -m.top4_finishes,
+            -m.top8_finishes,
             m.eighth_places,
             m.last_game_place,
             m.user_id,
@@ -388,6 +389,7 @@ async def apply_game_results(db: AsyncSession, group_id: int, ordered_user_ids: 
         member.total_points += points
         member.first_places += 1 if place == 1 else 0
         member.top4_finishes += 1 if place <= 4 else 0
+        member.top8_finishes = (member.top8_finishes or 0) + 1
         member.eighth_places += 1 if place == 8 else 0
         member.last_game_place = place
 
@@ -417,11 +419,12 @@ def get_playoff_stage_blueprint(usable_count: int) -> list[tuple[str, str, int, 
     return []
 
 
-def playoff_sort_key(participant: PlayoffParticipant) -> tuple[int, int, int, int, int]:
+def playoff_sort_key(participant: PlayoffParticipant) -> tuple[int, int, int, int, int, int]:
     return (
         participant.points,
         participant.wins,
         participant.top4_finishes,
+        participant.top8_finishes,
         -participant.last_place,
         -participant.user_id,
     )
@@ -433,6 +436,7 @@ def apply_points_to_playoff_participant(participant: PlayoffParticipant, place: 
         participant.wins += 1
     if place <= 4:
         participant.top4_finishes += 1
+    participant.top8_finishes = (participant.top8_finishes or 0) + 1
     participant.last_place = place
 
 

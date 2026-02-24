@@ -56,6 +56,7 @@ from app.services.tournament import (
     remove_group_member,
     replace_stage_player,
     sort_members_for_table,
+    playoff_sort_key,
     start_playoff_stage,
     swap_group_members,
     adjust_stage_points,
@@ -93,6 +94,15 @@ def _validate_user_update_payload(nickname: str, basket: str, direct_invite_stag
         "basket": basket,
         "direct_invite_stage": normalized_stage,
     }
+
+
+def _display_nickname(user: User | None, fallback: str) -> str:
+    if not user:
+        return fallback
+    game_nickname = (user.game_nickname or "").strip()
+    if game_nickname:
+        return f"{user.nickname}({game_nickname})"
+    return user.nickname
 
 
 def template_context(request: Request, **extra):
@@ -446,7 +456,17 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
         ).all()
     )
     standings = {
-        group.id: sort_members_for_table(group.members)
+        group.id: [
+            {
+                "user_id": member.user_id,
+                "display_nickname": _display_nickname(member.user, str(member.user_id)),
+                "total_points": member.total_points,
+                "first_places": member.first_places,
+                "top4_finishes": member.top4_finishes,
+                "top8_finishes": member.top8_finishes,
+            }
+            for member in sort_members_for_table(group.members)
+        ]
         for group in groups
     }
     playoff_stages = await get_playoff_stages_with_data(db) if show_playoff else []
@@ -477,7 +497,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
                 "participants": [
                     {
                         "user_id": member.user_id,
-                        "nickname": member.user.nickname,
+                        "nickname": _display_nickname(member.user, str(member.user_id)),
                     }
                     for member in sort_members_for_table(group.members)
                 ],
@@ -498,7 +518,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             participants_by_group.setdefault(group_number, []).append(
                 {
                     "user_id": participant.user_id,
-                    "nickname": user.nickname if user else str(participant.user_id),
+                    "nickname": _display_nickname(user, str(participant.user_id)),
                 }
             )
 
@@ -517,6 +537,24 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             )
         column["matches"] = matches_vm
 
+    playoff_standings = [
+        {
+            "title": stage.title,
+            "participants": [
+                {
+                    "user_id": participant.user_id,
+                    "display_nickname": _display_nickname(user_by_id.get(participant.user_id), str(participant.user_id)),
+                    "points": participant.points,
+                    "wins": participant.wins,
+                    "top4_finishes": participant.top4_finishes,
+                    "top8_finishes": participant.top8_finishes,
+                }
+                for participant in sorted(stage.participants, key=playoff_sort_key, reverse=True)
+            ],
+        }
+        for stage in playoff_stages
+    ]
+
     lang = get_lang(request.cookies.get("lang"))
     current_stage_label = t(lang, "tournament_group_stage")
     if show_playoff:
@@ -534,6 +572,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             standings=standings,
             playoff_stages=playoff_stages,
             bracket_columns=bracket_columns,
+            playoff_standings=playoff_standings,
             current_stage_label=current_stage_label,
             show_groups=show_groups,
         ),
