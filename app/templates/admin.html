@@ -79,15 +79,13 @@
       </div>
       {% endif %}
 
-
-      <h5 class="mt-4">Состав этапов плей-офф</h5>
-      {% for stage in playoff_stages %}
+      {% if current_playoff_stage %}
+      <h5 class="mt-4">Состав активного этапа плей-офф</h5>
       <div class="border rounded p-3 mb-2">
-        <div class="fw-bold mb-2">{{ stage.title }}</div>
-        {% set participants = playoff_stage_participants.get(stage.id, []) %}
-        {% if participants %}
+        <div class="fw-bold mb-2">{{ current_playoff_stage.title }}</div>
+        {% if current_stage_participants %}
         <ul class="mb-0">
-          {% for participant in participants %}
+          {% for participant in current_stage_participants %}
           <li>{{ participant.group_label }} · #{{ participant.seed }} · {{ participant.nickname }} ({{ participant.points }} pts)</li>
           {% endfor %}
         </ul>
@@ -95,15 +93,13 @@
         <div class="text-muted small">Нет участников</div>
         {% endif %}
       </div>
-      {% endfor %}
 
       <h5 class="mt-4">{{ tr('admin_playoff_match_results') }}</h5>
-      {% for stage in playoff_stages %}
       <div class="border rounded p-3 mb-3">
-        <div class="fw-bold mb-2">{{ stage.title }}</div>
-        {% for group in playoff_stage_groups.get(stage.id, []) %}
+        <div class="fw-bold mb-2">{{ current_playoff_stage.title }}</div>
+        {% for group in current_stage_groups %}
         <form action="/admin/playoff/results/batch" method="post" class="mb-3">
-          <input type="hidden" name="stage_id" value="{{ stage.id }}">
+          <input type="hidden" name="stage_id" value="{{ current_playoff_stage.id }}">
           <input type="hidden" name="group_number" value="{{ group.group_number }}">
           {% if group.game_limit == 'special' %}
           <div class="small text-contrast-muted mb-2">{{ tr('admin_group') }} {{ group.group_label }} · {{ tr('participants_game') }} {{ group.current_game }}</div>
@@ -135,14 +131,13 @@
           <button class="btn btn-success btn-sm">{{ tr('admin_save_playoff_places') }}</button>
         </form>
         <form action="/admin/playoff/group/finish" method="post" class="mb-3">
-          <input type="hidden" name="stage_id" value="{{ stage.id }}">
+          <input type="hidden" name="stage_id" value="{{ current_playoff_stage.id }}">
           <input type="hidden" name="group_number" value="{{ group.group_number }}">
           <button class="btn btn-outline-success btn-sm">Закончить этап, определить победителей по очкам</button>
         </form>
         {% endfor %}
       </div>
-      {% endfor %}
-
+      {% endif %}
 
 
       {% if show_group_stage_controls %}
