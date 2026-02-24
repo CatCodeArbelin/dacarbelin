@@ -27,11 +27,11 @@
 </section>
 {% endif %}
 
-{% if not has_stage_2_playoff and bracket_columns and bracket_columns[1].matches %}
+{% if not has_stage_2_playoff and stage_2_preview and stage_2_preview.matches %}
 <section class="mt-4">
   <h3>II этап · Предварительный состав</h3>
   <div class="row g-3">
-    {% for match in bracket_columns[1].matches %}
+    {% for match in stage_2_preview.matches %}
     {% call stage_ui.stage_panel('Group ' ~ match.group_label) %}
       <div class="p-3">
         <ul class="list-unstyled mb-0">
