@@ -223,3 +223,108 @@ def test_deprecated_manual_playoff_routes_redirect_to_group_finish_flow() -> Non
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_admin_auto_apply_start_then_group_score_flow(monkeypatch) -> None:
+    """E2E-like сценарий: auto draw → apply → start → ввод результатов группы."""
+    state: dict[str, object] = {
+        "draw_applied": False,
+        "groups_count": 8,
+        "tournament_started": "0",
+        "registration_open": "1",
+        "set_draw_applied_calls": [],
+        "apply_game_results_called": False,
+    }
+
+    class _FakeSetting:
+        def __init__(self, key: str, value: str) -> None:
+            self.key = key
+            self.value = value
+
+    tournament_started_setting = _FakeSetting("tournament_started", "0")
+    registration_open_setting = _FakeSetting("registration_open", "1")
+
+    async def fake_create_auto_draw(db):
+        return True, "ok"
+
+    async def fake_set_draw_applied(db, value: bool):
+        state["draw_applied"] = value
+        cast_calls = state["set_draw_applied_calls"]
+        assert isinstance(cast_calls, list)
+        cast_calls.append(value)
+
+    async def fake_get_draw_applied(db):
+        return bool(state["draw_applied"])
+
+    async def fake_validate_group_draw_integrity(db):
+        return True, None
+
+    async def fake_apply_game_results(db, group_id: int, ordered_user_ids: list[int]):
+        state["apply_game_results_called"] = True
+        assert group_id == 1
+        assert ordered_user_ids == [101, 102, 103, 104, 105, 106, 107, 108]
+
+    async def fake_generate_playoff_from_groups(db):
+        return True, "ok"
+
+    async def fake_scalar(self, statement):
+        sql = str(statement)
+        if "count(tournament_groups.id)" in sql:
+            return state["groups_count"]
+        if "FROM site_settings" in sql:
+            if not hasattr(fake_scalar, "_setting_calls"):
+                fake_scalar._setting_calls = 0
+            fake_scalar._setting_calls += 1
+            return tournament_started_setting if fake_scalar._setting_calls == 1 else registration_open_setting
+        return None
+
+    async def fake_commit(self):
+        state["tournament_started"] = tournament_started_setting.value
+        state["registration_open"] = registration_open_setting.value
+        return None
+
+    def fake_add(self, obj):
+        return None
+
+    monkeypatch.setattr(web, "create_auto_draw", fake_create_auto_draw)
+    monkeypatch.setattr(web, "set_draw_applied", fake_set_draw_applied)
+    monkeypatch.setattr(web, "get_draw_applied", fake_get_draw_applied)
+    monkeypatch.setattr(web, "validate_group_draw_integrity", fake_validate_group_draw_integrity)
+    monkeypatch.setattr(web, "apply_game_results", fake_apply_game_results)
+    monkeypatch.setattr(web, "generate_playoff_from_groups", fake_generate_playoff_from_groups)
+    monkeypatch.setattr(web.AsyncSession, "scalar", fake_scalar, raising=False)
+    monkeypatch.setattr(web.AsyncSession, "commit", fake_commit, raising=False)
+    monkeypatch.setattr(web.AsyncSession, "add", fake_add, raising=False)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+
+        response_auto = client.post("/admin/draw/auto", follow_redirects=False)
+        response_apply = client.post("/admin/draw/apply", follow_redirects=False)
+        response_start = client.post("/admin/tournament/start", follow_redirects=False)
+        response_score = client.post(
+            "/admin/group/score",
+            data={
+                "group_id": "1",
+                "user_ids[]": ["101", "102", "103", "104", "105", "106", "107", "108"],
+                "places[]": ["1", "2", "3", "4", "5", "6", "7", "8"],
+            },
+            follow_redirects=False,
+        )
+
+    assert response_auto.status_code == 303
+    assert response_auto.headers["location"] == "/admin?msg=msg_status_ok"
+
+    assert response_apply.status_code == 303
+    assert response_apply.headers["location"] == "/admin?msg=msg_status_ok&details=draw_applied_groups%3A8"
+
+    assert response_start.status_code == 303
+    assert response_start.headers["location"] == "/admin?msg=msg_status_ok"
+
+    assert response_score.status_code == 303
+    assert response_score.headers["location"] == "/admin?msg=msg_game_saved"
+
+    assert state["set_draw_applied_calls"] == [False, True]
+    assert state["apply_game_results_called"] is True
+    assert tournament_started_setting.value == "1"
+    assert registration_open_setting.value == "0"

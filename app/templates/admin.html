@@ -71,11 +71,24 @@
             {% if draw_applied %}Жеребьевка применена{% else %}Жеребьевка не применена{% endif %}
           </span>
         </div>
+
+        {% if not draw_exists %}
+        <div class="alert alert-warning py-2 mb-1">Жеребьевка не создана: отсутствуют группы группового этапа.</div>
+        {% elif invalid_draw_reason %}
+        <div class="alert alert-danger py-2 mb-1">Группы отсутствуют/битые ({{ invalid_draw_reason }}).</div>
+        {% elif not draw_applied %}
+        <div class="alert alert-warning py-2 mb-1">Жеребьевка не применена: подтвердите состав групп кнопкой ниже.</div>
+        {% elif not tournament_started %}
+        <div class="alert alert-info py-2 mb-1">Турнир не запущен: после применения жеребьевки нажмите «Начать турнир».</div>
+        {% endif %}
+
+        <div class="small text-contrast-muted">Групп найдено: {{ groups_count }}</div>
+
         <form action="/admin/draw/apply" method="post">
-          <button class="btn btn-success w-100">Применить жеребьевку</button>
+          <button class="btn btn-success w-100" {% if not draw_exists or invalid_draw_reason %}disabled{% endif %}>Применить жеребьевку</button>
         </form>
         <form action="/admin/tournament/start" method="post">
-          <button class="btn btn-danger w-100" {% if tournament_started or not draw_applied %}disabled{% endif %}>Начать турнир</button>
+          <button class="btn btn-danger w-100" {% if tournament_started or not draw_applied or invalid_draw_reason %}disabled{% endif %}>Начать турнир</button>
         </form>
       </div>
 
