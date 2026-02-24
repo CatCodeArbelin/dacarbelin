@@ -119,6 +119,10 @@
               <thead>
                 <tr>
                   <th>{{ tr('participants_nick') }}</th>
+                  <th>Pts</th>
+                  <th>#1</th>
+                  <th>#2-4</th>
+                  <th>#8</th>
                   <th>{{ tr('admin_current_points') }}</th>
                   <th>{{ tr('admin_current_group') }}</th>
                   <th>{{ tr('admin_place') }}</th>
@@ -128,6 +132,10 @@
                 {% for participant in group.participants %}
                 <tr>
                   <td>{{ participant.nickname }}<input type="hidden" name="user_ids[]" value="{{ participant.user_id }}"></td>
+                  <td>{{ participant.total_points }}</td>
+                  <td>{{ participant.first_places }}</td>
+                  <td>{{ participant.top2_4_finishes }}</td>
+                  <td>{{ participant.top8_finishes }}</td>
                   <td>{{ participant.points }}</td>
                   <td>{{ participant.group_label }}</td>
                   <td><input class="form-control form-control-sm" type="number" min="1" max="8" name="places[]" value="{{ loop.index }}" required></td>
@@ -213,14 +221,22 @@
                     <thead>
                       <tr>
                         <th>{{ tr('index_nickname') }}</th>
+                        <th>Pts</th>
+                        <th>#1</th>
+                        <th>#2-4</th>
+                        <th>#8</th>
                         <th style="width: 180px;">{{ tr('admin_place') }}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {% for m in group.members|sort(attribute='seat') %}
+                      {% for m in group_stage_table_members.get(group.id, []) %}
                       {% set member_index = loop.index %}
                       <tr>
-                        <td>{{ m.user.nickname }}</td>
+                        <td>{{ m.nickname }}</td>
+                        <td>{{ m.total_points }}</td>
+                        <td>{{ m.first_places }}</td>
+                        <td>{{ m.top2_4_finishes }}</td>
+                        <td>{{ m.top8_finishes }}</td>
                         <td>
                           <input type="hidden" name="user_ids[]" value="{{ m.user_id }}">
                           <select class="form-select form-select-sm" name="places[]" required {% if group_locked %}disabled{% endif %}>

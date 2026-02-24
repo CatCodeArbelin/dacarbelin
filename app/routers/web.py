@@ -916,6 +916,20 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
         ]
         for group in groups
     }
+    group_stage_table_members = {
+        group.id: [
+            {
+                "user_id": member.user_id,
+                "nickname": (member.user.nickname if member.user else users_by_id.get(member.user_id, f"#{member.user_id}")),
+                "total_points": member.total_points or 0,
+                "first_places": member.first_places or 0,
+                "top2_4_finishes": max((member.top4_finishes or 0) - (member.first_places or 0), 0),
+                "top8_finishes": member.top8_finishes or 0,
+            }
+            for member in sort_members_for_table(list(group.members))
+        ]
+        for group in groups
+    }
     playoff_stage_participants = {
         stage.id: [
             {
@@ -961,6 +975,10 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                         "user_id": participant.user_id,
                         "nickname": users_by_id.get(participant.user_id, f"#{participant.user_id}"),
                         "points": participant.points,
+                        "total_points": participant.points or 0,
+                        "first_places": participant.wins or 0,
+                        "top2_4_finishes": max((participant.top4_finishes or 0) - (participant.wins or 0), 0),
+                        "top8_finishes": participant.top8_finishes or 0,
                         "group_number": group_number,
                         "group_label": get_stage_group_label(stage.key, group_number),
                     }
@@ -970,7 +988,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                             for item in stage.participants
                             if get_stage_group_number_by_seed(item.seed) == group_number
                         ],
-                        key=lambda item: (item.points, item.user_id),
+                        key=playoff_sort_key,
                         reverse=True,
                     )
                 ],
@@ -1023,6 +1041,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             judge_login_url=judge_login_url,
             manual_draw_users=manual_draw_users,
             group_user_choices=group_user_choices,
+            group_stage_table_members=group_stage_table_members,
             playoff_stage_participants=playoff_stage_participants,
             playoff_stage_groups=playoff_stage_groups,
             active_playoff_stage=active_playoff_stage,
