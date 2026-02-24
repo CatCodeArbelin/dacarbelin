@@ -104,12 +104,11 @@ def get_stage_group_numbers(
     }
     groups_count = stage_group_count.get(stage_key)
     if stage_key in {"stage_2", "stage_1_8", "stage_1_4"}:
-        max_groups = max((stage_size or 0) // 8, 0)
-        participant_groups = max(math.ceil((participants_count or 0) / 8), 0)
-        if max_groups:
-            groups_count = min(participant_groups, max_groups) if participants_count is not None else max_groups
+        size_groups = max((stage_size or 0) // 8, 0)
+        if size_groups:
+            groups_count = size_groups
         elif participants_count is not None:
-            groups_count = participant_groups
+            groups_count = max(math.ceil((participants_count or 0) / 8), 0)
     if groups_count is None:
         return []
     return list(range(1, groups_count + 1))
