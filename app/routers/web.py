@@ -84,6 +84,19 @@ def build_stage_display_order(active_key: str, stage_order_keys: list[str]) -> l
     return [active_key, *after_active, *before_active]
 
 
+def get_stage_group_numbers(stage_key: str) -> list[int]:
+    stage_group_count = {
+        "stage_2": 7,
+        "stage_1_8": 4,
+        "stage_1_4": 2,
+        "stage_final": 1,
+    }
+    groups_count = stage_group_count.get(stage_key)
+    if groups_count is None:
+        return []
+    return list(range(1, groups_count + 1))
+
+
 
 def _normalize_direct_invite_stage(raw_value: str | None) -> str | None:
     value = (raw_value or "").strip() or None
@@ -993,7 +1006,10 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                     )
                 ],
             }
-            for group_number in sorted({get_stage_group_number_by_seed(item.seed) for item in stage.participants})
+            for group_number in (
+                get_stage_group_numbers(stage.key)
+                or sorted({get_stage_group_number_by_seed(item.seed) for item in stage.participants})
+            )
         ]
         for stage in playoff_stages
     }
