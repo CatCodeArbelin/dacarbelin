@@ -202,3 +202,14 @@ body {
   margin-top: 8px;
   color: #9ed9ff !important;
 }
+
+
+.table-row-promoted td,
+.table-row-promoted th {
+  background-color: #123f2f !important;
+}
+
+.table-row-eliminated td,
+.table-row-eliminated th {
+  background-color: #4a1e24 !important;
+}

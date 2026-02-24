@@ -44,9 +44,14 @@
     <div id="chat" class="card bg-black neon-border-blue mt-4">
       <div class="card-body">
         <h3 class="text-contrast-neon neon-text-outline">{{ tr('index_chat') }}</h3>
-        <form action="/chat/send" method="post" class="mb-3">
+        <form action="/chat/send" method="post" class="mb-3" id="chat-form">
           {% if not chat_settings.is_enabled %}<div class="alert alert-warning">{{ tr('msg_chat_disabled_admin') }}</div>{% endif %}
           <input class="form-control mb-2" name="temp_nick" placeholder="{{ tr('index_temp_nick') }}" required>
+          <select class="form-select mb-2" name="nick_color">
+            {% for color in chat_nick_colors %}
+              <option value="{{ color }}" style="color: {{ color }};">{{ color }}</option>
+            {% endfor %}
+          </select>
           <textarea class="form-control mb-2" name="message" maxlength="{{ chat_settings.max_length }}" placeholder="{{ tr('index_message') }}" required {% if not chat_settings.is_enabled %}disabled{% endif %}></textarea>
           <button class="btn btn-primary" {% if not chat_settings.is_enabled %}disabled{% endif %}>{{ tr('index_connect_send') }}</button>
           <div class="small text-contrast-muted">{{ tr('index_cooldown') }}: {{ chat_settings.cooldown_seconds }} sec · {{ tr('index_max_length') }}: {{ chat_settings.max_length }}</div>
@@ -155,5 +160,30 @@
     }
   });
 })();
+
+(() => {
+  const chatBox = document.getElementById("chat-box");
+  if (!chatBox) return;
+
+  const render = (messages) => {
+    chatBox.innerHTML = messages.map((msg) => `
+      <div><strong class="chat-nick${msg.is_admin ? " chat-nick-admin" : ""}" style="--nick-color: ${msg.nick_color};">${msg.temp_nick}</strong>: ${msg.message}</div>
+    `).join("");
+  };
+
+  const refresh = async () => {
+    try {
+      const response = await fetch("/chat/messages", { headers: { "Accept": "application/json" } });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (Array.isArray(data.messages)) render(data.messages);
+    } catch (e) {
+      // ignore polling errors
+    }
+  };
+
+  setInterval(refresh, 3000);
+})();
+
 </script>
 {% endblock %}

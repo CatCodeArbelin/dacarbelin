@@ -50,7 +50,7 @@
               </thead>
               <tbody>
                 {% for member in table %}
-                <tr>
+                <tr class="{% if member.status == "promoted" %}table-row-promoted{% elif member.status == "eliminated" %}table-row-eliminated{% endif %}">
                   <td>{{ loop.index }}</td>
                   <td>{{ member.display_nickname }}</td>
                   <td>{{ member.total_points }}</td>
@@ -113,7 +113,7 @@
           </thead>
           <tbody>
             {% for participant in stage.participants %}
-            <tr>
+            <tr class="{% if participant.status == "promoted" %}table-row-promoted{% elif participant.status == "eliminated" %}table-row-eliminated{% endif %}">
               <td>{{ loop.index }}</td>
               <td>{{ participant.display_nickname }}</td>
               <td>{{ participant.points }}</td>
@@ -131,28 +131,37 @@
 </section>
 {% endif %}
 
-{% if bracket_columns %}
-<section class="playoff-bracket mt-4">
-  {% for column in bracket_columns %}
-  <div class="playoff-round">
-    <h4 class="playoff-round-title">{{ column.title }}</h4>
-    <div class="playoff-round-matches">
-      {% for match in column.matches %}
-      <article class="playoff-match-card playoff-status-{{ match.state }}">
-        <div class="playoff-match-header d-block">
-          <div>Group {{ match.group_label }} · {{ tr('tournament_game') }} {{ match.game_number }} · {{ tr('tournament_schedule') }}: {{ match.schedule_text or tr('tournament_tbd') }}</div>
-          <div>{{ tr('tournament_lobby_pw') }}: <span class="text-info">{{ match.lobby_password }}</span></div>
+{% if ordered_stage_columns %}
+<section class="mt-4">
+  <h3>Стадии турнира</h3>
+  <div class="row g-3">
+    {% for column in ordered_stage_columns %}
+    <div class="col-12">
+      <div class="card bg-dark border-secondary">
+        <div class="card-header">{{ column.title }}</div>
+        <div class="card-body">
+          <div class="row g-2">
+            {% for match in column.matches %}
+            <div class="col-12 col-lg-6">
+              <article class="playoff-match-card playoff-status-{{ match.state }}">
+                <div class="playoff-match-header d-block">
+                  <div>Group {{ match.group_label }} · {{ tr('tournament_game') }} {{ match.game_number }} · {{ tr('tournament_schedule') }}: {{ match.schedule_text or tr('tournament_tbd') }}</div>
+                  <div>{{ tr('tournament_lobby_pw') }}: <span class="text-info">{{ match.lobby_password }}</span></div>
+                </div>
+                <ul class="playoff-participants list-unstyled mb-0 mt-2">
+                  {% for participant in match.participants %}
+                  <li>#{{ participant.user_id }} · {{ participant.nickname }}{% if participant.is_direct_invite_preview %} <span class="badge text-bg-info">прямой инвайт</span>{% endif %}</li>
+                  {% endfor %}
+                </ul>
+              </article>
+            </div>
+            {% endfor %}
+          </div>
         </div>
-        <ul class="playoff-participants list-unstyled mb-0 mt-2">
-          {% for participant in match.participants %}
-          <li>#{{ participant.user_id }} · {{ participant.nickname }}{% if participant.is_direct_invite_preview %} <span class="badge text-bg-info">прямой инвайт</span>{% endif %}</li>
-          {% endfor %}
-        </ul>
-      </article>
-      {% endfor %}
+      </div>
     </div>
+    {% endfor %}
   </div>
-  {% endfor %}
 </section>
 {% endif %}
 {% endblock %}

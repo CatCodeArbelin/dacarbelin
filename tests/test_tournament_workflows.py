@@ -4,6 +4,7 @@ import unittest
 
 from fastapi.testclient import TestClient
 
+from app.core.admin_session import ADMIN_SESSION_COOKIE, create_admin_session_cookie
 from app.db.session import get_db
 from app.main import app
 from app.routers import web
@@ -194,6 +195,40 @@ def test_tournament_page_hides_groups_before_start(monkeypatch) -> None:
     assert "Groups are prepared and will be shown after tournament start" in response.text
     assert "tournament_group_stage_title" not in response.text
     assert "Current playoff stage / bracket" not in response.text
+
+
+def test_stage_display_order_rotates_active_stage_first() -> None:
+    keys = ["group_stage", "stage_1_8", "stage_1_4", "stage_final"]
+    assert web.build_stage_display_order("group_stage", keys) == ["group_stage", "stage_1_8", "stage_1_4", "stage_final"]
+    assert web.build_stage_display_order("stage_1_8", keys) == ["stage_1_8", "stage_1_4", "stage_final", "group_stage"]
+    assert web.build_stage_display_order("stage_1_4", keys) == ["stage_1_4", "stage_final", "stage_1_8", "group_stage"]
+    assert web.build_stage_display_order("stage_final", keys) == ["stage_final", "stage_1_4", "stage_1_8", "group_stage"]
+
+
+def test_deprecated_manual_playoff_routes_redirect_to_group_finish_flow() -> None:
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response_start = client.post(
+            "/admin/playoff/start",
+            data={"stage_id": "1"},
+            follow_redirects=False,
+        )
+        response_promote = client.post(
+            "/admin/playoff/promote",
+            data={"stage_id": "1", "top_n": "4"},
+            follow_redirects=False,
+        )
+        response_generate = client.post(
+            "/admin/playoff/generate",
+            follow_redirects=False,
+        )
+
+    assert response_start.status_code == 303
+    assert "details=use_group_finish_flow" in response_start.headers["location"]
+    assert response_promote.status_code == 303
+    assert "details=use_group_finish_flow" in response_promote.headers["location"]
+    assert response_generate.status_code == 303
+    assert "details=use_group_finish_flow" in response_generate.headers["location"]
 
 
 if __name__ == "__main__":

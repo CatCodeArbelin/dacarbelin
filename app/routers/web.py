@@ -72,6 +72,20 @@ templates = Jinja2Templates(directory="app/templates")
 ALLOWED_USER_UPDATE_FIELDS = {"nickname", "basket", "direct_invite_stage"}
 ALLOWED_DIRECT_INVITE_STAGES = {None, "stage_2", "stage_1_8", "stage_1_4", "stage_semifinal_groups", "stage_final"}
 
+CHAT_NICK_COLORS = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff66c4", "#5ce1e6", "#f48c06", "#90be6d", "#4cc9f0"]
+FORBIDDEN_CHAT_NICKS = {"@admin"}
+
+
+def build_stage_display_order(active_key: str, stage_order_keys: list[str]) -> list[str]:
+    if active_key not in stage_order_keys:
+        return stage_order_keys
+
+    active_index = stage_order_keys.index(active_key)
+    after_active = stage_order_keys[active_index + 1 :]
+    before_active = list(reversed(stage_order_keys[:active_index]))
+    return [active_key, *after_active, *before_active]
+
+
 
 def _normalize_direct_invite_stage(raw_value: str | None) -> str | None:
     value = (raw_value or "").strip() or None
@@ -210,6 +224,35 @@ def validate_chat_message_length(message: str, max_length: int) -> None:
         raise ValueError("msg_message_too_long")
 
 
+def normalize_chat_nick(temp_nick: str) -> str:
+    cleaned = (temp_nick or "").strip()[:120]
+    if not cleaned:
+        raise ValueError("msg_operation_failed")
+    if cleaned.lower() in FORBIDDEN_CHAT_NICKS:
+        raise ValueError("msg_chat_nick_reserved")
+    return cleaned
+
+
+def normalize_chat_nick_color(color: str) -> str:
+    normalized = (color or "").strip().lower()
+    if normalized not in CHAT_NICK_COLORS:
+        raise ValueError("msg_chat_color_forbidden")
+    return normalized
+
+
+def _build_chat_messages_payload(chat_messages: list[ChatMessage]) -> list[dict[str, str]]:
+    return [
+        {
+            "id": msg.id,
+            "temp_nick": msg.temp_nick,
+            "message": msg.message,
+            "nick_color": msg.nick_color or CHAT_NICK_COLORS[msg.id % len(CHAT_NICK_COLORS)],
+            "is_admin": msg.temp_nick == "@Admin",
+        }
+        for msg in chat_messages
+    ]
+
+
 async def get_or_create_rules_content(db: AsyncSession) -> RulesContent:
     row = await db.scalar(select(RulesContent).where(RulesContent.id == 1))
     if row:
@@ -243,6 +286,8 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
             request,
             stages=stages,
             chat_messages=list(reversed(chat_messages)),
+            chat_messages_payload=_build_chat_messages_payload(list(reversed(chat_messages))),
+            chat_nick_colors=CHAT_NICK_COLORS,
             registration_open=registration_open,
             tournament_started=tournament_started,
             chat_settings=chat_settings,
@@ -344,6 +389,7 @@ async def register_preview(
 async def send_chat(
     request: Request,
     temp_nick: str = Form(...),
+    nick_color: str = Form(default="#00d4ff"),
     message: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
@@ -357,19 +403,36 @@ async def send_chat(
     except ValueError as exc:
         return redirect_with_msg("/", str(exc))
 
+    try:
+        safe_nick = normalize_chat_nick(temp_nick)
+        safe_color = normalize_chat_nick_color(nick_color)
+    except ValueError as exc:
+        return redirect_with_msg("/", str(exc))
+
     ip = request.client.host if request.client else "unknown"
+    chat_sender = request.cookies.get("chat_sender") or f"{ip}:{safe_nick.lower()}"
     last_msg = await db.scalar(
         select(ChatMessage)
-        .where(ChatMessage.ip_address == ip)
+        .where(ChatMessage.sender_token == chat_sender)
         .order_by(desc(ChatMessage.created_at))
         .limit(1)
     )
     if last_msg and datetime.utcnow() - last_msg.created_at < timedelta(seconds=chat_settings.cooldown_seconds):
         return redirect_with_msg("/", "msg_cooldown_active")
 
-    db.add(ChatMessage(temp_nick=temp_nick[:120], message=message, ip_address=ip))
+    db.add(ChatMessage(temp_nick=safe_nick, nick_color=safe_color, message=message, ip_address=ip, sender_token=chat_sender))
     await db.commit()
-    return RedirectResponse(url="/#chat", status_code=303)
+    redirect = RedirectResponse(url="/#chat", status_code=303)
+    if not request.cookies.get("chat_sender"):
+        redirect.set_cookie("chat_sender", chat_sender, max_age=60 * 60 * 24 * 365, samesite="lax")
+    return redirect
+
+
+@router.get("/chat/messages")
+async def chat_messages_api(db: AsyncSession = Depends(get_db)):
+    chat_messages = (await db.scalars(select(ChatMessage).order_by(desc(ChatMessage.id)).limit(20))).all()
+    payload = _build_chat_messages_payload(list(reversed(chat_messages)))
+    return {"messages": payload}
 
 
 @router.get("/participants", response_class=HTMLResponse)
@@ -456,20 +519,27 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             )
         ).all()
     )
-    standings = {
-        group.id: [
-            {
-                "user_id": member.user_id,
-                "display_nickname": _display_nickname(member.user, str(member.user_id)),
-                "total_points": member.total_points,
-                "first_places": member.first_places,
-                "top4_finishes": member.top4_finishes,
-                "top8_finishes": member.top8_finishes,
-            }
-            for member in sort_members_for_table(group.members)
-        ]
-        for group in groups
-    }
+    standings: dict[int, list[dict[str, object]]] = {}
+    for group in groups:
+        ranked_members = sort_members_for_table(group.members)
+        group_done = getattr(group, "current_game", 1) > 3
+        rows: list[dict[str, object]] = []
+        for idx, member in enumerate(ranked_members, start=1):
+            status = "normal"
+            if group_done:
+                status = "promoted" if idx <= 3 else "eliminated"
+            rows.append(
+                {
+                    "user_id": member.user_id,
+                    "display_nickname": _display_nickname(member.user, str(member.user_id)),
+                    "total_points": member.total_points,
+                    "first_places": member.first_places,
+                    "top4_finishes": member.top4_finishes,
+                    "top8_finishes": member.top8_finishes,
+                    "status": status,
+                }
+            )
+        standings[group.id] = rows
     playoff_stages = await get_playoff_stages_with_data(db) if show_playoff else []
 
     direct_invite_ids = list(
@@ -580,23 +650,36 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             )
         column["matches"] = matches_vm
 
-    playoff_standings = [
-        {
-            "title": stage.title,
-            "participants": [
-                {
-                    "user_id": participant.user_id,
-                    "display_nickname": _display_nickname(user_by_id.get(participant.user_id), str(participant.user_id)),
-                    "points": participant.points,
-                    "wins": participant.wins,
-                    "top4_finishes": participant.top4_finishes,
-                    "top8_finishes": participant.top8_finishes,
-                }
-                for participant in sorted(stage.participants, key=playoff_sort_key, reverse=True)
-            ],
-        }
-        for stage in playoff_stages
-    ]
+    playoff_standings: list[dict[str, object]] = []
+    for stage in playoff_stages:
+        participants_sorted = sorted(stage.participants, key=playoff_sort_key, reverse=True)
+        stage_group_done: set[int] = set()
+        for match in stage.matches:
+            if stage.key in {"stage_1_8", "stage_1_4", "stage_semifinal_groups"} and match.game_number > 3:
+                stage_group_done.add(match.group_number)
+        promote_n_by_key = {"stage_1_8": 3, "stage_1_4": 4, "stage_semifinal_groups": 4, "stage_final": 1}
+        promote_n = promote_n_by_key.get(stage.key, 0)
+        by_group_rank: dict[int, dict[int, int]] = {}
+        for g in {get_stage_group_number_by_seed(p.seed) for p in participants_sorted}:
+            group_sorted = [p for p in participants_sorted if get_stage_group_number_by_seed(p.seed) == g]
+            by_group_rank[g] = {p.user_id: idx for idx, p in enumerate(group_sorted, start=1)}
+
+        rows = []
+        for participant in participants_sorted:
+            group_number = get_stage_group_number_by_seed(participant.seed)
+            status = "normal"
+            if group_number in stage_group_done and promote_n > 0:
+                status = "promoted" if by_group_rank[group_number].get(participant.user_id, 99) <= promote_n else "eliminated"
+            rows.append({
+                "user_id": participant.user_id,
+                "display_nickname": _display_nickname(user_by_id.get(participant.user_id), str(participant.user_id)),
+                "points": participant.points,
+                "wins": participant.wins,
+                "top4_finishes": participant.top4_finishes,
+                "top8_finishes": participant.top8_finishes,
+                "status": status,
+            })
+        playoff_standings.append({"title": stage.title, "participants": rows})
 
     lang = get_lang(request.cookies.get("lang"))
     current_stage_label = t(lang, "tournament_group_stage")
@@ -606,6 +689,16 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             current_stage_label = active_playoff.title
         elif playoff_stages:
             current_stage_label = playoff_stages[0].title
+    stage_order_keys = ["group_stage", "stage_1_8", "stage_1_4", "stage_final"]
+    active_key = "group_stage"
+    if show_playoff:
+        active_playoff = next((stage for stage in playoff_stages if stage.is_started), None)
+        if active_playoff:
+            active_key = active_playoff.key
+    ordered_keys = build_stage_display_order(active_key, stage_order_keys)
+    columns_by_key = {column["key"]: column for column in bracket_columns}
+    ordered_stage_columns = [columns_by_key[key] for key in ordered_keys if key in columns_by_key]
+
     return templates.TemplateResponse(
         request,
         "tournament.html",
@@ -615,6 +708,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             standings=standings,
             playoff_stages=playoff_stages,
             bracket_columns=bracket_columns,
+            ordered_stage_columns=ordered_stage_columns,
             playoff_standings=playoff_standings,
             current_stage_label=current_stage_label,
             show_groups=show_groups,
@@ -690,8 +784,11 @@ async def admin_logout():
 
 @router.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
-    judge_login_token = create_judge_login_token()
-    judge_login_url = str(request.url_for("admin_page")).rstrip("/") + f"?judge_token={judge_login_token}"
+    judge_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "judge_login_token"))
+    judge_login_token = (judge_setting.value if judge_setting else "")
+    judge_login_url = ""
+    if judge_login_token:
+        judge_login_url = str(request.url_for("admin_page")).rstrip("/") + f"?judge_token={judge_login_token}"
 
     manual_draw_users = (
         await db.scalars(
@@ -705,7 +802,8 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     stages = (await db.scalars(select(TournamentStage).order_by(TournamentStage.id))).all()
     playoff_stages = await get_playoff_stages_with_data(db)
     active_playoff_stage = next((stage for stage in playoff_stages if stage.is_started), None)
-    show_group_stage_controls = bool(active_playoff_stage and active_playoff_stage.key == "stage_1_8")
+    tournament_started = await get_tournament_started(db)
+    show_group_stage_controls = bool(tournament_started)
     groups = (
         list(
             (
@@ -942,6 +1040,67 @@ async def _update_user_allowed_fields(
 
     await db.commit()
     return redirect_with_admin_users_msg("msg_status_ok")
+
+
+@router.get("/admin/chat", response_class=HTMLResponse)
+async def admin_chat_page(request: Request, db: AsyncSession = Depends(get_db)):
+    chat_settings = await get_or_create_chat_settings(db)
+    chat_messages = (
+        await db.scalars(select(ChatMessage).order_by(desc(ChatMessage.id)).limit(100))
+    ).all()
+    return templates.TemplateResponse(
+        request,
+        "admin_chat.html",
+        template_context(
+            request,
+            chat_settings=chat_settings,
+            chat_messages=chat_messages,
+        ),
+    )
+
+
+@router.get("/admin/content", response_class=HTMLResponse)
+async def admin_content_page(request: Request, db: AsyncSession = Depends(get_db)):
+    rules_content = await get_or_create_rules_content(db)
+    donation_links = (await db.scalars(select(DonationLink).order_by(DonationLink.sort_order, DonationLink.id))).all()
+    donation_methods = (await db.scalars(select(DonationMethod).order_by(DonationMethod.sort_order, DonationMethod.id))).all()
+    prize_pool_entries = (await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all()
+    donors = (await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all()
+    archive_entries = (await db.scalars(select(ArchiveEntry).order_by(ArchiveEntry.sort_order, ArchiveEntry.id))).all()
+    return templates.TemplateResponse(
+        request,
+        "admin_content.html",
+        template_context(
+            request,
+            rules_content=rules_content,
+            donation_links=donation_links,
+            donation_methods=donation_methods,
+            prize_pool_entries=prize_pool_entries,
+            donors=donors,
+            archive_entries=archive_entries,
+        ),
+    )
+
+
+@router.get("/admin/emergency", response_class=HTMLResponse)
+async def admin_emergency_page(request: Request, db: AsyncSession = Depends(get_db)):
+    manual_draw_users = (
+        await db.scalars(
+            select(User)
+            .where(User.basket != Basket.INVITED.value)
+            .order_by(User.nickname.asc(), User.created_at.desc())
+        )
+    ).all()
+    playoff_stages = await get_playoff_stages_with_data(db)
+    return templates.TemplateResponse(
+        request,
+        "admin_emergency.html",
+        template_context(
+            request,
+            playoff_stages=playoff_stages,
+            manual_draw_users=manual_draw_users,
+        ),
+    )
 
 
 @router.post("/admin/user/update")
@@ -1306,11 +1465,8 @@ async def admin_group_score(
 
 
 @router.post("/admin/playoff/generate")
-async def admin_generate_playoff(
-    db: AsyncSession = Depends(get_db),
-):
-    ok, message = await generate_playoff_from_groups(db)
-    return redirect_with_admin_msg("msg_status_ok" if ok else "msg_status_warn", details=None if ok else message)
+async def admin_generate_playoff(db: AsyncSession = Depends(get_db)):
+    return redirect_with_admin_msg("msg_operation_failed", details="use_group_finish_flow")
 
 
 @router.post("/admin/playoff/start")
@@ -1318,13 +1474,7 @@ async def admin_start_playoff(
     stage_id: int = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if not await _playoff_stage_exists(db, stage_id):
-        return redirect_with_admin_msg("msg_invalid_playoff_stage")
-    try:
-        await start_playoff_stage(db, stage_id)
-        return redirect_with_admin_msg("msg_playoff_stage_started")
-    except Exception as exc:  # noqa: BLE001
-        return redirect_with_admin_msg("msg_operation_failed")
+    return redirect_with_admin_msg("msg_operation_failed", details="use_group_finish_flow")
 
 
 @router.post("/admin/playoff/promote")
@@ -1333,13 +1483,7 @@ async def admin_promote_playoff(
     top_n: int = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if not await _playoff_stage_exists(db, stage_id):
-        return redirect_with_admin_msg("msg_invalid_playoff_stage")
-    try:
-        await promote_top_between_stages(db, stage_id, top_n)
-        return redirect_with_admin_msg("msg_players_promoted")
-    except Exception as exc:  # noqa: BLE001
-        return redirect_with_admin_msg("msg_operation_failed")
+    return redirect_with_admin_msg("msg_operation_failed", details="use_group_finish_flow")
 
 
 @router.post("/admin/playoff/move")
@@ -1409,6 +1553,52 @@ async def admin_playoff_score(
         return redirect_with_admin_msg("msg_playoff_game_saved")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
+
+
+@router.post("/admin/playoff/group/finish")
+async def admin_finish_playoff_group(
+    stage_id: int = Form(...),
+    group_number: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.id == stage_id))
+    if not stage:
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
+
+    participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))).all())
+    group_participants = [p for p in participants if get_stage_group_number_by_seed(p.seed) == group_number]
+    if not group_participants:
+        return redirect_with_admin_msg("msg_operation_failed")
+
+    match = await db.scalar(select(PlayoffMatch).where(PlayoffMatch.stage_id == stage_id, PlayoffMatch.group_number == group_number))
+    if not match:
+        return redirect_with_admin_msg("msg_operation_failed")
+
+    if stage.key in {"stage_1_8", "stage_1_4", "stage_semifinal_groups"} and match.game_number <= 3:
+        return redirect_with_admin_msg("msg_operation_failed", details="group_games_not_completed")
+
+    ranked = sorted(group_participants, key=playoff_sort_key, reverse=True)
+    promote_n_by_key = {"stage_1_8": 3, "stage_1_4": 4, "stage_semifinal_groups": 4, "stage_final": 1}
+    promote_n = promote_n_by_key.get(stage.key, 0)
+    promoted_ids = {p.user_id for p in ranked[:promote_n]}
+    for participant in group_participants:
+        participant.is_eliminated = participant.user_id not in promoted_ids
+    match.state = "finished"
+    await db.commit()
+
+    group_numbers = sorted({m.group_number for m in stage.matches})
+    stage_finished = all((await db.scalar(select(PlayoffMatch).where(PlayoffMatch.stage_id == stage.id, PlayoffMatch.group_number == g))).state == "finished" for g in group_numbers)
+    if stage_finished and stage.key in {"stage_1_8", "stage_1_4", "stage_semifinal_groups"}:
+        top_n = {"stage_1_8": 3, "stage_1_4": 4, "stage_semifinal_groups": 4}[stage.key]
+        try:
+            await promote_top_between_stages(db, stage.id, top_n)
+            next_stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.stage_order == stage.stage_order + 1))
+            if next_stage:
+                await start_playoff_stage(db, next_stage.id)
+        except Exception:
+            return redirect_with_admin_msg("msg_operation_failed")
+
+    return redirect_with_admin_msg("msg_status_ok")
 
 
 @router.post("/admin/playoff/results/batch")
@@ -1577,6 +1767,19 @@ async def admin_save_archive(
     return redirect_with_admin_msg("msg_archive_saved")
 
 
+@router.post("/admin/judge-link/regenerate")
+async def admin_regenerate_judge_link(db: AsyncSession = Depends(get_db)):
+    token = create_judge_login_token()
+    row = await db.scalar(select(SiteSetting).where(SiteSetting.key == "judge_login_token"))
+    if not row:
+        row = SiteSetting(key="judge_login_token", value=token)
+        db.add(row)
+    else:
+        row.value = token
+    await db.commit()
+    return redirect_with_admin_msg("msg_status_ok")
+
+
 @router.post("/admin/chat-settings")
 async def admin_save_chat_settings(
     cooldown_seconds: int = Form(...),
@@ -1607,7 +1810,7 @@ async def admin_send_chat_message(
     except ValueError as exc:
         return redirect_with_admin_msg(str(exc))
 
-    db.add(ChatMessage(temp_nick="@Admin", message=message, ip_address="admin"))
+    db.add(ChatMessage(temp_nick="@Admin", nick_color="#ff0000", message=message, ip_address="admin", sender_token="admin"))
     await db.commit()
     return redirect_with_admin_msg("msg_admin_chat_message_saved")
 
