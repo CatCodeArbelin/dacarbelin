@@ -596,15 +596,19 @@ async def generate_playoff_from_groups(db: AsyncSession) -> tuple[bool, str]:
 
 
 async def get_playoff_stages_with_data(db: AsyncSession) -> list[PlayoffStage]:
+    statement = (
+        select(PlayoffStage)
+        .options(
+            selectinload(PlayoffStage.matches),
+            selectinload(PlayoffStage.participants),
+        )
+        .order_by(PlayoffStage.stage_order)
+        .execution_options(populate_existing=True)
+    )
     stages = list(
         (
             await db.scalars(
-                select(PlayoffStage)
-                .options(
-                    selectinload(PlayoffStage.matches),
-                    selectinload(PlayoffStage.participants),
-                )
-                .order_by(PlayoffStage.stage_order)
+                statement
             )
         ).all()
     )
@@ -625,11 +629,24 @@ async def move_user_to_stage(db: AsyncSession, from_stage_id: int, to_stage_id: 
     participant = await db.scalar(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == from_stage_id, PlayoffParticipant.user_id == user_id))
     if not participant:
         raise ValueError("Участник не найден в исходном этапе")
+    target_stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.id == to_stage_id))
+    if not target_stage:
+        raise ValueError("Целевой этап не найден")
+
     exists_in_target = await db.scalar(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == to_stage_id, PlayoffParticipant.user_id == user_id))
     if exists_in_target:
         raise ValueError("Игрок уже есть в целевом этапе")
+
+    stage_participants = list(
+        (await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == to_stage_id))).all()
+    )
+    if len(stage_participants) >= target_stage.stage_size:
+        raise ValueError("Вместимость целевого этапа превышена")
+
+    next_seed = max((stage_participant.seed for stage_participant in stage_participants), default=0) + 1
+
     participant.is_eliminated = True
-    db.add(PlayoffParticipant(stage_id=to_stage_id, user_id=user_id, seed=participant.seed))
+    db.add(PlayoffParticipant(stage_id=to_stage_id, user_id=user_id, seed=next_seed))
     await db.commit()
 
 
