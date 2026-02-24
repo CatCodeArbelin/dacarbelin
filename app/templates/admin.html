@@ -89,15 +89,7 @@
         {% if not tournament_started %}<br><span class="small">Турнир ещё не запущен.</span>{% endif %}
       </div>
       {% endif %}
-      <form action="/admin/playoff/start" method="post" class="row g-2 mb-2">
-        <div class="col-md-4"><select class="form-select" name="stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
-        <div class="col-md-8"><button class="btn btn-outline-success w-100" {% if not has_playoff_stages %}disabled{% endif %}>{{ tr('admin_start_stage') }}</button></div>
-      </form>
-      <form action="/admin/playoff/promote" method="post" class="row g-2 mb-3">
-        <div class="col-md-4"><select class="form-select" name="stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
-        <div class="col-md-4"><input class="form-control" type="number" name="top_n" placeholder="{{ tr('admin_top_n') }}" value="4" required></div>
-        <div class="col-md-4"><button class="btn btn-outline-info w-100" {% if not has_playoff_stages %}disabled{% endif %}>{{ tr('admin_promote_next_stage') }}</button></div>
-      </form>
+
 
       <h5 class="mt-4">Состав этапов плей-офф</h5>
       {% for stage in playoff_stages %}
@@ -199,24 +191,8 @@
         </form>
 
         
-        <form action="/admin/group/member/add" method="post" class="row g-2 mb-2">
-          <input type="hidden" name="group_id" value="{{ group.id }}">
-          <div class="col-md-9"><select class="form-select" name="user_id" required {% if group_locked %}disabled{% endif %}>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
-          <div class="col-md-3"><button class="btn btn-sm btn-primary w-100" {% if group_locked %}disabled{% endif %}>{{ tr('admin_add') }}</button></div>
-        </form>
 
-        <form action="/admin/group/member/remove" method="post" class="row g-2 mb-2">
-          <input type="hidden" name="group_id" value="{{ group.id }}">
-          <div class="col-md-9"><select class="form-select" name="user_id" required {% if group_locked %}disabled{% endif %}>{% for m in group.members|sort(attribute='seat') %}<option value="{{ m.user_id }}">{{ m.user.nickname }}</option>{% endfor %}</select></div>
-          <div class="col-md-3"><button class="btn btn-sm btn-outline-danger w-100" {% if group_locked %}disabled{% endif %}>{{ tr('admin_remove') }}</button></div>
-        </form>
 
-        <form action="/admin/group/promote-manual" method="post" class="row g-2 mb-2">
-          <input type="hidden" name="group_id" value="{{ group.id }}">
-          <div class="col-md-5"><select class="form-select" name="user_id" required>{% for m in group.members|sort(attribute='seat') %}<option value="{{ m.user_id }}">{{ m.user.nickname }}</option>{% endfor %}</select></div>
-          <div class="col-md-5"><select class="form-select" name="target_stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
-          <div class="col-md-2"><button class="btn btn-sm btn-outline-success w-100" {% if not has_playoff_stages %}disabled{% endif %}>Назначить в следующий этап</button></div>
-        </form>
 
         <form action="/admin/group/score" method="post" class="mb-2">
           <input type="hidden" name="group_id" value="{{ group.id }}">
