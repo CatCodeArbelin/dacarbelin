@@ -304,13 +304,12 @@ async def apply_game_results(db: AsyncSession, group_id: int, ordered_user_ids: 
 
 
 PLAYOFF_STAGE_SEQUENCE = [
-    ("stage_1_8", "Stage 1/8", 32, "standard"),
-    ("stage_1_4", "Stage 1/4", 16, "standard"),
+    ("stage_2", "Stage 2", 32, "standard"),
     ("stage_final", "Final", 8, "final_22_top1"),
 ]
 FINAL_SCORING_MODE = "final_22_top1"
 GROUP_STAGE_GAME_LIMIT = 3
-LIMITED_PLAYOFF_STAGE_KEYS = {"stage_1_8", "stage_1_4"}
+LIMITED_PLAYOFF_STAGE_KEYS = {"stage_2", "stage_1_8", "stage_1_4"}
 DIRECT_INVITE_STAGE_2 = "stage_2"
 STAGE_2_DIRECT_INVITES_LIMIT = 11
 
@@ -347,9 +346,7 @@ def get_group_count_for_stage(stage_size: int) -> int:
 
 
 def get_promoted_count_for_stage(stage: PlayoffStage) -> int:
-    if stage.key == "stage_1_8":
-        return 16
-    if stage.key == "stage_1_4":
+    if stage.key in {"stage_2", "stage_1_8", "stage_1_4"}:
         return 8
     return 0
 
@@ -359,7 +356,7 @@ def get_stage_group_number_by_seed(seed: int) -> int:
 
 
 def get_stage_group_label(stage_key: str, group_number: int) -> str:
-    if stage_key in {"stage_1_8", "stage_1_4", "stage_semifinal_groups"}:
+    if stage_key in {"stage_2", "stage_1_8", "stage_1_4", "stage_semifinal_groups"}:
         return chr(ord("A") + max(group_number - 1, 0))
     if stage_key == "stage_final":
         return "Final"
@@ -729,8 +726,8 @@ async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int
         raise ValueError("Для этого этапа продвижение не поддерживается")
 
     allowed_top_n_by_stage = {
-        "stage_1_8": 4,
-        "stage_1_4": 4,
+        "stage_2": 2,
+        "stage_1_8": 2,
     }
     allowed_top_n = allowed_top_n_by_stage.get(stage.key)
     if allowed_top_n is None:
@@ -743,7 +740,7 @@ async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int
         group_ranked = sorted(stage_grouped[group_number], key=playoff_sort_key, reverse=True)
         top_players.extend(group_ranked[:top_n])
 
-    if stage.key == "stage_1_8":
+    if stage.key in {"stage_2", "stage_1_8"}:
         direct_invite_users = list(
             (
                 await db.scalars(
@@ -779,11 +776,11 @@ async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int
         db.add(PlayoffParticipant(stage_id=next_stage.id, user_id=participant.user_id, seed=seed))
         participant.is_eliminated = False
         seed += 1
-    if stage.key == "stage_1_8":
+    if stage.key in {"stage_2", "stage_1_8"}:
         for invited_id in invited_ids:
             db.add(PlayoffParticipant(stage_id=next_stage.id, user_id=invited_id, seed=seed))
             seed += 1
-    if stage.key == "stage_1_8":
+    if stage.key in {"stage_2", "stage_1_8"}:
         promoted_ids = {participant.user_id for participant in top_players}
         for invited_id in invited_ids:
             promoted_ids.add(invited_id)

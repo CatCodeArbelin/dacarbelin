@@ -27,8 +27,8 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
         ]
         stage = PlayoffStage(
             id=1,
-            key="stage_1_4",
-            title="Stage 1/4",
+            key="stage_2",
+            title="Stage 2",
             stage_size=8,
             stage_order=1,
             scoring_mode="standard",
@@ -54,8 +54,8 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
         ]
         stage = PlayoffStage(
             id=1,
-            key="stage_1_4",
-            title="Stage 1/4",
+            key="stage_2",
+            title="Stage 2",
             stage_size=8,
             stage_order=1,
             scoring_mode="standard",

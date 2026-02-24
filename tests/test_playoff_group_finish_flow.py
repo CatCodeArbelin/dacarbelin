@@ -39,7 +39,7 @@ class PlayoffGroupFinishFlowTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status_code, 303)
         self.assertIn("msg=msg_status_ok", response.headers["location"])
-        promote_mock.assert_awaited_once_with(db, 10, 4)
+        promote_mock.assert_awaited_once_with(db, 10, 2)
         start_mock.assert_not_awaited()
 
 
