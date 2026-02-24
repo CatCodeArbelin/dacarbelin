@@ -46,7 +46,6 @@ from app.services.tournament import (
     create_auto_draw,
     create_manual_draw,
     generate_playoff_from_groups,
-    build_stage_2_direct_invite_preview,
     get_playoff_stages_with_data,
     override_playoff_match_winner,
     parse_manual_draw_user_ids,
@@ -61,6 +60,12 @@ from app.services.tournament import (
     get_stage_group_number_by_seed,
     get_stage_group_label,
     shuffle_stage_2_participants,
+)
+from app.services.tournament_view import (
+    build_bracket_columns,
+    build_group_stage_standings,
+    build_playoff_standings,
+    resolve_current_stage_label,
 )
 
 router = APIRouter()
@@ -578,29 +583,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             )
         ).all()
     )
-    standings: dict[int, list[dict[str, object]]] = {}
-    for group in groups:
-        ranked_members = sort_members_for_table(group.members)
-        group_done = getattr(group, "current_game", 1) > 3
-        rows: list[dict[str, object]] = []
-        for idx, member in enumerate(ranked_members, start=1):
-            status = "normal"
-            if group_done:
-                status = "promoted" if idx <= 3 else "eliminated"
-            rows.append(
-                {
-                    "user_id": member.user_id,
-                    "display_nickname": _display_nickname(member.user, str(member.user_id)),
-                    "total_points": member.total_points,
-                    "first_places": member.first_places,
-                    "top4_finishes": member.top4_finishes,
-                    "games_played": member.top8_finishes,
-                    "top8_finishes": member.top8_finishes,
-                    "eighth_places": member.eighth_places,
-                    "status": status,
-                }
-            )
-        standings[group.id] = rows
+    standings = build_group_stage_standings(groups)
     playoff_stages = await get_playoff_stages_with_data(db) if show_playoff else []
 
     direct_invite_ids = list(
@@ -616,141 +599,11 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
     users = list((await db.scalars(select(User))).all())
     user_by_id = {user.id: user for user in users}
     stage_by_key = {stage.key: stage for stage in playoff_stages}
-
-    def _normalize_schedule(value: str | None) -> str:
-        return (value or "").strip() or "TBD"
-
-    bracket_columns: list[dict[str, object]] = [
-        {"key": "group_stage", "title": "I этап", "matches": []},
-        {"key": "stage_2", "title": "II этап (32)", "matches": []},
-        {"key": "stage_final", "title": "Финал (8)", "matches": []},
-    ]
-
-    group_matches_vm: list[dict[str, object]] = []
-    for group in groups:
-        raw_group_name = str(getattr(group, "name", "")).strip()
-        fallback_label = str(getattr(group, "id", "?")).strip()
-        group_name = raw_group_name or fallback_label
-        group_matches_vm.append(
-            {
-                "group_label": get_stage_group_label('stage_2', int(group_name)) if group_name.isdigit() else group_name.replace('Group ', '').strip(),
-                "label": f"Group {get_stage_group_label('stage_2', int(group_name))}" if group_name.isdigit() else f"Group {group_name.replace('Group ', '').strip()}",
-                "game_number": 3 if getattr(group, "current_game", 1) > 3 else getattr(group, "current_game", 1),
-                "schedule_text": _normalize_schedule(getattr(group, "schedule_text", "TBD")),
-                "lobby_password": getattr(group, "lobby_password", "TBD"),
-                "participants": [
-                    {
-                        "user_id": member.user_id,
-                        "nickname": _display_nickname(member.user, str(member.user_id)),
-                    }
-                    for member in sort_members_for_table(group.members)
-                ],
-                "state": "started" if getattr(group, "is_started", False) else "pending",
-            }
-        )
-    bracket_columns[0]["matches"] = sorted(group_matches_vm, key=lambda item: item["label"])
-
-    for column in bracket_columns[1:]:
-        stage = stage_by_key.get(column["key"])
-        if not stage:
-            if column["key"] == "stage_2":
-                preview_direct_invites = build_stage_2_direct_invite_preview(direct_invite_ids)
-                participants_by_group: dict[int, list[dict[str, object]]] = {}
-                for invited in preview_direct_invites:
-                    user = user_by_id.get(invited["user_id"])
-                    participants_by_group.setdefault(invited["group_number"], []).append(
-                        {
-                            "user_id": invited["user_id"],
-                            "nickname": _display_nickname(user, str(invited["user_id"])),
-                            "is_direct_invite_preview": True,
-                        }
-                    )
-
-                preview_matches_vm: list[dict[str, object]] = []
-                for group_number in sorted(participants_by_group):
-                    preview_matches_vm.append(
-                        {
-                            "group_label": get_stage_group_label("stage_2", group_number),
-                            "label": f"Group {get_stage_group_label('stage_2', group_number)}",
-                            "game_number": 1,
-                            "schedule_text": "TBD",
-                            "lobby_password": "TBD",
-                            "participants": participants_by_group[group_number],
-                            "state": "pending",
-                            "is_preview": True,
-                        }
-                    )
-                column["matches"] = preview_matches_vm
-            continue
-
-        participants_by_group: dict[int, list[dict[str, object]]] = {}
-        for participant in sorted(stage.participants, key=lambda item: item.seed):
-            group_number = get_stage_group_number_by_seed(participant.seed)
-            user = user_by_id.get(participant.user_id)
-            participants_by_group.setdefault(group_number, []).append(
-                {
-                    "user_id": participant.user_id,
-                    "nickname": _display_nickname(user, str(participant.user_id)),
-                    "is_direct_invite_preview": False,
-                }
-            )
-
-        matches_vm: list[dict[str, object]] = []
-        for match in sorted(stage.matches, key=lambda item: item.group_number):
-            matches_vm.append(
-                {
-                    "group_label": get_stage_group_label(stage.key, match.group_number),
-                    "label": f"Group {get_stage_group_label(stage.key, match.group_number)}",
-                    "game_number": match.game_number,
-                    "schedule_text": _normalize_schedule(match.schedule_text),
-                    "lobby_password": match.lobby_password,
-                    "participants": participants_by_group.get(match.group_number, []),
-                    "state": match.state,
-                }
-            )
-        column["matches"] = matches_vm
-
-    playoff_standings: list[dict[str, object]] = []
-    for stage in playoff_stages:
-        participants_sorted = sorted(stage.participants, key=playoff_sort_key, reverse=True)
-        stage_group_done: set[int] = set()
-        for match in stage.matches:
-            if stage.key in {"stage_2", "stage_1_8", "stage_1_4"} and match.game_number > 3:
-                stage_group_done.add(match.group_number)
-        promote_n_by_key = {"stage_2": 2, "stage_1_8": 2, "stage_1_4": 4, "stage_final": 1}
-        promote_n = promote_n_by_key.get(stage.key, 0)
-        by_group_rank: dict[int, dict[int, int]] = {}
-        for g in {get_stage_group_number_by_seed(p.seed) for p in participants_sorted}:
-            group_sorted = [p for p in participants_sorted if get_stage_group_number_by_seed(p.seed) == g]
-            by_group_rank[g] = {p.user_id: idx for idx, p in enumerate(group_sorted, start=1)}
-
-        rows = []
-        for participant in participants_sorted:
-            group_number = get_stage_group_number_by_seed(participant.seed)
-            status = "normal"
-            if group_number in stage_group_done and promote_n > 0:
-                status = "promoted" if by_group_rank[group_number].get(participant.user_id, 99) <= promote_n else "eliminated"
-            rows.append({
-                "user_id": participant.user_id,
-                "display_nickname": _display_nickname(user_by_id.get(participant.user_id), str(participant.user_id)),
-                "points": participant.points,
-                "wins": participant.wins,
-                "top4_finishes": participant.top4_finishes,
-                "games_played": participant.top8_finishes,
-                "top8_finishes": participant.top8_finishes,
-                "eighth_places": getattr(participant, "eighth_places", 0),
-                "status": status,
-            })
-        playoff_standings.append({"title": stage.title, "participants": rows})
+    bracket_columns = build_bracket_columns(groups, playoff_stages, user_by_id, direct_invite_ids)
+    playoff_standings = build_playoff_standings(playoff_stages, user_by_id)
 
     lang = get_lang(request.cookies.get("lang"))
-    current_stage_label = t(lang, "tournament_group_stage")
-    if show_playoff:
-        active_playoff = next((stage for stage in playoff_stages if stage.is_started), None)
-        if active_playoff:
-            current_stage_label = active_playoff.title
-        elif playoff_stages:
-            current_stage_label = playoff_stages[0].title
+    current_stage_label = resolve_current_stage_label(lang, playoff_stages, show_playoff)
     stage_order_keys = ["group_stage", "stage_2", "stage_final"]
     active_key = "group_stage"
     if show_playoff:
