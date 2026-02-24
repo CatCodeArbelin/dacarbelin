@@ -12,49 +12,8 @@
   <a class="btn btn-sm btn-outline-light" href="/admin/logout">{{ tr('admin_logout') }}</a>
 </div>
 <div class="row g-4">
-  <div class="col-12 col-md-6 col-xl-4">
+  <div class="col-12 col-xl-8 mx-auto">
     <div class="card bg-black neon-border-red"><div class="card-body">
-      <h4>{{ tr('admin_registration_toggle') }}</h4>
-      <form action="/admin/registration" method="post">
-        <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="registration_open" {% if registration_open %}checked{% endif %}><label class="form-check-label">{{ tr('admin_registration_open') }}</label></div>
-        <button class="btn btn-danger">{{ tr('admin_save') }}</button>
-      </form>
-    </div></div>
-    <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
-      <h4>{{ tr('admin_manual_invited_add') }}</h4>
-      <form action="/admin/invite" method="post" class="row g-2">
-        <div class="col-12"><input class="form-control" name="nickname" placeholder="{{ tr('admin_nickname') }}" required></div>
-        <div class="col-12"><input class="form-control" name="steam_input" placeholder="{{ tr('admin_steam_id_or_url') }}" required></div>
-        <div class="col-6"><input class="form-control" name="telegram" placeholder="{{ tr('participants_telegram') }}"></div>
-        <div class="col-6"><input class="form-control" name="discord" placeholder="{{ tr('participants_discord') }}"></div>
-        <div class="col-12">
-          <select class="form-select" name="invite_type">
-            <option value="regular">Обычный инвайт</option>
-            <option value="stage_2">Прямой инвайт во II этап</option>
-          </select>
-        </div>
-        <div class="col-12"><button class="btn btn-warning">{{ tr('admin_add_to_invited') }}</button></div>
-      </form>
-    </div></div>
-
-    <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
-      <h4>Ссылка входа для судей</h4>
-      <p class="small text-contrast-muted">Одноразовая подписанная ссылка. Сгенерируйте заново, если есть риск утечки.</p>
-      <form action="/admin/judge-link/regenerate" method="post" class="mb-2">
-        <button class="btn btn-sm btn-outline-warning">Сгенерировать новую ссылку</button>
-      </form>
-      <input class="form-control" type="text" readonly value="{{ judge_login_url or 'Ссылка не сгенерирована' }}" onclick="this.select()">
-    </div></div>
-
-  </div>
-</div>
-
-<div class="row g-4">
-  <div class="col-12 col-xl-10 mx-auto admin-wide-section">
-    <div class="container-fluid px-0">
-      <div class="row g-4 admin-group-grid">
-        <div class="col-12">
-          <div class="card bg-black neon-border-red w-100"><div class="card-body">
       <h4>{{ tr('admin_draw_controls') }}</h4>
       <form action="/admin/draw/auto" method="post" class="mb-3">
         <button class="btn btn-danger">{{ tr('admin_auto_draw') }}</button>
@@ -99,7 +58,16 @@
           <button class="btn btn-danger w-100" {% if tournament_started or not draw_applied or invalid_draw_reason %}disabled{% endif %}>Начать турнир</button>
         </form>
       </div>
+    </div></div>
+  </div>
+</div>
 
+
+<div class="row g-4">
+  <div class="col-12 col-xl-10 mx-auto admin-wide-section">
+    <div class="container-fluid px-0">
+      <div class="row g-4 admin-group-grid">
+        <div class="col-12">
 
       {% set has_playoff_stages = playoff_stages|length > 0 %}
       <h5 class="mt-3">{{ tr('admin_playoff_stage_management') }}</h5>
@@ -263,6 +231,44 @@
   </div>
 </div>
 
+
+
+<div class="row g-4 mt-1">
+  <div class="col-12 col-md-6 col-xl-4 mx-auto">
+    <div class="card bg-black neon-border-red"><div class="card-body">
+      <h4>{{ tr('admin_registration_toggle') }}</h4>
+      <form action="/admin/registration" method="post">
+        <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="registration_open" {% if registration_open %}checked{% endif %}><label class="form-check-label">{{ tr('admin_registration_open') }}</label></div>
+        <button class="btn btn-danger">{{ tr('admin_save') }}</button>
+      </form>
+    </div></div>
+    <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
+      <h4>{{ tr('admin_manual_invited_add') }}</h4>
+      <form action="/admin/invite" method="post" class="row g-2">
+        <div class="col-12"><input class="form-control" name="nickname" placeholder="{{ tr('admin_nickname') }}" required></div>
+        <div class="col-12"><input class="form-control" name="steam_input" placeholder="{{ tr('admin_steam_id_or_url') }}" required></div>
+        <div class="col-6"><input class="form-control" name="telegram" placeholder="{{ tr('participants_telegram') }}"></div>
+        <div class="col-6"><input class="form-control" name="discord" placeholder="{{ tr('participants_discord') }}"></div>
+        <div class="col-12">
+          <select class="form-select" name="invite_type">
+            <option value="regular">Обычный инвайт</option>
+            <option value="stage_2">Прямой инвайт во II этап</option>
+          </select>
+        </div>
+        <div class="col-12"><button class="btn btn-warning">{{ tr('admin_add_to_invited') }}</button></div>
+      </form>
+    </div></div>
+
+    <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
+      <h4>Ссылка входа для судей</h4>
+      <p class="small text-contrast-muted">Одноразовая подписанная ссылка. Сгенерируйте заново, если есть риск утечки.</p>
+      <form action="/admin/judge-link/regenerate" method="post" class="mb-2">
+        <button class="btn btn-sm btn-outline-warning">Сгенерировать новую ссылку</button>
+      </form>
+      <input class="form-control" type="text" readonly value="{{ judge_login_url or 'Ссылка не сгенерирована' }}" onclick="this.select()">
+    </div></div>
+  </div>
+</div>
 
 
 <script>
