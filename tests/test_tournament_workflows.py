@@ -193,6 +193,13 @@ def test_stage_display_order_rotates_active_stage_first() -> None:
     assert web.build_stage_display_order("stage_final", keys) == ["stage_final", "stage_2", "group_stage"]
 
 
+def test_get_stage_group_numbers_limits_stage_2_to_real_groups() -> None:
+    assert web.get_stage_group_numbers("stage_2") == [1, 2, 3, 4]
+    assert web.get_stage_group_numbers("stage_2", stage_size=32, participants_count=32) == [1, 2, 3, 4]
+    assert web.get_stage_group_numbers("stage_2", stage_size=32, participants_count=26) == [1, 2, 3, 4]
+    assert web.get_stage_group_numbers("stage_2", stage_size=32, participants_count=24) == [1, 2, 3]
+
+
 def test_deprecated_manual_playoff_routes_redirect_to_group_finish_flow() -> None:
     with TestClient(app) as client:
         client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
