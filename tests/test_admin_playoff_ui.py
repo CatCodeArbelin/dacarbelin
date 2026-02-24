@@ -17,3 +17,11 @@ def test_admin_template_has_stage_placeholder_option() -> None:
 
     assert "{{ tr('admin_select_stage') }}" in template
     assert '<option value="" selected disabled>' in template
+
+
+def test_admin_users_template_has_group_sections() -> None:
+    template = Path("app/templates/admin_users.html").read_text(encoding="utf-8")
+
+    assert "{% for section in group_sections %}" in template
+    assert "{% for user in section.users %}" in template
+    assert "Группы отображаются, потому что жеребьевка применена и турнир запущен." in template

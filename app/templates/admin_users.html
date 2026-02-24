@@ -9,59 +9,70 @@
 
 <div class="card bg-black neon-border-red"><div class="card-body">
   <h4>{{ tr('admin_participants_list') }}</h4>
-  <div class="table-responsive">
-    <table class="table table-dark table-sm align-middle">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>{{ tr('participants_nick') }}</th>
-          <th>Steam ID</th>
-          <th>{{ tr('participants_highest') }}</th>
-          <th>Basket</th>
-          <th>{{ tr('tournament_pts') }}</th>
-          <th>Ручные очки</th>
-          <th>Direct invite</th>
-          <th>{{ tr('admin_save') }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for user in users %}
-        <tr>
-          <td>{{ user.id }}</td>
-          <td>
-            <input class="form-control form-control-sm" form="user-update-{{ user.id }}" name="nickname" value="{{ user.nickname }}" maxlength="120" required>
-          </td>
-          <td>{{ user.steam_id }}</td>
-          <td>{{ user.highest_rank }}</td>
-          <td>
-            <select class="form-select form-select-sm" form="user-update-{{ user.id }}" name="basket">
-              {% for basket in basket_values %}
-              <option value="{{ basket }}" {% if user.basket == basket %}selected{% endif %}>{{ basket }}</option>
-              {% endfor %}
-            </select>
-          </td>
-          <td>{{ points_by_user.get(user.id, 0) }}</td>
-          <td>
-            <input class="form-control form-control-sm" form="user-update-{{ user.id }}" type="number" min="0" name="manual_points" value="{{ points_by_user.get(user.id, 0) }}">
-          </td>
-          <td>
-            <select class="form-select form-select-sm" form="user-update-{{ user.id }}" name="direct_invite_stage">
-              <option value="" {% if not user.direct_invite_stage %}selected{% endif %}>-</option>
-              {% for stage_key in allowed_direct_invite_stages %}
-              <option value="{{ stage_key }}" {% if user.direct_invite_stage == stage_key %}selected{% endif %}>{{ stage_key }}</option>
-              {% endfor %}
-            </select>
-          </td>
-          <td>
-            <form id="user-update-{{ user.id }}" action="/admin/user/update" method="post" class="d-inline">
-              <input type="hidden" name="user_id" value="{{ user.id }}">
-            </form>
-            <button class="btn btn-sm btn-outline-info" form="user-update-{{ user.id }}">{{ tr('admin_save') }}</button>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  {% if show_group_sections %}
+  <div class="small text-contrast-muted mb-3">Группы отображаются, потому что жеребьевка применена и турнир запущен.</div>
+  {% endif %}
+  {% for section in group_sections %}
+  <div class="mb-4 {% if not loop.last %}border-bottom border-secondary pb-3{% endif %}">
+    <h5 class="mb-2">{{ section.title }}</h5>
+    <div class="table-responsive">
+      <table class="table table-dark table-sm align-middle">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>{{ tr('participants_nick') }}</th>
+            <th>Steam ID</th>
+            <th>{{ tr('participants_highest') }}</th>
+            <th>Basket</th>
+            <th>{{ tr('tournament_pts') }}</th>
+            <th>Ручные очки</th>
+            <th>Direct invite</th>
+            <th>{{ tr('admin_save') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in section.users %}
+          <tr>
+            <td>{{ user.id }}</td>
+            <td>
+              <input class="form-control form-control-sm" form="user-update-{{ user.id }}" name="nickname" value="{{ user.nickname }}" maxlength="120" required>
+            </td>
+            <td>{{ user.steam_id }}</td>
+            <td>{{ user.highest_rank }}</td>
+            <td>
+              <select class="form-select form-select-sm" form="user-update-{{ user.id }}" name="basket">
+                {% for basket in basket_values %}
+                <option value="{{ basket }}" {% if user.basket == basket %}selected{% endif %}>{{ basket }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td>{{ points_by_user.get(user.id, 0) }}</td>
+            <td>
+              <input class="form-control form-control-sm" form="user-update-{{ user.id }}" type="number" min="0" name="manual_points" value="{{ points_by_user.get(user.id, 0) }}">
+            </td>
+            <td>
+              <select class="form-select form-select-sm" form="user-update-{{ user.id }}" name="direct_invite_stage">
+                <option value="" {% if not user.direct_invite_stage %}selected{% endif %}>-</option>
+                {% for stage_key in allowed_direct_invite_stages %}
+                <option value="{{ stage_key }}" {% if user.direct_invite_stage == stage_key %}selected{% endif %}>{{ stage_key }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td>
+              <form id="user-update-{{ user.id }}" action="/admin/user/update" method="post" class="d-inline">
+                <input type="hidden" name="user_id" value="{{ user.id }}">
+              </form>
+              <button class="btn btn-sm btn-outline-info" form="user-update-{{ user.id }}">{{ tr('admin_save') }}</button>
+            </td>
+          </tr>
+          {% endfor %}
+          {% if section.users|length == 0 %}
+          <tr><td colspan="9" class="text-muted">Нет участников</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
   </div>
+  {% endfor %}
 </div></div>
 {% endblock %}

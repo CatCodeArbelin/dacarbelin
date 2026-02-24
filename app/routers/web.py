@@ -733,6 +733,36 @@ async def admin_users_page(request: Request, db: AsyncSession = Depends(get_db))
         normalized_user_id = int(user_id)
         points_by_user[normalized_user_id] = max(points_by_user.get(normalized_user_id, 0), int(points or 0))
 
+    draw_applied = await get_draw_applied(db)
+    tournament_started = await get_tournament_started(db)
+    show_group_sections = draw_applied and tournament_started
+
+    users_by_id: dict[int, User] = {user.id: user for user in users}
+    group_sections: list[dict[str, object]] = []
+    grouped_user_ids: set[int] = set()
+
+    if show_group_sections:
+        stage_groups = (
+            await db.scalars(
+                select(TournamentGroup)
+                .where(TournamentGroup.stage == "group_stage")
+                .options(selectinload(TournamentGroup.members).selectinload(GroupMember.user))
+                .order_by(TournamentGroup.name)
+            )
+        ).all()
+        for group in stage_groups:
+            members = sorted(group.members, key=lambda member: (member.seat, member.id))
+            section_users = [member.user for member in members if member.user and member.user.id in users_by_id]
+            group_sections.append({"title": f"Группа {group.name}", "users": section_users, "group_id": group.id})
+            grouped_user_ids.update(user.id for user in section_users)
+
+        extra_users = [user for user in users if user.id not in grouped_user_ids]
+        if extra_users:
+            group_sections.append({"title": "Вне групп", "users": extra_users, "group_id": None})
+
+    if not group_sections:
+        group_sections.append({"title": "Список участников", "users": users, "group_id": None})
+
     return templates.TemplateResponse(
         request,
         "admin_users.html",
@@ -742,6 +772,8 @@ async def admin_users_page(request: Request, db: AsyncSession = Depends(get_db))
             basket_values=[basket.value for basket in Basket],
             points_by_user=points_by_user,
             allowed_direct_invite_stages=allowed_direct_invite_stages,
+            group_sections=group_sections,
+            show_group_sections=show_group_sections,
         ),
     )
 
