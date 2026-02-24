@@ -77,8 +77,14 @@ def test_admin_apply_draw_sets_draw_applied_flag(monkeypatch) -> None:
     async def fake_commit(self):
         state["committed"] = True
 
+    async def fake_scalar(self, statement):
+        if "count(tournament_groups.id)" in str(statement):
+            return 8
+        return None
+
     monkeypatch.setattr(web, "validate_group_draw_integrity", fake_validate_group_draw_integrity)
     monkeypatch.setattr(web, "set_draw_applied", fake_set_draw_applied)
+    monkeypatch.setattr(web.AsyncSession, "scalar", fake_scalar, raising=False)
     monkeypatch.setattr(web.AsyncSession, "commit", fake_commit, raising=False)
 
     with TestClient(app) as client:
@@ -86,7 +92,7 @@ def test_admin_apply_draw_sets_draw_applied_flag(monkeypatch) -> None:
         response = client.post("/admin/draw/apply", follow_redirects=False)
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/admin?msg=msg_status_ok"
+    assert response.headers["location"] == "/admin?msg=msg_status_ok&details=draw_applied_groups%3A8"
     assert state == {"committed": True, "set_true": True}
 
 
@@ -96,7 +102,13 @@ def test_admin_start_tournament_requires_applied_draw(monkeypatch) -> None:
     async def fake_get_draw_applied(db):
         return False
 
+    async def fake_scalar(self, statement):
+        if "count(tournament_groups.id)" in str(statement):
+            return 8
+        return None
+
     monkeypatch.setattr(web, "get_draw_applied", fake_get_draw_applied)
+    monkeypatch.setattr(web.AsyncSession, "scalar", fake_scalar, raising=False)
 
     with TestClient(app) as client:
         client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())

@@ -798,21 +798,24 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     playoff_stages = await get_playoff_stages_with_data(db)
     active_playoff_stage = next((stage for stage in playoff_stages if stage.is_started), None)
     tournament_started = await get_tournament_started(db)
-    show_group_stage_controls = bool(tournament_started)
-    groups = (
-        list(
-            (
-                await db.scalars(
-                    select(TournamentGroup)
-                    .where(TournamentGroup.stage == "group_stage")
-                    .options(selectinload(TournamentGroup.members).selectinload(GroupMember.user))
-                    .order_by(TournamentGroup.name)
-                )
-            ).all()
-        )
-        if show_group_stage_controls
-        else []
+    group_stage_groups = list(
+        (
+            await db.scalars(
+                select(TournamentGroup)
+                .where(TournamentGroup.stage == "group_stage")
+                .options(selectinload(TournamentGroup.members).selectinload(GroupMember.user))
+                .order_by(TournamentGroup.name)
+            )
+        ).all()
     )
+    draw_exists = bool(group_stage_groups)
+    groups_count = len(group_stage_groups)
+    draw_applied = await get_draw_applied(db)
+    is_draw_valid, invalid_draw_reason = await validate_group_draw_integrity(db)
+    if is_draw_valid:
+        invalid_draw_reason = None
+    show_group_stage_controls = bool(tournament_started)
+    groups = group_stage_groups if show_group_stage_controls else []
     group_user_choices = {
         group.id: [
             {
@@ -890,7 +893,6 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     registration_open = (registration_setting.value == "1") if registration_setting else True
     tournament_started_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_started"))
     tournament_started = (tournament_started_setting.value == "1") if tournament_started_setting else False
-    draw_applied = await get_draw_applied(db)
     donation_links = (await db.scalars(select(DonationLink).order_by(DonationLink.sort_order, DonationLink.id))).all()
     donation_methods = (await db.scalars(select(DonationMethod).order_by(DonationMethod.method_type, DonationMethod.sort_order, DonationMethod.id))).all()
     prize_pool_entries = (await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all()
@@ -914,6 +916,9 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             registration_open=registration_open,
             tournament_started=tournament_started,
             draw_applied=draw_applied,
+            draw_exists=draw_exists,
+            groups_count=groups_count,
+            invalid_draw_reason=invalid_draw_reason,
             donation_links=donation_links,
             donation_methods=donation_methods,
             prize_pool_entries=prize_pool_entries,
@@ -1176,9 +1181,19 @@ async def admin_registration_toggle(
 
 @router.post("/admin/tournament/start")
 async def admin_start_tournament(db: AsyncSession = Depends(get_db)):
+    groups_count = await db.scalar(
+        select(func.count(TournamentGroup.id)).where(TournamentGroup.stage == "group_stage")
+    )
+    if not groups_count:
+        return redirect_with_admin_msg("msg_operation_failed", details="draw_not_created")
+
     draw_applied = await get_draw_applied(db)
     if not draw_applied:
         return redirect_with_admin_msg("msg_operation_failed", details="draw_not_applied")
+
+    is_draw_valid, draw_issue = await validate_group_draw_integrity(db)
+    if not is_draw_valid:
+        return redirect_with_admin_msg("msg_operation_failed", details=f"invalid_draw:{draw_issue}")
 
     tournament_started_row = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_started"))
     if not tournament_started_row:
@@ -1314,12 +1329,18 @@ async def admin_group_schedule(
 
 @router.post("/admin/draw/apply")
 async def admin_apply_draw(db: AsyncSession = Depends(get_db)):
+    groups_count = await db.scalar(
+        select(func.count(TournamentGroup.id)).where(TournamentGroup.stage == "group_stage")
+    )
+    if not groups_count:
+        return redirect_with_admin_msg("msg_operation_failed", details="draw_not_created")
+
     is_valid, details = await validate_group_draw_integrity(db)
     if not is_valid:
-        return redirect_with_admin_msg("msg_operation_failed", details=details)
+        return redirect_with_admin_msg("msg_operation_failed", details=f"invalid_draw:{details}")
     await set_draw_applied(db, True)
     await db.commit()
-    return redirect_with_admin_msg("msg_status_ok")
+    return redirect_with_admin_msg("msg_status_ok", details=f"draw_applied_groups:{groups_count}")
 
 
 @router.post("/admin/group/promote-manual")
