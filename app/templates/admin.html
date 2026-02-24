@@ -185,8 +185,8 @@
       <div class="container-fluid px-0 w-100">
         <h5 class="mt-4">Результат жеребьевки</h5>
         <div class="row g-2 mb-3 w-100">
-          {% for group in groups %}
-          <div class="col-12 col-lg-6">
+          {% for group in groups|sort(attribute='name') %}
+          <div class="col-12 col-md-6">
             <div class="border rounded p-2 h-100">
               <div class="fw-bold">{{ group.name }}</div>
               <ul class="mb-0">
@@ -201,9 +201,9 @@
       </div>
       <div class="container-fluid px-0 w-100">
         <div class="row g-3 admin-group-grid">
-          {% for group in groups %}
+          {% for group in groups|sort(attribute='name') %}
           {% set group_locked = group.current_game > 3 %}
-          <div class="col-12">
+          <div class="col-12 col-md-6">
             <div class="border rounded p-3 w-100">
               <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2">
                 <strong>{{ group.name }} ({{ tr('tournament_game') }} {{ 3 if group.current_game > 3 else group.current_game }})</strong>
