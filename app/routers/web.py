@@ -999,6 +999,67 @@ async def _update_user_allowed_fields(
     return redirect_with_admin_users_msg("msg_status_ok")
 
 
+@router.get("/admin/chat", response_class=HTMLResponse)
+async def admin_chat_page(request: Request, db: AsyncSession = Depends(get_db)):
+    chat_settings = await get_or_create_chat_settings(db)
+    chat_messages = (
+        await db.scalars(select(ChatMessage).order_by(desc(ChatMessage.id)).limit(100))
+    ).all()
+    return templates.TemplateResponse(
+        request,
+        "admin_chat.html",
+        template_context(
+            request,
+            chat_settings=chat_settings,
+            chat_messages=chat_messages,
+        ),
+    )
+
+
+@router.get("/admin/content", response_class=HTMLResponse)
+async def admin_content_page(request: Request, db: AsyncSession = Depends(get_db)):
+    rules_content = await get_or_create_rules_content(db)
+    donation_links = (await db.scalars(select(DonationLink).order_by(DonationLink.sort_order, DonationLink.id))).all()
+    donation_methods = (await db.scalars(select(DonationMethod).order_by(DonationMethod.sort_order, DonationMethod.id))).all()
+    prize_pool_entries = (await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all()
+    donors = (await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all()
+    archive_entries = (await db.scalars(select(ArchiveEntry).order_by(ArchiveEntry.sort_order, ArchiveEntry.id))).all()
+    return templates.TemplateResponse(
+        request,
+        "admin_content.html",
+        template_context(
+            request,
+            rules_content=rules_content,
+            donation_links=donation_links,
+            donation_methods=donation_methods,
+            prize_pool_entries=prize_pool_entries,
+            donors=donors,
+            archive_entries=archive_entries,
+        ),
+    )
+
+
+@router.get("/admin/emergency", response_class=HTMLResponse)
+async def admin_emergency_page(request: Request, db: AsyncSession = Depends(get_db)):
+    manual_draw_users = (
+        await db.scalars(
+            select(User)
+            .where(User.basket != Basket.INVITED.value)
+            .order_by(User.nickname.asc(), User.created_at.desc())
+        )
+    ).all()
+    playoff_stages = await get_playoff_stages_with_data(db)
+    return templates.TemplateResponse(
+        request,
+        "admin_emergency.html",
+        template_context(
+            request,
+            playoff_stages=playoff_stages,
+            manual_draw_users=manual_draw_users,
+        ),
+    )
+
+
 @router.post("/admin/user/update")
 async def admin_update_user(
     user_id: int = Form(...),

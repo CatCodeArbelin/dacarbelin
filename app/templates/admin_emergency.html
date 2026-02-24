@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ tr('admin_advanced_actions_title') }}</h2>
+{% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}{% if request.query_params.get('details') %}: <span class="small">{{ request.query_params.get('details') }}</span>{% endif %}</div>{% endif %}
+<div class="d-flex justify-content-end align-items-center gap-2 mb-3">
+  <a class="btn btn-sm btn-outline-secondary" href="/admin">{{ tr('admin_back_to_panel') }}</a>
+  <a class="btn btn-sm btn-outline-light" href="/admin/logout">{{ tr('admin_logout') }}</a>
+</div>
+<div class="card bg-black neon-border-red"><div class="card-body">
+  <div class="alert alert-warning mt-2 mb-2">{{ tr('admin_advanced_actions_warning') }}</div>
+  {% set has_playoff_stages = playoff_stages|length > 0 %}
+  <form action="/admin/playoff/move" method="post" class="row g-2 mb-2">
+    <div class="col-md-4"><select class="form-select" name="from_stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
+    <div class="col-md-4"><select class="form-select" name="to_stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
+    <div class="col-md-4"><select class="form-select" name="user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><button class="btn btn-outline-warning w-100" {% if not has_playoff_stages %}disabled{% endif %}>{{ tr('admin_manual_transfer') }}</button></div>
+  </form>
+  <form action="/admin/playoff/replace" method="post" class="row g-2 mb-2">
+    <div class="col-md-4"><select class="form-select" name="stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
+    <div class="col-md-4"><select class="form-select" name="from_user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
+    <div class="col-md-4"><select class="form-select" name="to_user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><button class="btn btn-outline-danger w-100" {% if not has_playoff_stages %}disabled{% endif %}>{{ tr('admin_replace_participant') }}</button></div>
+  </form>
+  <form action="/admin/playoff/points" method="post" class="row g-2 mb-2">
+    <div class="col-md-4"><select class="form-select" name="stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
+    <div class="col-md-4"><select class="form-select" name="user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><input class="form-control" type="number" name="points_delta" placeholder="{{ tr('admin_points_delta') }}" required></div>
+    <div class="col-md-3"><button class="btn btn-outline-secondary w-100" {% if not has_playoff_stages %}disabled{% endif %}>{{ tr('admin_adjust_points') }}</button></div>
+  </form>
+  <form action="/admin/playoff/override" method="post" class="row g-2 mb-3">
+    <div class="col-md-4"><select class="form-select" name="stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><input class="form-control" type="number" name="group_number" value="1" required></div>
+    <div class="col-md-4"><select class="form-select" name="winner_user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><input class="form-control" name="note" placeholder="{{ tr('admin_override_note') }}"></div>
+    <div class="col-md-2"><button class="btn btn-outline-light w-100" {% if not has_playoff_stages %}disabled{% endif %}>{{ tr('admin_set_winner') }}</button></div>
+  </form>
+</div></div>
+{% endblock %}
