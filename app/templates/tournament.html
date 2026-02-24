@@ -13,19 +13,6 @@
 <div class="alert alert-secondary">{{ tr('tournament_wait_start') }}</div>
 {% endif %}
 
-{% if playoff_standings %}
-<section class="mt-4">
-  <h3>Playoff</h3>
-  <div class="row g-3">
-  {% for stage in playoff_standings %}
-    {% call stage_ui.stage_panel(stage.title, column_class='col-12', card_extra_class='') %}
-      {{ stage_ui.stage_standings_table(stage.participants, 'points', 'wins', 'games_played') }}
-    {% endcall %}
-  {% endfor %}
-  </div>
-</section>
-{% endif %}
-
 {% if ordered_stage_columns %}
 <section class="mt-4">
   <h3>Стадии турнира</h3>
@@ -36,23 +23,7 @@
         <div class="row g-2">
           {% for match in column.matches %}
           <div class="col-12 col-lg-6">
-            <article class="playoff-match-card playoff-status-{{ match.state }} neon-border-stage">
-              <div class="playoff-match-header d-block">
-                <div>Group {{ match.group_label }} · {{ tr('tournament_game') }} {{ match.game_number }}</div>
-                <div class="playoff-accent-row">
-                  {% if match.is_preview %}
-                  <span class="neon-accent-badge neon-accent-badge-time">предварительный состав</span>
-                  {% endif %}
-                  <span class="neon-accent-badge neon-accent-badge-time">{{ tr('tournament_schedule') }}: {{ match.schedule_text or tr('tournament_tbd') }}</span>
-                  <span class="neon-accent-badge neon-accent-badge-password">{{ tr('tournament_lobby_pw') }}: {{ match.lobby_password or tr('tournament_tbd') }}</span>
-                </div>
-              </div>
-              <ul class="playoff-participants list-unstyled mb-0 mt-2">
-                {% for participant in match.participants %}
-                <li>#{{ participant.user_id }} · {{ participant.nickname }}{% if participant.is_direct_invite_preview %} <span class="badge text-bg-info">прямой инвайт</span>{% endif %}</li>
-                {% endfor %}
-              </ul>
-            </article>
+            {{ stage_ui.stage_match_card(match, tr) }}
           </div>
           {% endfor %}
         </div>

@@ -9,6 +9,26 @@
 </div>
 {%- endmacro %}
 
+{% macro stage_match_card(match, tr) -%}
+<article class="playoff-match-card playoff-status-{{ match.state }} neon-border-stage">
+  <div class="playoff-match-header d-block">
+    <div>Group {{ match.group_label }} · {{ tr('tournament_game') }} {{ match.game_number }}</div>
+    <div class="playoff-accent-row">
+      {% if match.is_preview %}
+      <span class="neon-accent-badge neon-accent-badge-time">предварительный состав</span>
+      {% endif %}
+      <span class="neon-accent-badge neon-accent-badge-time">{{ tr('tournament_schedule') }}: {{ match.schedule_text or tr('tournament_tbd') }}</span>
+      <span class="neon-accent-badge neon-accent-badge-password">{{ tr('tournament_lobby_pw') }}: {{ match.lobby_password or tr('tournament_tbd') }}</span>
+    </div>
+  </div>
+  <ul class="playoff-participants list-unstyled mb-0 mt-2">
+    {% for participant in match.participants %}
+    <li>#{{ participant.user_id }} · {{ participant.nickname }}{% if participant.is_direct_invite_preview %} <span class="badge text-bg-info">прямой инвайт</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+</article>
+{%- endmacro %}
+
 {% macro stage_standings_table(rows, points_key='total_points', wins_key='first_places', games_key='games_played') -%}
 <div class="table-responsive mb-0">
   <table class="table table-dark table-striped mb-0 tournament-stage-table">

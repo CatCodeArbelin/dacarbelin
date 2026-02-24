@@ -64,7 +64,6 @@ from app.services.tournament import (
 )
 from app.services.tournament_view import (
     build_bracket_columns,
-    build_playoff_standings,
     resolve_current_stage_label,
 )
 
@@ -598,7 +597,6 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
     users = list((await db.scalars(select(User))).all())
     user_by_id = {user.id: user for user in users}
     stage_columns = build_bracket_columns(groups, playoff_stages, user_by_id, direct_invite_ids)
-    playoff_standings = build_playoff_standings(playoff_stages, user_by_id)
 
     lang = get_lang(request.cookies.get("lang"))
     current_stage_display = resolve_current_stage_label(lang, playoff_stages, tournament_started)
@@ -621,7 +619,6 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             playoff_stages=playoff_stages,
             stage_columns=stage_columns,
             ordered_stage_columns=ordered_stage_columns,
-            playoff_standings=playoff_standings,
             current_stage_display=current_stage_display,
             show_groups=tournament_started,
         ),
