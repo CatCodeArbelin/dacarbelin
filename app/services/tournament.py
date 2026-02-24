@@ -416,6 +416,37 @@ def split_participants_by_group(participants: list[PlayoffParticipant]) -> dict[
     return grouped
 
 
+async def shuffle_stage_2_participants(db: AsyncSession) -> None:
+    stage_2 = await db.scalar(select(PlayoffStage).where(PlayoffStage.key == "stage_2"))
+    if not stage_2:
+        raise ValueError("Этап stage_2 не найден")
+
+    stage_2_matches = list((await db.scalars(select(PlayoffMatch).where(PlayoffMatch.stage_id == stage_2.id))).all())
+    if not stage_2_matches:
+        raise ValueError("Матчи stage_2 не найдены")
+
+    has_played_games = any(
+        match.game_number != 1
+        or match.state != "pending"
+        or match.winner_user_id is not None
+        or match.manual_winner_user_id is not None
+        for match in stage_2_matches
+    )
+    if has_played_games:
+        raise ValueError("После старта игр stage_2 пересидирование запрещено")
+
+    participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_2.id))).all())
+    if len(participants) != stage_2.stage_size:
+        raise ValueError("Для пересидирования stage_2 требуется полный состав из 32 участников")
+
+    shuffled_seeds = list(range(1, stage_2.stage_size + 1))
+    random.shuffle(shuffled_seeds)
+    for participant, seed in zip(participants, shuffled_seeds, strict=True):
+        participant.seed = seed
+
+    await db.commit()
+
+
 async def rebuild_playoff_stages(db: AsyncSession, player_ids: list[int]) -> list[PlayoffStage]:
     usable_count = len(player_ids)
     stages_to_create = get_playoff_stage_blueprint(usable_count)

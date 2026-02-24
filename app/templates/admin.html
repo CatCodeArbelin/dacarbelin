@@ -81,6 +81,14 @@
 
       {% if current_playoff_stage %}
       <h5 class="mt-4">Состав активного этапа плей-офф</h5>
+      {% if current_playoff_stage.key == 'stage_2' %}
+      <div class="alert alert-warning py-2">
+        Пересидирование stage_2 доступно только до старта игр (пока не сыграна ни одна игра).
+        <form action="/admin/playoff/stage-2/shuffle" method="post" class="mt-2" onsubmit="return confirm('Перемешать seed 1..32 для stage_2 и переразложить по группам? После старта игр это действие недоступно.');">
+          <button class="btn btn-sm btn-outline-warning">Shuffle stage_2 (seed 1..32)</button>
+        </form>
+      </div>
+      {% endif %}
       <div class="border rounded p-3 mb-2">
         <div class="fw-bold mb-2">{{ current_playoff_stage.title }}</div>
         {% if current_stage_participants %}
