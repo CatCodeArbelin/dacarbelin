@@ -834,6 +834,25 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     stages = (await db.scalars(select(TournamentStage).order_by(TournamentStage.id))).all()
     playoff_stages = await get_playoff_stages_with_data(db)
     active_playoff_stage = next((stage for stage in playoff_stages if stage.is_started), None)
+
+    def _is_stage_finished(stage: PlayoffStage) -> bool:
+        participants_group_numbers = {
+            get_stage_group_number_by_seed(participant.seed)
+            for participant in stage.participants
+        }
+        if not participants_group_numbers:
+            return False
+
+        for group_number in participants_group_numbers:
+            group_matches = [match for match in stage.matches if match.group_number == group_number]
+            if not group_matches:
+                return False
+            if not any(match.state == "finished" for match in group_matches):
+                return False
+        return True
+
+    playoff_stage_by_key = {stage.key: stage for stage in playoff_stages}
+    stage_progression_keys = ["stage_2", "stage_1_8", "stage_1_4", "stage_final"]
     tournament_started = await get_tournament_started(db)
     group_stage_groups = list(
         (
@@ -851,7 +870,32 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     is_draw_valid, invalid_draw_reason = await validate_group_draw_integrity(db)
     if is_draw_valid:
         invalid_draw_reason = None
-    show_group_stage_controls = bool(tournament_started)
+    group_stage_finished = bool(playoff_stages)
+    active_stage_key = None
+    if not tournament_started:
+        active_stage_key = None
+    elif not group_stage_finished:
+        active_stage_key = "group_stage"
+    else:
+        for stage_key in stage_progression_keys:
+            stage = playoff_stage_by_key.get(stage_key)
+            if not stage:
+                continue
+            if stage.is_started and not _is_stage_finished(stage):
+                active_stage_key = stage_key
+                break
+
+        if active_stage_key is None:
+            for stage_key in stage_progression_keys:
+                stage = playoff_stage_by_key.get(stage_key)
+                if stage and not _is_stage_finished(stage):
+                    active_stage_key = stage_key
+                    break
+
+        if active_stage_key is None and playoff_stages:
+            active_stage_key = playoff_stages[-1].key
+
+    show_group_stage_controls = active_stage_key == "group_stage"
     groups = group_stage_groups if show_group_stage_controls else []
     group_stage_finish_ready, group_stage_finish_status, group_stage_games_played = await get_group_stage_completion_status(db)
     group_stage_games_summary = [
@@ -934,6 +978,9 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
         ]
         for stage in playoff_stages
     }
+    current_playoff_stage = playoff_stage_by_key.get(active_stage_key) if active_stage_key else None
+    current_stage_groups = playoff_stage_groups.get(current_playoff_stage.id, []) if current_playoff_stage else []
+    current_stage_participants = playoff_stage_participants.get(current_playoff_stage.id, []) if current_playoff_stage else []
     registration_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "registration_open"))
     registration_open = (registration_setting.value == "1") if registration_setting else True
     tournament_started_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_started"))
@@ -978,6 +1025,10 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             playoff_stage_participants=playoff_stage_participants,
             playoff_stage_groups=playoff_stage_groups,
             active_playoff_stage=active_playoff_stage,
+            active_stage_key=active_stage_key,
+            current_playoff_stage=current_playoff_stage,
+            current_stage_groups=current_stage_groups,
+            current_stage_participants=current_stage_participants,
             show_group_stage_controls=show_group_stage_controls,
             group_stage_finish_ready=group_stage_finish_ready,
             group_stage_finish_status=group_stage_finish_status,
