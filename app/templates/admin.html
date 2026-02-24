@@ -12,7 +12,7 @@
   <a class="btn btn-sm btn-outline-light" href="/admin/logout">{{ tr('admin_logout') }}</a>
 </div>
 <div class="row g-4">
-  <div class="col-lg-4">
+  <div class="col-12 col-md-6 col-xl-4">
     <div class="card bg-black neon-border-red"><div class="card-body">
       <h4>{{ tr('admin_registration_toggle') }}</h4>
       <form action="/admin/registration" method="post">
@@ -46,7 +46,15 @@
       <input class="form-control" type="text" readonly value="{{ judge_login_url or 'Ссылка не сгенерирована' }}" onclick="this.select()">
     </div></div>
 
-                <div class="card bg-black neon-border-red mt-4"><div class="card-body">
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-xl-10 mx-auto admin-wide-section">
+    <div class="container-fluid px-0">
+      <div class="row g-4 admin-group-grid">
+        <div class="col-12">
+          <div class="card bg-black neon-border-red w-100"><div class="card-body">
       <h4>{{ tr('admin_draw_controls') }}</h4>
       <form action="/admin/draw/auto" method="post" class="mb-3">
         <button class="btn btn-danger">{{ tr('admin_auto_draw') }}</button>
@@ -170,80 +178,88 @@
 
 
       {% if show_group_stage_controls %}
-      <h5 class="mt-4">Результат жеребьевки</h5>
-      <div class="row g-2 mb-3">
-        {% for group in groups %}
-        <div class="col-md-6">
-          <div class="border rounded p-2">
-            <div class="fw-bold">{{ group.name }}</div>
-            <ul class="mb-0">
-              {% for m in group.members|sort(attribute='seat') %}
-              <li>{{ m.user.nickname }}</li>
-              {% endfor %}
-            </ul>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-      {% for group in groups %}
-      {% set group_locked = group.current_game > 3 %}
-      <div class="border rounded p-3 mb-3">
-        <div class="d-flex justify-content-between align-items-center">
-          <strong>{{ group.name }} ({{ tr('tournament_game') }} {{ 3 if group.current_game > 3 else group.current_game }})</strong>
-          <form action="/admin/group/password" method="post" class="d-flex gap-2 align-items-center">
-            <input type="hidden" name="group_id" value="{{ group.id }}">
-            <input class="form-control form-control-sm js-group-password" style="width:120px" name="password" value="{{ group.lobby_password }}" pattern="[0-9]{4}" inputmode="numeric" maxlength="4" title="4 digits" {% if group_locked %}disabled{% endif %}>
-            <button type="button" class="btn btn-sm btn-outline-secondary js-generate-pin" {% if group_locked %}disabled{% endif %}>{{ tr('admin_generate_pin') }}</button>
-            <button class="btn btn-sm btn-outline-info" {% if group_locked %}disabled{% endif %}>{{ tr('admin_save_pw') }}</button>
-          </form>
-        </div>
-        <form action="/admin/group/schedule" method="post" class="row g-2 mt-2 mb-2">
-          <input type="hidden" name="group_id" value="{{ group.id }}">
-          <div class="col-md-10"><input class="form-control form-control-sm" name="schedule_text" value="{{ group.schedule_text or tr('tournament_tbd') }}" placeholder="{{ tr('tournament_tbd') }}" {% if group_locked %}disabled{% endif %}></div>
-          <div class="col-md-2"><button class="btn btn-sm btn-outline-light w-100" {% if group_locked %}disabled{% endif %}>{{ tr('admin_save_time') }}</button></div>
-        </form>
-
-        
-
-
-
-        <form action="/admin/group/score" method="post" class="mb-2">
-          <input type="hidden" name="group_id" value="{{ group.id }}">
-          <div class="small text-muted mb-2">{{ tr('admin_group_score_hint') }}</div>
-          <div class="table-responsive">
-            <table class="table table-sm table-dark align-middle mb-2">
-              <thead>
-                <tr>
-                  <th>{{ tr('index_nickname') }}</th>
-                  <th style="width: 180px;">{{ tr('admin_place') }}</th>
-                </tr>
-              </thead>
-              <tbody>
+      <div class="container-fluid px-0 w-100">
+        <h5 class="mt-4">Результат жеребьевки</h5>
+        <div class="row g-2 mb-3 w-100">
+          {% for group in groups %}
+          <div class="col-12 col-lg-6">
+            <div class="border rounded p-2 h-100">
+              <div class="fw-bold">{{ group.name }}</div>
+              <ul class="mb-0">
                 {% for m in group.members|sort(attribute='seat') %}
-                {% set member_index = loop.index %}
-                <tr>
-                  <td>{{ m.user.nickname }}</td>
-                  <td>
-                    <input type="hidden" name="user_ids[]" value="{{ m.user_id }}">
-                    <select class="form-select form-select-sm" name="places[]" required {% if group_locked %}disabled{% endif %}>
-                      {% for place in range(1, 9) %}
-                      <option value="{{ place }}" {% if place == member_index %}selected{% endif %}>{{ place }}</option>
-                      {% endfor %}
-                    </select>
-                  </td>
-                </tr>
+                <li>{{ m.user.nickname }}</li>
                 {% endfor %}
-              </tbody>
-            </table>
+              </ul>
+            </div>
           </div>
-          <button class="btn btn-sm btn-success" {% if group_locked %}disabled{% endif %}>{{ tr('admin_save_game_result') }}</button>
-        </form>
+          {% endfor %}
+        </div>
       </div>
-      {% else %}
-      <div class="alert alert-secondary">{{ tr('admin_groups_not_created') }}</div>
-      {% endfor %}
+      <div class="container-fluid px-0 w-100">
+        <div class="row g-3 admin-group-grid">
+          {% for group in groups %}
+          {% set group_locked = group.current_game > 3 %}
+          <div class="col-12">
+            <div class="border rounded p-3 w-100">
+              <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2">
+                <strong>{{ group.name }} ({{ tr('tournament_game') }} {{ 3 if group.current_game > 3 else group.current_game }})</strong>
+                <form action="/admin/group/password" method="post" class="d-flex flex-wrap gap-2 align-items-center w-100 admin-password-form">
+                  <input type="hidden" name="group_id" value="{{ group.id }}">
+                  <input class="form-control form-control-sm js-group-password" style="width:120px" name="password" value="{{ group.lobby_password }}" pattern="[0-9]{4}" inputmode="numeric" maxlength="4" title="4 digits" {% if group_locked %}disabled{% endif %}>
+                  <button type="button" class="btn btn-sm btn-outline-secondary js-generate-pin" {% if group_locked %}disabled{% endif %}>{{ tr('admin_generate_pin') }}</button>
+                  <button class="btn btn-sm btn-outline-info" {% if group_locked %}disabled{% endif %}>{{ tr('admin_save_pw') }}</button>
+                </form>
+              </div>
+              <form action="/admin/group/schedule" method="post" class="row g-2 mt-2 mb-2">
+                <input type="hidden" name="group_id" value="{{ group.id }}">
+                <div class="col-12 col-md-10"><input class="form-control form-control-sm" name="schedule_text" value="{{ group.schedule_text or tr('tournament_tbd') }}" placeholder="{{ tr('tournament_tbd') }}" {% if group_locked %}disabled{% endif %}></div>
+                <div class="col-12 col-md-2"><button class="btn btn-sm btn-outline-light w-100" {% if group_locked %}disabled{% endif %}>{{ tr('admin_save_time') }}</button></div>
+              </form>
+              <form action="/admin/group/score" method="post" class="mb-2">
+                <input type="hidden" name="group_id" value="{{ group.id }}">
+                <div class="small text-muted mb-2">{{ tr('admin_group_score_hint') }}</div>
+                <div class="table-responsive">
+                  <table class="table table-sm table-dark align-middle mb-2">
+                    <thead>
+                      <tr>
+                        <th>{{ tr('index_nickname') }}</th>
+                        <th style="width: 180px;">{{ tr('admin_place') }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for m in group.members|sort(attribute='seat') %}
+                      {% set member_index = loop.index %}
+                      <tr>
+                        <td>{{ m.user.nickname }}</td>
+                        <td>
+                          <input type="hidden" name="user_ids[]" value="{{ m.user_id }}">
+                          <select class="form-select form-select-sm" name="places[]" required {% if group_locked %}disabled{% endif %}>
+                            {% for place in range(1, 9) %}
+                            <option value="{{ place }}" {% if place == member_index %}selected{% endif %}>{{ place }}</option>
+                            {% endfor %}
+                          </select>
+                        </td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+                <button class="btn btn-sm btn-success" {% if group_locked %}disabled{% endif %}>{{ tr('admin_save_game_result') }}</button>
+              </form>
+            </div>
+          </div>
+          {% else %}
+          <div class="col-12">
+            <div class="alert alert-secondary">{{ tr('admin_groups_not_created') }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
       {% endif %}
-    </div></div>
+          </div></div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
