@@ -113,7 +113,7 @@
           </thead>
           <tbody>
             {% for participant in stage.participants %}
-            <tr>
+            <tr class="{% if participant.is_eliminated %}table-danger{% elif stage.participants|length > 0 and loop.index <= (3 if stage.title == "Stage 1/8" else (4 if stage.title in ["Stage 1/4", "Semifinal Groups"] else 1)) %}table-success{% endif %}">
               <td>{{ loop.index }}</td>
               <td>{{ participant.display_nickname }}</td>
               <td>{{ participant.points }}</td>
@@ -131,28 +131,4 @@
 </section>
 {% endif %}
 
-{% if bracket_columns %}
-<section class="playoff-bracket mt-4">
-  {% for column in bracket_columns %}
-  <div class="playoff-round">
-    <h4 class="playoff-round-title">{{ column.title }}</h4>
-    <div class="playoff-round-matches">
-      {% for match in column.matches %}
-      <article class="playoff-match-card playoff-status-{{ match.state }}">
-        <div class="playoff-match-header d-block">
-          <div>Group {{ match.group_label }} · {{ tr('tournament_game') }} {{ match.game_number }} · {{ tr('tournament_schedule') }}: {{ match.schedule_text or tr('tournament_tbd') }}</div>
-          <div>{{ tr('tournament_lobby_pw') }}: <span class="text-info">{{ match.lobby_password }}</span></div>
-        </div>
-        <ul class="playoff-participants list-unstyled mb-0 mt-2">
-          {% for participant in match.participants %}
-          <li>#{{ participant.user_id }} · {{ participant.nickname }}{% if participant.is_direct_invite_preview %} <span class="badge text-bg-info">прямой инвайт</span>{% endif %}</li>
-          {% endfor %}
-        </ul>
-      </article>
-      {% endfor %}
-    </div>
-  </div>
-  {% endfor %}
-</section>
-{% endif %}
 {% endblock %}

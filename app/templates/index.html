@@ -44,20 +44,33 @@
     <div id="chat" class="card bg-black neon-border-blue mt-4">
       <div class="card-body">
         <h3 class="text-contrast-neon neon-text-outline">{{ tr('index_chat') }}</h3>
-        <form action="/chat/send" method="post" class="mb-3">
+        <form id="chat-form" action="/chat/send" method="post" class="mb-3">
           {% if not chat_settings.is_enabled %}<div class="alert alert-warning">{{ tr('msg_chat_disabled_admin') }}</div>{% endif %}
           <input class="form-control mb-2" name="temp_nick" placeholder="{{ tr('index_temp_nick') }}" required>
+          <select class="form-select mb-2" name="nick_color">
+            <option value="#00d4ff">Cyan</option>
+            <option value="#ff7a59">Orange</option>
+            <option value="#b084ff">Purple</option>
+            <option value="#2dd36f">Green</option>
+            <option value="#ffd166">Yellow</option>
+            <option value="#ff66c4">Pink</option>
+            <option value="#5ce1e6">Teal</option>
+            <option value="#f48c06">Amber</option>
+            <option value="#90be6d">Olive</option>
+            <option value="#4cc9f0">Sky</option>
+            <option value="#8ecae6">Light Blue</option>
+            <option value="#8338ec">Violet</option>
+            <option value="#ffbe0b">Gold</option>
+          </select>
           <textarea class="form-control mb-2" name="message" maxlength="{{ chat_settings.max_length }}" placeholder="{{ tr('index_message') }}" required {% if not chat_settings.is_enabled %}disabled{% endif %}></textarea>
           <button class="btn btn-primary" {% if not chat_settings.is_enabled %}disabled{% endif %}>{{ tr('index_connect_send') }}</button>
           <div class="small text-contrast-muted">{{ tr('index_cooldown') }}: {{ chat_settings.cooldown_seconds }} sec · {{ tr('index_max_length') }}: {{ chat_settings.max_length }}</div>
         </form>
-        <div class="chat-box">
-          {% set nick_palette = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff66c4", "#5ce1e6", "#f48c06", "#90be6d", "#4cc9f0"] %}
+        <div id="chat-box" class="chat-box" data-last-id="{{ chat_messages[-1].id if chat_messages else 0 }}">
           {% for msg in chat_messages %}
-            {% set nick_color = nick_palette[msg.id % (nick_palette|length)] %}
             {% set is_admin_message = msg.temp_nick == '@Admin' %}
-            <div>
-              <strong class="chat-nick{% if is_admin_message %} chat-nick-admin{% endif %}" style="--nick-color: {{ nick_color }};">{{ msg.temp_nick }}</strong>: {{ msg.message }}
+            <div data-id="{{ msg.id }}">
+              <strong class="chat-nick{% if is_admin_message %} chat-nick-admin{% endif %}" style="--nick-color: {{ '#ff0000' if is_admin_message else (msg.nick_color or '#00d4ff') }};">{{ msg.temp_nick }}</strong>: {{ msg.message }}
             </div>
           {% endfor %}
         </div>
@@ -154,6 +167,40 @@
       previewBtn.disabled = false;
     }
   });
+
+  });
+})();
+
+(() => {
+  const chatBox = document.getElementById("chat-box");
+  if (!chatBox) return;
+
+  const appendMessage = (item) => {
+    const row = document.createElement("div");
+    row.dataset.id = item.id;
+    const strong = document.createElement("strong");
+    strong.className = `chat-nick${item.is_admin ? " chat-nick-admin" : ""}`;
+    strong.style.setProperty("--nick-color", item.is_admin ? "#ff0000" : (item.nick_color || "#00d4ff"));
+    strong.textContent = item.temp_nick;
+    row.appendChild(strong);
+    row.insertAdjacentText("beforeend", `: ${item.message}`);
+    chatBox.appendChild(row);
+    chatBox.dataset.lastId = String(item.id);
+  };
+
+  const poll = async () => {
+    const sinceId = Number(chatBox.dataset.lastId || 0);
+    try {
+      const response = await fetch(`/chat/messages?since_id=${sinceId}`);
+      if (!response.ok) return;
+      const data = await response.json();
+      (data.items || []).forEach(appendMessage);
+    } catch (e) {
+      // ignore transient errors
+    }
+  };
+
+  setInterval(poll, 2500);
 })();
 </script>
 {% endblock %}

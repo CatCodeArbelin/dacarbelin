@@ -14,5 +14,6 @@ class ChatMessage(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     temp_nick: Mapped[str] = mapped_column(String(120), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
+    nick_color: Mapped[str] = mapped_column(String(7), default="#00d4ff")
     ip_address: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

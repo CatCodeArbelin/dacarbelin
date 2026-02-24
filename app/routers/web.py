@@ -71,6 +71,23 @@ templates = Jinja2Templates(directory="app/templates")
 
 ALLOWED_USER_UPDATE_FIELDS = {"nickname", "basket", "direct_invite_stage"}
 ALLOWED_DIRECT_INVITE_STAGES = {None, "stage_2", "stage_1_8", "stage_1_4", "stage_semifinal_groups", "stage_final"}
+CHAT_NICK_FORBIDDEN = {"@admin"}
+CHAT_ADMIN_COLOR = "#ff0000"
+CHAT_ALLOWED_COLORS = {
+    "#00d4ff",
+    "#ff7a59",
+    "#b084ff",
+    "#2dd36f",
+    "#ffd166",
+    "#ff66c4",
+    "#5ce1e6",
+    "#f48c06",
+    "#90be6d",
+    "#4cc9f0",
+    "#8ecae6",
+    "#8338ec",
+    "#ffbe0b",
+}
 
 
 def _normalize_direct_invite_stage(raw_value: str | None) -> str | None:
@@ -203,6 +220,20 @@ async def get_or_create_chat_settings(db: AsyncSession) -> ChatSetting:
     db.add(row)
     await db.flush()
     return row
+
+
+async def get_or_create_judge_login_token(db: AsyncSession) -> str:
+    row = await db.scalar(select(SiteSetting).where(SiteSetting.key == "judge_login_token"))
+    if row and row.value:
+        return row.value
+    token = create_judge_login_token()
+    if not row:
+        row = SiteSetting(key="judge_login_token", value=token)
+        db.add(row)
+    else:
+        row.value = token
+    await db.commit()
+    return token
 
 
 def validate_chat_message_length(message: str, max_length: int) -> None:
@@ -344,6 +375,7 @@ async def register_preview(
 async def send_chat(
     request: Request,
     temp_nick: str = Form(...),
+    nick_color: str = Form(default="#00d4ff"),
     message: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
@@ -357,19 +389,45 @@ async def send_chat(
     except ValueError as exc:
         return redirect_with_msg("/", str(exc))
 
+    cleaned_nick = temp_nick.strip()[:120]
+    if cleaned_nick.lower() in CHAT_NICK_FORBIDDEN:
+        return redirect_with_msg("/", "msg_operation_failed")
+
+    selected_color = nick_color.lower()
+    if selected_color not in CHAT_ALLOWED_COLORS:
+        selected_color = "#00d4ff"
+
     ip = request.client.host if request.client else "unknown"
     last_msg = await db.scalar(
         select(ChatMessage)
-        .where(ChatMessage.ip_address == ip)
+        .where(ChatMessage.temp_nick == cleaned_nick)
         .order_by(desc(ChatMessage.created_at))
         .limit(1)
     )
     if last_msg and datetime.utcnow() - last_msg.created_at < timedelta(seconds=chat_settings.cooldown_seconds):
         return redirect_with_msg("/", "msg_cooldown_active")
 
-    db.add(ChatMessage(temp_nick=temp_nick[:120], message=message, ip_address=ip))
+    db.add(ChatMessage(temp_nick=cleaned_nick, nick_color=selected_color, message=message, ip_address=ip))
     await db.commit()
     return RedirectResponse(url="/#chat", status_code=303)
+
+
+@router.get("/chat/messages")
+async def get_chat_messages(since_id: int = Query(default=0), db: AsyncSession = Depends(get_db)):
+    rows = (
+        await db.scalars(select(ChatMessage).where(ChatMessage.id > since_id).order_by(ChatMessage.id))
+    ).all()
+    payload = [
+        {
+            "id": row.id,
+            "temp_nick": row.temp_nick,
+            "message": row.message,
+            "is_admin": row.temp_nick == "@Admin",
+            "nick_color": CHAT_ADMIN_COLOR if row.temp_nick == "@Admin" else (row.nick_color or "#00d4ff"),
+        }
+        for row in rows
+    ]
+    return {"items": payload}
 
 
 @router.get("/participants", response_class=HTMLResponse)
@@ -591,12 +649,23 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
                     "wins": participant.wins,
                     "top4_finishes": participant.top4_finishes,
                     "top8_finishes": participant.top8_finishes,
+                    "is_eliminated": participant.is_eliminated,
                 }
                 for participant in sorted(stage.participants, key=playoff_sort_key, reverse=True)
             ],
         }
         for stage in playoff_stages
     ]
+
+    if playoff_standings:
+        active_index = 0
+        active_playoff = next((stage for stage in playoff_stages if stage.is_started), None)
+        if active_playoff:
+            for idx, stage in enumerate(playoff_stages):
+                if stage.id == active_playoff.id:
+                    active_index = idx
+                    break
+        playoff_standings = playoff_standings[active_index:] + playoff_standings[:active_index]
 
     lang = get_lang(request.cookies.get("lang"))
     current_stage_label = t(lang, "tournament_group_stage")
@@ -690,7 +759,7 @@ async def admin_logout():
 
 @router.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
-    judge_login_token = create_judge_login_token()
+    judge_login_token = await get_or_create_judge_login_token(db)
     judge_login_url = str(request.url_for("admin_page")).rstrip("/") + f"?judge_token={judge_login_token}"
 
     manual_draw_users = (
@@ -705,7 +774,9 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     stages = (await db.scalars(select(TournamentStage).order_by(TournamentStage.id))).all()
     playoff_stages = await get_playoff_stages_with_data(db)
     active_playoff_stage = next((stage for stage in playoff_stages if stage.is_started), None)
-    show_group_stage_controls = bool(active_playoff_stage and active_playoff_stage.key == "stage_1_8")
+    tournament_started_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_started"))
+    tournament_started = (tournament_started_setting.value == "1") if tournament_started_setting else False
+    show_group_stage_controls = tournament_started
     groups = (
         list(
             (
@@ -1577,6 +1648,40 @@ async def admin_save_archive(
     return redirect_with_admin_msg("msg_archive_saved")
 
 
+@router.post("/admin/judge-link/regenerate")
+async def admin_regenerate_judge_link(db: AsyncSession = Depends(get_db)):
+    row = await db.scalar(select(SiteSetting).where(SiteSetting.key == "judge_login_token"))
+    token = create_judge_login_token()
+    if not row:
+        row = SiteSetting(key="judge_login_token", value=token)
+        db.add(row)
+    else:
+        row.value = token
+    await db.commit()
+    return redirect_with_admin_msg("msg_status_ok")
+
+
+@router.post("/admin/playoff/finish-stage")
+async def admin_finish_playoff_stage(
+    stage_id: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if not await _playoff_stage_exists(db, stage_id):
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
+    stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.id == stage_id))
+    if not stage:
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
+    expected_top = 3 if stage.key == "stage_1_8" else 4
+    try:
+        await promote_top_between_stages(db, stage_id, expected_top)
+        next_stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.stage_order == stage.stage_order + 1))
+        if next_stage:
+            await start_playoff_stage(db, next_stage.id)
+        return redirect_with_admin_msg("msg_status_ok")
+    except Exception:
+        return redirect_with_admin_msg("msg_operation_failed")
+
+
 @router.post("/admin/chat-settings")
 async def admin_save_chat_settings(
     cooldown_seconds: int = Form(...),
@@ -1607,7 +1712,7 @@ async def admin_send_chat_message(
     except ValueError as exc:
         return redirect_with_admin_msg(str(exc))
 
-    db.add(ChatMessage(temp_nick="@Admin", message=message, ip_address="admin"))
+    db.add(ChatMessage(temp_nick="@Admin", nick_color=CHAT_ADMIN_COLOR, message=message, ip_address="admin"))
     await db.commit()
     return redirect_with_admin_msg("msg_admin_chat_message_saved")
 
