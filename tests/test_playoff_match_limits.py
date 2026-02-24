@@ -4,7 +4,11 @@ import unittest
 from unittest.mock import AsyncMock
 
 from app.models.tournament import PlayoffMatch, PlayoffParticipant, PlayoffStage
-from app.services.tournament import apply_playoff_match_results, playoff_sort_key
+from app.services.tournament import (
+    apply_playoff_match_results,
+    playoff_sort_key,
+    simulate_three_random_games_for_limited_stages,
+)
 
 
 class _ScalarResult:
@@ -184,6 +188,63 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(ranked_ids[0], 2)
         self.assertEqual(ranked_ids[1:], [3, 1])
+
+
+    async def test_debug_simulation_plays_three_games_for_full_group(self) -> None:
+        stage = PlayoffStage(
+            id=11,
+            key="stage_2",
+            title="Stage 2",
+            stage_size=8,
+            stage_order=1,
+            scoring_mode="standard",
+        )
+        match = PlayoffMatch(stage_id=11, match_number=1, group_number=1, game_number=1, state="pending")
+        participants = [
+            PlayoffParticipant(stage_id=11, user_id=user_id, seed=user_id, points=0, wins=0, top4_finishes=0, last_place=8)
+            for user_id in range(1, 9)
+        ]
+
+        db = AsyncMock()
+        db.scalars = AsyncMock(
+            side_effect=[
+                _ScalarResult([stage]),
+                _ScalarResult(participants),
+                _ScalarResult(participants),
+                _ScalarResult(participants),
+                _ScalarResult(participants),
+            ]
+        )
+        db.scalar = AsyncMock(side_effect=[stage, match, stage, match, stage, match])
+
+        await simulate_three_random_games_for_limited_stages(db)
+
+        self.assertEqual(match.game_number, 4)
+        self.assertEqual(match.state, "finished")
+        self.assertEqual(db.commit.await_count, 3)
+
+    async def test_debug_simulation_skips_groups_with_non_eight_participants(self) -> None:
+        stage = PlayoffStage(
+            id=12,
+            key="stage_2",
+            title="Stage 2",
+            stage_size=8,
+            stage_order=1,
+            scoring_mode="standard",
+        )
+        participants = [
+            PlayoffParticipant(stage_id=12, user_id=user_id, seed=user_id, points=0, wins=0, top4_finishes=0, last_place=8)
+            for user_id in range(1, 8)
+        ]
+
+        db = AsyncMock()
+        db.scalars = AsyncMock(side_effect=[_ScalarResult([stage]), _ScalarResult(participants)])
+        db.scalar = AsyncMock()
+
+        await simulate_three_random_games_for_limited_stages(db)
+
+        db.scalar.assert_not_called()
+        db.commit.assert_not_called()
 
 
 if __name__ == "__main__":

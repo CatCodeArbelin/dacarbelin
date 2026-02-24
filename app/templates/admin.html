@@ -87,6 +87,9 @@
         <form action="/admin/playoff/stage-2/shuffle" method="post" class="mt-2" onsubmit="return confirm('Перемешать seed 1..32 для stage_2 и переразложить по группам? После старта игр это действие недоступно.');">
           <button class="btn btn-sm btn-outline-warning">Shuffle stage_2 (seed 1..32)</button>
         </form>
+        <form action="/admin/playoff/debug/simulate-3-games" method="post" class="mt-2" onsubmit="return confirm('{{ tr('admin_playoff_debug_simulate_3_games_confirm') }}');">
+          <button class="btn btn-sm btn-outline-danger">{{ tr('admin_playoff_debug_simulate_3_games') }}</button>
+        </form>
       </div>
       {% endif %}
       <div class="border rounded p-3 mb-2">
