@@ -249,12 +249,13 @@ def resolve_chat_sender_token(chat_sender_cookie: str | None) -> tuple[str, bool
 
 
 def _build_chat_messages_payload(chat_messages: list[ChatMessage]) -> list[dict[str, str]]:
+    default_nick_color = CHAT_NICK_COLORS[0]
     return [
         {
             "id": msg.id,
             "temp_nick": msg.temp_nick,
             "message": msg.message,
-            "nick_color": msg.nick_color or CHAT_NICK_COLORS[msg.id % len(CHAT_NICK_COLORS)],
+            "nick_color": msg.nick_color or default_nick_color,
             "is_admin": msg.temp_nick == "@Admin",
         }
         for msg in chat_messages

@@ -108,6 +108,51 @@ body {
   font-style: italic;
 }
 
+
+.chat-color-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chat-color-swatch {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.chat-color-swatch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chat-color-swatch span {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #44506a;
+  background: var(--swatch-color, #00d4ff);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.chat-color-swatch:hover span {
+  transform: scale(1.08);
+  border-color: #8fa7d4;
+}
+
+.chat-color-swatch input:focus-visible + span {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+.chat-color-swatch input:checked + span {
+  transform: scale(1.08);
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.35);
+}
+
 .badge.bg-success {
   background-color: #1b7448 !important;
   color: #f6fff9 !important;
