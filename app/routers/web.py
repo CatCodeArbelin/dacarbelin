@@ -428,7 +428,7 @@ async def participants(
 
 @router.get("/tournament", response_class=HTMLResponse)
 async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
-    # Отдаем турнирную таблицу с текущими группами и playoff-расписанием.
+    # Отдаем единую турнирную сетку со всеми этапами.
     draw_applied = await get_draw_applied(db)
     tournament_started = await get_tournament_started(db)
     show_groups = tournament_started
@@ -449,64 +449,73 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
         for group in groups
     }
     playoff_stages = await get_playoff_stages_with_data(db) if show_playoff else []
-    playoff_bracket_rounds: list[dict[str, object]] = []
-    if playoff_stages:
-        users = list((await db.scalars(select(User))).all())
-        user_by_id = {user.id: user for user in users}
-        stage_by_key = {stage.key: stage for stage in playoff_stages}
-        bracket_order = ["stage_1_8", "stage_1_4", "stage_semifinal_groups", "stage_final"]
-        stage_groups_count: dict[str, int] = {
-            stage.key: max((match.group_number for match in stage.matches), default=0)
-            for stage in playoff_stages
-        }
 
-        for stage_key in bracket_order:
-            stage = stage_by_key.get(stage_key)
-            if not stage:
-                continue
+    users = list((await db.scalars(select(User))).all())
+    user_by_id = {user.id: user for user in users}
+    stage_by_key = {stage.key: stage for stage in playoff_stages}
 
-            participants_by_group: dict[int, list[dict[str, object]]] = {}
-            for participant in sorted(stage.participants, key=lambda item: item.seed):
-                group_number = get_stage_group_number_by_seed(participant.seed)
-                user = user_by_id.get(participant.user_id)
-                participants_by_group.setdefault(group_number, []).append(
+    def _letter(group_number: int) -> str:
+        return chr(ord("A") + max(group_number - 1, 0))
+
+    def _normalize_schedule(value: str | None) -> str:
+        return (value or "").strip() or "TBD"
+
+    bracket_columns: list[dict[str, object]] = [
+        {"key": "group_stage", "title": "I этап", "matches": []},
+        {"key": "stage_1_8", "title": "II этап", "matches": []},
+        {"key": "stage_1_4", "title": "III этап", "matches": []},
+        {"key": "stage_final", "title": "Final", "matches": []},
+    ]
+
+    group_matches_vm: list[dict[str, object]] = []
+    for group in groups:
+        group_matches_vm.append(
+            {
+                "label": f"Group {_letter(int(group.name))}" if str(group.name).isdigit() else f"Group {str(group.name).replace('Group ', '').strip()}",
+                "game_number": 3 if group.current_game > 3 else group.current_game,
+                "schedule_text": _normalize_schedule(group.schedule_text),
+                "lobby_password": group.lobby_password,
+                "participants": [
                     {
-                        "user_id": participant.user_id,
-                        "nickname": user.nickname if user else str(participant.user_id),
+                        "user_id": member.user_id,
+                        "nickname": member.user.nickname,
                     }
-                )
+                    for member in sort_members_for_table(group.members)
+                ],
+                "state": "started" if group.is_started else "pending",
+            }
+        )
+    bracket_columns[0]["matches"] = sorted(group_matches_vm, key=lambda item: item["label"])
 
-            matches_vm: list[dict[str, object]] = []
-            for match in sorted(stage.matches, key=lambda item: item.group_number):
-                participants = participants_by_group.get(match.group_number, [])
-                winner = user_by_id.get(match.winner_user_id) if match.winner_user_id else None
-                matches_vm.append(
-                    {
-                        "group_number": match.group_number,
-                        "game_number": match.game_number,
-                        "state": match.state,
-                        "winner_user_id": match.winner_user_id,
-                        "winner_nickname": winner.nickname if winner else None,
-                        "participants": participants,
-                    }
-                )
+    for column in bracket_columns[1:]:
+        stage = stage_by_key.get(column["key"])
+        if not stage:
+            continue
 
-            playoff_bracket_rounds.append(
+        participants_by_group: dict[int, list[dict[str, object]]] = {}
+        for participant in sorted(stage.participants, key=lambda item: item.seed):
+            group_number = get_stage_group_number_by_seed(participant.seed)
+            user = user_by_id.get(participant.user_id)
+            participants_by_group.setdefault(group_number, []).append(
                 {
-                    "key": stage.key,
-                    "title": stage.title,
-                    "matches": matches_vm,
-                    "group_count": stage_groups_count.get(stage.key, 0),
+                    "user_id": participant.user_id,
+                    "nickname": user.nickname if user else str(participant.user_id),
                 }
             )
 
-        for index, round_vm in enumerate(playoff_bracket_rounds[:-1]):
-            next_round = playoff_bracket_rounds[index + 1]
-            current_group_count = max(int(round_vm.get("group_count", 0)), 1)
-            next_group_count = max(int(next_round.get("group_count", 0)), 1)
-            for match in round_vm["matches"]:
-                group_idx = int(match["group_number"]) - 1
-                match["next_group_number"] = ((group_idx * next_group_count) // current_group_count) + 1
+        matches_vm: list[dict[str, object]] = []
+        for match in sorted(stage.matches, key=lambda item: item.group_number):
+            matches_vm.append(
+                {
+                    "label": f"Group {_letter(match.group_number)}",
+                    "game_number": match.game_number,
+                    "schedule_text": _normalize_schedule(match.schedule_text),
+                    "lobby_password": match.lobby_password,
+                    "participants": participants_by_group.get(match.group_number, []),
+                    "state": match.state,
+                }
+            )
+        column["matches"] = matches_vm
 
     lang = get_lang(request.cookies.get("lang"))
     current_stage_label = t(lang, "tournament_group_stage")
@@ -516,10 +525,6 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             current_stage_label = active_playoff.title
         elif playoff_stages:
             current_stage_label = playoff_stages[0].title
-    playoff_standings = {
-        stage.id: sorted(stage.participants, key=lambda p: (p.points, p.wins, p.top4_finishes, -p.last_place, -p.user_id), reverse=True)
-        for stage in playoff_stages
-    }
     return templates.TemplateResponse(
         request,
         "tournament.html",
@@ -528,8 +533,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             groups=groups,
             standings=standings,
             playoff_stages=playoff_stages,
-            playoff_bracket_rounds=playoff_bracket_rounds,
-            playoff_standings=playoff_standings,
+            bracket_columns=bracket_columns,
             current_stage_label=current_stage_label,
             show_groups=show_groups,
         ),
