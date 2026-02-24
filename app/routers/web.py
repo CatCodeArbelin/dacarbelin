@@ -1,6 +1,7 @@
 """Содержит веб-маршруты для страниц турнира, админки и пользовательских действий."""
 
 import json
+import uuid
 import re
 from urllib.parse import urlencode
 from datetime import datetime, timedelta
@@ -69,6 +70,7 @@ ALLOWED_DIRECT_INVITE_STAGES = {None, "stage_2", "stage_1_8", "stage_1_4", "stag
 
 CHAT_NICK_COLORS = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff66c4", "#5ce1e6", "#f48c06", "#90be6d", "#4cc9f0"]
 FORBIDDEN_CHAT_NICKS = {"@admin"}
+CHAT_SENDER_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
 
 
 def build_stage_display_order(active_key: str, stage_order_keys: list[str]) -> list[str]:
@@ -233,6 +235,17 @@ def normalize_chat_nick_color(color: str) -> str:
     if normalized not in CHAT_NICK_COLORS:
         raise ValueError("msg_chat_color_forbidden")
     return normalized
+
+
+def generate_chat_sender_token() -> str:
+    return uuid.uuid4().hex
+
+
+def resolve_chat_sender_token(chat_sender_cookie: str | None) -> tuple[str, bool]:
+    chat_sender = (chat_sender_cookie or "").strip().lower()
+    if CHAT_SENDER_TOKEN_RE.fullmatch(chat_sender):
+        return chat_sender, False
+    return generate_chat_sender_token(), True
 
 
 def _build_chat_messages_payload(chat_messages: list[ChatMessage]) -> list[dict[str, str]]:
@@ -405,7 +418,7 @@ async def send_chat(
         return redirect_with_msg("/", str(exc))
 
     ip = request.client.host if request.client else "unknown"
-    chat_sender = request.cookies.get("chat_sender") or f"{ip}:{safe_nick.lower()}"
+    chat_sender, should_set_chat_sender_cookie = resolve_chat_sender_token(request.cookies.get("chat_sender"))
     last_msg = await db.scalar(
         select(ChatMessage)
         .where(ChatMessage.sender_token == chat_sender)
@@ -418,7 +431,7 @@ async def send_chat(
     db.add(ChatMessage(temp_nick=safe_nick, nick_color=safe_color, message=message, ip_address=ip, sender_token=chat_sender))
     await db.commit()
     redirect = RedirectResponse(url="/#chat", status_code=303)
-    if not request.cookies.get("chat_sender"):
+    if should_set_chat_sender_cookie:
         redirect.set_cookie("chat_sender", chat_sender, max_age=60 * 60 * 24 * 365, samesite="lax")
     return redirect
 

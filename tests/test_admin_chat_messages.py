@@ -114,3 +114,49 @@ def test_admin_chat_message_delete_success(monkeypatch) -> None:
     assert response.status_code == 303
     assert response.headers["location"] == "/admin?msg=msg_admin_chat_message_deleted"
     assert state == {"deleted": True, "committed": True}
+
+
+
+def test_send_chat_with_cyrillic_temp_nick_sets_ascii_sender_token(monkeypatch) -> None:
+    """Проверяет, что отправка сообщения с кириллическим ником не падает и выставляет ASCII cookie."""
+
+    class _FakeSendChatSettings:
+        is_enabled = True
+        max_length = 100
+        cooldown_seconds = 10
+
+    state = {"committed": False, "saved_message": None}
+
+    async def fake_get_chat_settings(db):
+        return _FakeSendChatSettings()
+
+    async def fake_scalar(self, statement):
+        return None
+
+    def fake_add(self, instance):
+        state["saved_message"] = instance
+
+    async def fake_commit(self):
+        state["committed"] = True
+
+    monkeypatch.setattr(web, "get_chat_settings", fake_get_chat_settings)
+    monkeypatch.setattr(web.AsyncSession, "scalar", fake_scalar, raising=False)
+    monkeypatch.setattr(web.AsyncSession, "add", fake_add, raising=False)
+    monkeypatch.setattr(web.AsyncSession, "commit", fake_commit, raising=False)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/chat/send",
+            data={"temp_nick": "Кириллица", "nick_color": "#00d4ff", "message": "Привет"},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/#chat"
+    assert state["committed"] is True
+    assert state["saved_message"] is not None
+    assert state["saved_message"].temp_nick == "Кириллица"
+    assert web.CHAT_SENDER_TOKEN_RE.fullmatch(state["saved_message"].sender_token)
+    assert "chat_sender=" in response.headers["set-cookie"]
+    cookie_token = response.headers["set-cookie"].split("chat_sender=", 1)[1].split(";", 1)[0]
+    assert web.CHAT_SENDER_TOKEN_RE.fullmatch(cookie_token)
