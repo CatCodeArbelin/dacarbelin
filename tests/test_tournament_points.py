@@ -51,7 +51,7 @@ class TournamentPointsTests(unittest.IsolatedAsyncioTestCase):
         Запуск: `pytest tests/test_tournament_points.py -q` и `pytest tests/test_tournament_points.py -k "test_apply_game_results_uses_points_by_place" -q`."""
         group = TournamentGroup(id=1, name="Group A", lobby_password="1234", schedule_text="TBD", current_game=1)
         members = [
-            GroupMember(group_id=1, user_id=i, seat=i, total_points=0, first_places=0, top4_finishes=0, eighth_places=0, last_game_place=8)
+            GroupMember(group_id=1, user_id=i, seat=i, total_points=0, first_places=0, top4_finishes=0, top8_finishes=0, eighth_places=0, last_game_place=8)
             for i in range(1, 9)
         ]
         session = _FakeSession(group=group, members=members)
@@ -85,6 +85,7 @@ class TournamentPointsTests(unittest.IsolatedAsyncioTestCase):
                 apply_points_to_playoff_participant(participant, place=place, scoring_mode="standard")
 
                 self.assertEqual(participant.points, expected_points)
+                self.assertEqual(participant.top8_finishes, 1)
 
 
     def test_apply_points_to_playoff_participant_final_stage_uses_points_by_place(self) -> None:
@@ -108,6 +109,7 @@ class TournamentPointsTests(unittest.IsolatedAsyncioTestCase):
                 apply_points_to_playoff_participant(participant, place=place, scoring_mode=FINAL_SCORING_MODE)
 
                 self.assertEqual(participant.points, expected_points)
+                self.assertEqual(participant.top8_finishes, 1)
 
 
 if __name__ == "__main__":
