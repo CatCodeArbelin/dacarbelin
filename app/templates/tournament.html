@@ -70,6 +70,28 @@
 </section>
 {% endif %}
 
+{% if not has_stage_2_playoff and bracket_columns and bracket_columns[1].matches %}
+<section class="mt-4">
+  <h3>II этап · Предварительный состав</h3>
+  <div class="row g-3">
+    {% for match in bracket_columns[1].matches %}
+    <div class="col-12 col-lg-6">
+      <div class="card bg-dark border-secondary h-100">
+        <div class="card-header">Group {{ match.group_label }}</div>
+        <div class="card-body">
+          <ul class="list-unstyled mb-0">
+            {% for participant in match.participants %}
+            <li>#{{ participant.user_id }} · {{ participant.nickname }} <span class="badge text-bg-info">прямой инвайт</span></li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 {% if playoff_standings %}
 <section class="mt-4">
   <h3>Playoff</h3>
@@ -123,7 +145,7 @@
         </div>
         <ul class="playoff-participants list-unstyled mb-0 mt-2">
           {% for participant in match.participants %}
-          <li>#{{ participant.user_id }} · {{ participant.nickname }}</li>
+          <li>#{{ participant.user_id }} · {{ participant.nickname }}{% if participant.is_direct_invite_preview %} <span class="badge text-bg-info">прямой инвайт</span>{% endif %}</li>
           {% endfor %}
         </ul>
       </article>

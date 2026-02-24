@@ -9,6 +9,7 @@ from app.main import app
 from app.routers import web
 from app.services.tournament import (
     build_stage_2_player_ids,
+    build_stage_2_direct_invite_preview,
     get_stage_group_number_by_seed,
     get_group_count_for_stage,
     get_playoff_stage_blueprint,
@@ -100,6 +101,17 @@ class TournamentWorkflowTests(unittest.TestCase):
             group_number = get_stage_group_number_by_seed(seed)
             group_sizes[group_number] = group_sizes.get(group_number, 0) + 1
         self.assertEqual(group_sizes, {1: 8, 2: 8, 3: 8, 4: 8})
+
+
+    def test_stage_2_direct_invite_preview_uses_stage_seeding(self) -> None:
+        """Проверяет позитивный сценарий `test_stage_2_direct_invite_preview_uses_stage_seeding`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_workflows.py -q` и `pytest tests/test_tournament_workflows.py -k "test_stage_2_direct_invite_preview_uses_stage_seeding" -q`."""
+        preview = build_stage_2_direct_invite_preview(list(range(101, 115)))
+
+        self.assertEqual(len(preview), 11)
+        self.assertEqual(preview[0], {"user_id": 101, "seed": 22, "group_number": 3})
+        self.assertEqual(preview[-1], {"user_id": 111, "seed": 32, "group_number": 4})
 
     def test_stage_2_players_requires_exactly_21_promoted(self) -> None:
         """Проверяет негативный сценарий `test_stage_2_players_requires_exactly_21_promoted`.
