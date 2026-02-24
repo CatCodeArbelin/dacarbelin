@@ -10,6 +10,7 @@ def test_admin_template_has_playoff_hint_without_manual_stage_controls() -> None
     assert "admin_playoff_stages_empty_hint_title" in template
     assert "admin_playoff_stages_empty_hint_steps" in template
     assert "Закончить этап, определить победителей по очкам" in template
+    assert "/admin/playoff/group/finish" in template
     assert "/admin/playoff/start" not in template
     assert "/admin/playoff/promote" not in template
     assert "/admin/group/create" not in template
