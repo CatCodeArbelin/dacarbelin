@@ -1,15 +1,30 @@
-"""Заполняет БД тестовыми данными турнира с 56 основными и 11 дополнительными участниками."""
+"""Заполняет БД тестовыми данными турнира: 56 основных, 20 резервных и 11 direct invite."""
 
 import asyncio
 import os
 import random
 import string
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
-from app.models.user import User
-from app.services.basket_allocator import allocate_basket
-from app.services.rank import mmr_to_rank, pick_basket
+from app.models.user import Basket, User
+from app.services.rank import mmr_to_rank
+
+MAIN_ROSTER_BASKETS = [
+    Basket.QUEEN.value,
+    Basket.KING.value,
+    Basket.ROOK.value,
+    Basket.BISHOP.value,
+    Basket.LOW_RANK.value,
+]
+
+RESERVE_ROSTER_BASKETS = [
+    Basket.QUEEN_RESERVE.value,
+    Basket.KING_RESERVE.value,
+    Basket.ROOK_RESERVE.value,
+    Basket.BISHOP_RESERVE.value,
+    Basket.LOW_RANK_RESERVE.value,
+]
 
 
 def _random_nick(prefix: str) -> str:
@@ -30,19 +45,13 @@ def _rank_from_mmr(mmr: int) -> str:
 
 
 async def main() -> None:
-    """Создает 56 обычных и 11 direct invite участников."""
+    """Создает 56 основных, 20 резервных и 11 direct invite участников."""
     os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/dac")
     os.environ.setdefault("ADMIN_KEY", "local_seed_admin_key")
 
     from app.db.session import SessionLocal
 
     async with SessionLocal() as db:
-        basket_counts_rows = (
-            await db.execute(
-                select(User.basket, func.count(User.id)).where(User.basket.isnot(None)).group_by(User.basket)
-            )
-        ).all()
-        basket_counts = {name: count for name, count in basket_counts_rows}
         existing_steam_ids = set((await db.execute(select(User.steam_id))).scalars().all())
 
         def next_unique_steam_id() -> str:
@@ -53,19 +62,17 @@ async def main() -> None:
                 existing_steam_ids.add(steam_id)
                 return steam_id
 
-        regular_created = 0
-        while regular_created < 56:
+        main_created = 0
+        while main_created < 56:
             steam_id = next_unique_steam_id()
 
             highest_mmr = random.randint(800, 4600)
             current_mmr = random.randint(600, highest_mmr)
             highest_rank = _rank_from_mmr(highest_mmr)
             current_rank = _rank_from_mmr(current_mmr)
-            target_basket = pick_basket(highest_rank, current_rank)
-            basket = allocate_basket(target_basket=target_basket, basket_counts=basket_counts)
-            basket_counts[basket] = basket_counts.get(basket, 0) + 1
+            basket = random.choice(MAIN_ROSTER_BASKETS)
 
-            player_index = regular_created + 1
+            player_index = main_created + 1
             user = User(
                 nickname=_random_nick(f"Player{player_index}"),
                 steam_input=steam_id,
@@ -79,7 +86,33 @@ async def main() -> None:
             )
             db.add(user)
 
-            regular_created += 1
+            main_created += 1
+
+        reserve_created = 0
+        while reserve_created < 20:
+            steam_id = next_unique_steam_id()
+
+            highest_mmr = random.randint(800, 4600)
+            current_mmr = random.randint(600, highest_mmr)
+            highest_rank = _rank_from_mmr(highest_mmr)
+            current_rank = _rank_from_mmr(current_mmr)
+            basket = random.choice(RESERVE_ROSTER_BASKETS)
+
+            reserve_index = reserve_created + 1
+            user = User(
+                nickname=_random_nick(f"Reserve{reserve_index}"),
+                steam_input=steam_id,
+                steam_id=steam_id,
+                game_nickname=_random_nick("ReserveNick"),
+                current_rank=current_rank,
+                highest_rank=highest_rank,
+                telegram=f"@reserve_{reserve_index}",
+                discord=f"reserve_{reserve_index}",
+                basket=basket,
+            )
+            db.add(user)
+
+            reserve_created += 1
 
         direct_invites_created = 0
         while direct_invites_created < 11:
@@ -110,7 +143,8 @@ async def main() -> None:
 
     print(
         "Сидер завершен: "
-        f"обычных участников создано {regular_created}, "
+        f"основных участников создано {main_created}, "
+        f"резервных участников создано {reserve_created}, "
         f"direct invites создано {direct_invites_created}."
     )
 
