@@ -1,6 +1,6 @@
 """add chat color and sender token
 
-Revision ID: 0015_chat_colors_and_sender_token
+Revision ID: 0015_chat_colors_sender_token
 Revises: 0014_add_top8_finishes_counters
 Create Date: 2026-02-24
 """
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0015_chat_colors_and_sender_token"
+revision = "0015_chat_colors_sender_token"
 down_revision = "0014_add_top8_finishes_counters"
 branch_labels = None
 depends_on = None
