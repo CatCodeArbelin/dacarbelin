@@ -723,6 +723,41 @@ async def apply_playoff_match_results(
     await db.commit()
 
 
+async def simulate_three_random_games_for_limited_stages(db: AsyncSession) -> None:
+    stages = list(
+        (
+            await db.scalars(
+                select(PlayoffStage).where(PlayoffStage.key.in_(LIMITED_PLAYOFF_STAGE_KEYS))
+            )
+        ).all()
+    )
+    if not stages:
+        return
+
+    for stage in stages:
+        participants = list(
+            (await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage.id))).all()
+        )
+        grouped_participants: dict[int, list[PlayoffParticipant]] = defaultdict(list)
+        for participant in participants:
+            grouped_participants[get_stage_group_number_by_seed(participant.seed)].append(participant)
+
+        for group_number, group_members in grouped_participants.items():
+            if len(group_members) != 8:
+                continue
+
+            ordered_user_ids = [participant.user_id for participant in group_members]
+            for _ in range(GROUP_STAGE_GAME_LIMIT):
+                shuffled_user_ids = ordered_user_ids.copy()
+                random.shuffle(shuffled_user_ids)
+                await apply_playoff_match_results(
+                    db,
+                    stage.id,
+                    shuffled_user_ids,
+                    group_number=group_number,
+                )
+
+
 
 
 async def override_playoff_match_winner(db: AsyncSession, stage_id: int, group_number: int, winner_user_id: int, note: str = "") -> None:

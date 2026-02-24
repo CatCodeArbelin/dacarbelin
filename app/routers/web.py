@@ -60,6 +60,7 @@ from app.services.tournament import (
     get_stage_group_number_by_seed,
     get_stage_group_label,
     shuffle_stage_2_participants,
+    simulate_three_random_games_for_limited_stages,
 )
 from app.services.tournament_view import (
     build_bracket_columns,
@@ -1461,6 +1462,16 @@ async def admin_shuffle_stage_2(db: AsyncSession = Depends(get_db)):
     except Exception:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed", details="stage_2_shuffle_forbidden")
 
+
+
+
+@router.post("/admin/playoff/debug/simulate-3-games")
+async def admin_debug_simulate_three_random_playoff_games(db: AsyncSession = Depends(get_db)):
+    try:
+        await simulate_three_random_games_for_limited_stages(db)
+        return redirect_with_admin_msg("msg_status_ok", details="debug_simulate_3_games_done")
+    except Exception:  # noqa: BLE001
+        return redirect_with_admin_msg("msg_operation_failed", details="debug_simulate_3_games_failed")
 
 @router.post("/admin/playoff/move")
 async def admin_move_playoff_player(
