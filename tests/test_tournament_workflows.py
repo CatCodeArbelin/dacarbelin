@@ -157,6 +157,7 @@ class _FakeScalarResult:
 
 class _FakeTournamentGroup:
     id = 1
+    name = "A"
     members = []
 
 
@@ -206,6 +207,50 @@ def test_tournament_page_hides_groups_before_start(monkeypatch) -> None:
     assert "tournament_group_stage_title" not in response.text
     assert "Current playoff stage / bracket" not in response.text
 
+
+
+
+def test_tournament_page_context_contains_expected_keys_when_started(monkeypatch) -> None:
+    fake_db = _FakeTournamentPageDB()
+
+    class _CaptureResponse:
+        def __init__(self, context):
+            self.context = context
+
+    async def fake_get_tournament_started(db):
+        return True
+
+    async def fake_get_playoff_stages_with_data(db):
+        return [SimpleNamespace(key="stage_2", is_started=True)]
+
+    def fake_build_group_stage_standings(groups):
+        return [{"group_name": "A", "rows": []}]
+
+    def fake_build_bracket_columns(groups, playoff_stages, user_by_id, direct_invite_ids):
+        return [{"key": "group_stage"}, {"key": "stage_2"}]
+
+    def fake_build_playoff_standings(playoff_stages, user_by_id):
+        return [{"stage_key": "stage_2", "rows": []}]
+
+    def fake_template_response(request, template_name, context):
+        return _CaptureResponse(context)
+
+    monkeypatch.setattr(web, "get_tournament_started", fake_get_tournament_started)
+    monkeypatch.setattr(web, "get_playoff_stages_with_data", fake_get_playoff_stages_with_data)
+    monkeypatch.setattr(web, "build_group_stage_standings", fake_build_group_stage_standings)
+    monkeypatch.setattr(web, "build_bracket_columns", fake_build_bracket_columns)
+    monkeypatch.setattr(web, "build_playoff_standings", fake_build_playoff_standings)
+    monkeypatch.setattr(web.templates, "TemplateResponse", fake_template_response)
+
+    request = SimpleNamespace(cookies={})
+    response = __import__("asyncio").run(web.tournament_page(request, fake_db))
+
+    assert response.context["show_groups"] is True
+    assert response.context["playoff_stages"][0].key == "stage_2"
+    assert response.context["stage_columns"] == [{"key": "group_stage"}, {"key": "stage_2"}]
+    assert response.context["ordered_stage_columns"] == [{"key": "stage_2"}, {"key": "group_stage"}]
+    assert response.context["stage_2_preview"] == {"key": "stage_2"}
+    assert response.context["playoff_standings"] == [{"stage_key": "stage_2", "rows": []}]
 
 def test_stage_display_order_rotates_active_stage_first() -> None:
     keys = ["group_stage", "stage_2", "stage_final"]

@@ -114,6 +114,10 @@ def get_stage_group_numbers(
     return list(range(1, groups_count + 1))
 
 
+def get_active_playoff_stage(playoff_stages: list[PlayoffStage]) -> PlayoffStage | None:
+    return next((stage for stage in playoff_stages if stage.is_started), None)
+
+
 
 def _normalize_direct_invite_stage(raw_value: str | None) -> str | None:
     value = (raw_value or "").strip() or None
@@ -568,10 +572,7 @@ async def participants(
 @router.get("/tournament", response_class=HTMLResponse)
 async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
     # Отдаем единую турнирную сетку со всеми этапами.
-    draw_applied = await get_draw_applied(db)
     tournament_started = await get_tournament_started(db)
-    show_groups = tournament_started
-    show_playoff = tournament_started
 
     groups = list(
         (
@@ -584,7 +585,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
         ).all()
     )
     standings = build_group_stage_standings(groups)
-    playoff_stages = await get_playoff_stages_with_data(db) if show_playoff else []
+    playoff_stages = await get_playoff_stages_with_data(db) if tournament_started else []
 
     direct_invite_ids = list(
         (
@@ -603,11 +604,11 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
     playoff_standings = build_playoff_standings(playoff_stages, user_by_id)
 
     lang = get_lang(request.cookies.get("lang"))
-    current_stage_display = resolve_current_stage_label(lang, playoff_stages, show_playoff)
+    current_stage_display = resolve_current_stage_label(lang, playoff_stages, tournament_started)
     stage_order_keys = ["group_stage", "stage_2", "stage_final"]
     active_key = "group_stage"
-    if show_playoff:
-        active_playoff = next((stage for stage in playoff_stages if stage.is_started), None)
+    if tournament_started:
+        active_playoff = get_active_playoff_stage(playoff_stages)
         if active_playoff:
             active_key = active_playoff.key
     ordered_keys = build_stage_display_order(active_key, stage_order_keys)
@@ -629,7 +630,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             stage_2_preview=stage_2_preview,
             playoff_standings=playoff_standings,
             current_stage_display=current_stage_display,
-            show_groups=show_groups,
+            show_groups=tournament_started,
             has_stage_2_playoff=stage_2_has_started,
         ),
     )
@@ -719,7 +720,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     users_by_id = {user_id: nickname for user_id, nickname in user_rows}
     stages = (await db.scalars(select(TournamentStage).order_by(TournamentStage.id))).all()
     playoff_stages = await get_playoff_stages_with_data(db)
-    active_playoff_stage = next((stage for stage in playoff_stages if stage.is_started), None)
+    active_playoff_stage = get_active_playoff_stage(playoff_stages)
 
     def _is_stage_finished(stage: PlayoffStage) -> bool:
         participants_group_numbers = {
