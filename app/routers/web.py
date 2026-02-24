@@ -72,6 +72,9 @@ templates = Jinja2Templates(directory="app/templates")
 ALLOWED_USER_UPDATE_FIELDS = {"nickname", "basket", "direct_invite_stage"}
 ALLOWED_DIRECT_INVITE_STAGES = {None, "stage_2", "stage_1_8", "stage_1_4", "stage_semifinal_groups", "stage_final"}
 
+CHAT_NICK_COLORS = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff66c4", "#5ce1e6", "#f48c06", "#90be6d", "#4cc9f0"]
+FORBIDDEN_CHAT_NICKS = {"@admin"}
+
 
 def _normalize_direct_invite_stage(raw_value: str | None) -> str | None:
     value = (raw_value or "").strip() or None
@@ -210,6 +213,35 @@ def validate_chat_message_length(message: str, max_length: int) -> None:
         raise ValueError("msg_message_too_long")
 
 
+def normalize_chat_nick(temp_nick: str) -> str:
+    cleaned = (temp_nick or "").strip()[:120]
+    if not cleaned:
+        raise ValueError("msg_operation_failed")
+    if cleaned.lower() in FORBIDDEN_CHAT_NICKS:
+        raise ValueError("msg_chat_nick_reserved")
+    return cleaned
+
+
+def normalize_chat_nick_color(color: str) -> str:
+    normalized = (color or "").strip().lower()
+    if normalized not in CHAT_NICK_COLORS:
+        raise ValueError("msg_chat_color_forbidden")
+    return normalized
+
+
+def _build_chat_messages_payload(chat_messages: list[ChatMessage]) -> list[dict[str, str]]:
+    return [
+        {
+            "id": msg.id,
+            "temp_nick": msg.temp_nick,
+            "message": msg.message,
+            "nick_color": msg.nick_color or CHAT_NICK_COLORS[msg.id % len(CHAT_NICK_COLORS)],
+            "is_admin": msg.temp_nick == "@Admin",
+        }
+        for msg in chat_messages
+    ]
+
+
 async def get_or_create_rules_content(db: AsyncSession) -> RulesContent:
     row = await db.scalar(select(RulesContent).where(RulesContent.id == 1))
     if row:
@@ -243,6 +275,8 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
             request,
             stages=stages,
             chat_messages=list(reversed(chat_messages)),
+            chat_messages_payload=_build_chat_messages_payload(list(reversed(chat_messages))),
+            chat_nick_colors=CHAT_NICK_COLORS,
             registration_open=registration_open,
             tournament_started=tournament_started,
             chat_settings=chat_settings,
@@ -344,6 +378,7 @@ async def register_preview(
 async def send_chat(
     request: Request,
     temp_nick: str = Form(...),
+    nick_color: str = Form(default="#00d4ff"),
     message: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
@@ -357,19 +392,36 @@ async def send_chat(
     except ValueError as exc:
         return redirect_with_msg("/", str(exc))
 
+    try:
+        safe_nick = normalize_chat_nick(temp_nick)
+        safe_color = normalize_chat_nick_color(nick_color)
+    except ValueError as exc:
+        return redirect_with_msg("/", str(exc))
+
     ip = request.client.host if request.client else "unknown"
+    chat_sender = request.cookies.get("chat_sender") or f"{ip}:{safe_nick.lower()}"
     last_msg = await db.scalar(
         select(ChatMessage)
-        .where(ChatMessage.ip_address == ip)
+        .where(ChatMessage.sender_token == chat_sender)
         .order_by(desc(ChatMessage.created_at))
         .limit(1)
     )
     if last_msg and datetime.utcnow() - last_msg.created_at < timedelta(seconds=chat_settings.cooldown_seconds):
         return redirect_with_msg("/", "msg_cooldown_active")
 
-    db.add(ChatMessage(temp_nick=temp_nick[:120], message=message, ip_address=ip))
+    db.add(ChatMessage(temp_nick=safe_nick, nick_color=safe_color, message=message, ip_address=ip, sender_token=chat_sender))
     await db.commit()
-    return RedirectResponse(url="/#chat", status_code=303)
+    redirect = RedirectResponse(url="/#chat", status_code=303)
+    if not request.cookies.get("chat_sender"):
+        redirect.set_cookie("chat_sender", chat_sender, max_age=60 * 60 * 24 * 365, samesite="lax")
+    return redirect
+
+
+@router.get("/chat/messages")
+async def chat_messages_api(db: AsyncSession = Depends(get_db)):
+    chat_messages = (await db.scalars(select(ChatMessage).order_by(desc(ChatMessage.id)).limit(20))).all()
+    payload = _build_chat_messages_payload(list(reversed(chat_messages)))
+    return {"messages": payload}
 
 
 @router.get("/participants", response_class=HTMLResponse)
@@ -690,8 +742,11 @@ async def admin_logout():
 
 @router.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
-    judge_login_token = create_judge_login_token()
-    judge_login_url = str(request.url_for("admin_page")).rstrip("/") + f"?judge_token={judge_login_token}"
+    judge_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "judge_login_token"))
+    judge_login_token = (judge_setting.value if judge_setting else "")
+    judge_login_url = ""
+    if judge_login_token:
+        judge_login_url = str(request.url_for("admin_page")).rstrip("/") + f"?judge_token={judge_login_token}"
 
     manual_draw_users = (
         await db.scalars(
@@ -1577,6 +1632,19 @@ async def admin_save_archive(
     return redirect_with_admin_msg("msg_archive_saved")
 
 
+@router.post("/admin/judge-link/regenerate")
+async def admin_regenerate_judge_link(db: AsyncSession = Depends(get_db)):
+    token = create_judge_login_token()
+    row = await db.scalar(select(SiteSetting).where(SiteSetting.key == "judge_login_token"))
+    if not row:
+        row = SiteSetting(key="judge_login_token", value=token)
+        db.add(row)
+    else:
+        row.value = token
+    await db.commit()
+    return redirect_with_admin_msg("msg_status_ok")
+
+
 @router.post("/admin/chat-settings")
 async def admin_save_chat_settings(
     cooldown_seconds: int = Form(...),
@@ -1607,7 +1675,7 @@ async def admin_send_chat_message(
     except ValueError as exc:
         return redirect_with_admin_msg(str(exc))
 
-    db.add(ChatMessage(temp_nick="@Admin", message=message, ip_address="admin"))
+    db.add(ChatMessage(temp_nick="@Admin", nick_color="#ff0000", message=message, ip_address="admin", sender_token="admin"))
     await db.commit()
     return redirect_with_admin_msg("msg_admin_chat_message_saved")
 

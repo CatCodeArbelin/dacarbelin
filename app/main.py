@@ -10,10 +10,31 @@ from app.core.admin_session import (
     create_admin_session_cookie,
     is_admin_session,
 )
+from sqlalchemy import select
 from app.core.config import settings
+from app.db.session import SessionLocal
+from app.models.settings import SiteSetting
 from app.routers.web import router as web_router
 
 app = FastAPI(title=settings.app_name)
+
+
+async def consume_persisted_judge_token(token: str | None) -> bool:
+    if not token:
+        return False
+
+    async with SessionLocal() as session:
+        row = await session.scalar(select(SiteSetting).where(SiteSetting.key == "judge_login_token"))
+        if not row or row.value != token:
+            return False
+
+        if not consume_judge_login_token(token):
+            return False
+
+        row.value = ""
+        await session.commit()
+        return True
+
 
 
 @app.middleware("http")
@@ -24,7 +45,7 @@ async def admin_auth_middleware(request: Request, call_next):
         admin_key = request.query_params.get("admin_key")
         judge_token = request.query_params.get("judge_token")
 
-        is_valid_entry = (admin_key and admin_key == settings.admin_key) or consume_judge_login_token(judge_token)
+        is_valid_entry = (admin_key and admin_key == settings.admin_key) or await consume_persisted_judge_token(judge_token)
         if is_valid_entry:
             response = RedirectResponse(url="/admin", status_code=303)
             response.set_cookie(
