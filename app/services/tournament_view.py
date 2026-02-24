@@ -262,11 +262,25 @@ def build_playoff_standings(
 
 
 def resolve_current_stage_label(lang: str, playoff_stages: Sequence[PlayoffStage], show_playoff: bool) -> str:
-    current_stage_label = t(lang, "tournament_group_stage")
-    if show_playoff:
-        active_playoff = next((stage for stage in playoff_stages if stage.is_started), None)
-        if active_playoff:
-            return active_playoff.title
-        if playoff_stages:
-            return playoff_stages[0].title
-    return current_stage_label
+    stage_display_key_by_stage_key = {
+        "group_stage": "tournament_stage_group_stage_label",
+        "stage_2": "tournament_stage_1_4_label",
+        "stage_1_8": "tournament_stage_1_8_label",
+        "stage_1_4": "tournament_stage_1_4_label",
+        "stage_final": "tournament_stage_final_label",
+    }
+
+    default_display = t(lang, stage_display_key_by_stage_key["group_stage"])
+    if not show_playoff:
+        return default_display
+
+    active_playoff = next((stage for stage in playoff_stages if stage.is_started), None)
+    current_stage = active_playoff or (playoff_stages[0] if playoff_stages else None)
+    if current_stage is None:
+        return default_display
+
+    display_key = stage_display_key_by_stage_key.get(current_stage.key)
+    if display_key is not None:
+        return t(lang, display_key)
+
+    return current_stage.title or default_display
