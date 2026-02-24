@@ -50,35 +50,25 @@ class TournamentWorkflowTests(unittest.TestCase):
         """Проверяет позитивный сценарий `test_playoff_stage_blueprint`.
         Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
         Запуск: `pytest tests/test_tournament_workflows.py -q` и `pytest tests/test_tournament_workflows.py -k "test_playoff_stage_blueprint" -q`."""
-        stages_56 = get_playoff_stage_blueprint(56)
-        self.assertEqual(
-            [stage[0] for stage in stages_56],
-            [
-                "stage_1_8",
-                "stage_1_4",
-                "stage_semifinal_groups",
-                "stage_final",
-            ],
-        )
-        self.assertEqual([stage[2] for stage in stages_56], [56, 32, 16, 8])
-        self.assertEqual([stage[3] for stage in stages_56], ["standard", "standard", "standard", "final_22_top1"])
-
         stages_32 = get_playoff_stage_blueprint(32)
         self.assertEqual(
             [stage[0] for stage in stages_32],
             [
+                "stage_1_8",
                 "stage_1_4",
-                "stage_semifinal_groups",
                 "stage_final",
             ],
         )
         self.assertEqual([stage[2] for stage in stages_32], [32, 16, 8])
+        self.assertEqual([stage[3] for stage in stages_32], ["standard", "standard", "final_22_top1"])
+
+        stages_16 = get_playoff_stage_blueprint(16)
+        self.assertEqual(stages_16, [])
 
     def test_stage_group_counts_for_new_playoff_flow(self) -> None:
         """Проверяет граничный сценарий `test_stage_group_counts_for_new_playoff_flow`.
         Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
         Запуск: `pytest tests/test_tournament_workflows.py -q` и `pytest tests/test_tournament_workflows.py -k "test_stage_group_counts_for_new_playoff_flow" -q`."""
-        self.assertEqual(get_group_count_for_stage(56), 7)
         self.assertEqual(get_group_count_for_stage(32), 4)
         self.assertEqual(get_group_count_for_stage(16), 2)
         self.assertEqual(get_group_count_for_stage(8), 1)

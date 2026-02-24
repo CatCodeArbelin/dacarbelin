@@ -399,14 +399,13 @@ async def apply_game_results(db: AsyncSession, group_id: int, ordered_user_ids: 
 
 
 PLAYOFF_STAGE_SEQUENCE = [
-    ("stage_1_8", "Stage 1/8", 56, "standard"),
-    ("stage_1_4", "Stage 1/4", 32, "standard"),
-    ("stage_semifinal_groups", "Semifinal Groups", 16, "standard"),
+    ("stage_1_8", "Stage 1/8", 32, "standard"),
+    ("stage_1_4", "Stage 1/4", 16, "standard"),
     ("stage_final", "Final", 8, "final_22_top1"),
 ]
 FINAL_SCORING_MODE = "final_22_top1"
 GROUP_STAGE_GAME_LIMIT = 3
-LIMITED_PLAYOFF_STAGE_KEYS = {"stage_1_8", "stage_1_4", "stage_semifinal_groups"}
+LIMITED_PLAYOFF_STAGE_KEYS = {"stage_1_8", "stage_1_4"}
 DIRECT_INVITE_STAGE_2 = "stage_2"
 STAGE_2_DIRECT_INVITES_LIMIT = 11
 
@@ -414,8 +413,6 @@ STAGE_2_DIRECT_INVITES_LIMIT = 11
 def get_playoff_stage_blueprint(usable_count: int) -> list[tuple[str, str, int, str]]:
     if usable_count >= PLAYOFF_STAGE_SEQUENCE[0][2]:
         return PLAYOFF_STAGE_SEQUENCE
-    if usable_count >= PLAYOFF_STAGE_SEQUENCE[1][2]:
-        return PLAYOFF_STAGE_SEQUENCE[1:]
     return []
 
 
@@ -446,10 +443,8 @@ def get_group_count_for_stage(stage_size: int) -> int:
 
 def get_promoted_count_for_stage(stage: PlayoffStage) -> int:
     if stage.key == "stage_1_8":
-        return 32
-    if stage.key == "stage_1_4":
         return 16
-    if stage.key == "stage_semifinal_groups":
+    if stage.key == "stage_1_4":
         return 8
     return 0
 
@@ -549,8 +544,13 @@ async def rebuild_playoff_stages(db: AsyncSession, player_ids: list[int]) -> lis
     for seed, user_id in enumerate(seeded, start=1):
         db.add(PlayoffParticipant(stage_id=first_stage.id, user_id=user_id, seed=seed))
 
-    for stage in stages:
-        for group_number in range(1, get_group_count_for_stage(stage.stage_size) + 1):
+    for index, stage in enumerate(stages):
+        if index == 0:
+            groups_count = get_group_count_for_stage(len(seeded))
+        else:
+            groups_count = get_group_count_for_stage(stage.stage_size)
+
+        for group_number in range(1, groups_count + 1):
             db.add(
                 PlayoffMatch(
                     stage_id=stage.id,
@@ -824,9 +824,8 @@ async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int
         raise ValueError("Для этого этапа продвижение не поддерживается")
 
     allowed_top_n_by_stage = {
-        "stage_1_8": 3,
+        "stage_1_8": 4,
         "stage_1_4": 4,
-        "stage_semifinal_groups": 4,
     }
     allowed_top_n = allowed_top_n_by_stage.get(stage.key)
     if allowed_top_n is None:

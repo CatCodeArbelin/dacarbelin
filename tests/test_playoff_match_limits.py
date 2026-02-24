@@ -72,8 +72,8 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(match.state, "finished")
         db.commit.assert_called_once()
 
-    async def test_stage_3_group_limit_blocks_fourth_game(self) -> None:
-        """Проверяет негативный сценарий `test_stage_3_group_limit_blocks_fourth_game`.
+    async def test_stage_1_8_group_limit_blocks_fourth_game(self) -> None:
+        """Проверяет негативный сценарий `test_stage_1_8_group_limit_blocks_fourth_game`.
         Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
         Запуск: `pytest tests/test_playoff_match_limits.py -q` и `pytest tests/test_playoff_match_limits.py -k "test_stage_3_group_limit_blocks_fourth_game" -q`."""
         ordered_user_ids = [1, 2, 3, 4, 5, 6, 7, 8]
@@ -83,8 +83,8 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
         ]
         stage = PlayoffStage(
             id=1,
-            key="stage_semifinal_groups",
-            title="Semifinal Groups",
+            key="stage_1_8",
+            title="Stage 1/8",
             stage_size=8,
             stage_order=2,
             scoring_mode="standard",

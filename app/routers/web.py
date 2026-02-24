@@ -32,7 +32,7 @@ from app.models.settings import (
     SiteSetting,
     TournamentStage,
 )
-from app.models.tournament import GroupMember, PlayoffParticipant, PlayoffStage, TournamentGroup
+from app.models.tournament import GroupMember, PlayoffMatch, PlayoffParticipant, PlayoffStage, TournamentGroup
 from app.models.user import Basket, User
 from app.services.basket_allocator import allocate_basket
 from app.services.i18n import get_lang, t
@@ -70,7 +70,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 ALLOWED_USER_UPDATE_FIELDS = {"nickname", "basket", "direct_invite_stage"}
-ALLOWED_DIRECT_INVITE_STAGES = {None, "stage_2", "stage_1_8", "stage_1_4", "stage_semifinal_groups", "stage_final"}
+ALLOWED_DIRECT_INVITE_STAGES = {None, "stage_2", "stage_1_8", "stage_1_4", "stage_final"}
 
 CHAT_NICK_COLORS = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff66c4", "#5ce1e6", "#f48c06", "#90be6d", "#4cc9f0"]
 FORBIDDEN_CHAT_NICKS = {"@admin"}
@@ -561,9 +561,9 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
 
     bracket_columns: list[dict[str, object]] = [
         {"key": "group_stage", "title": "I этап", "matches": []},
-        {"key": "stage_1_8", "title": "II этап", "matches": []},
-        {"key": "stage_1_4", "title": "III этап", "matches": []},
-        {"key": "stage_final", "title": "Final", "matches": []},
+        {"key": "stage_1_8", "title": "II этап (32)", "matches": []},
+        {"key": "stage_1_4", "title": "III этап (16)", "matches": []},
+        {"key": "stage_final", "title": "Финал (8)", "matches": []},
     ]
 
     group_matches_vm: list[dict[str, object]] = []
@@ -655,9 +655,9 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
         participants_sorted = sorted(stage.participants, key=playoff_sort_key, reverse=True)
         stage_group_done: set[int] = set()
         for match in stage.matches:
-            if stage.key in {"stage_1_8", "stage_1_4", "stage_semifinal_groups"} and match.game_number > 3:
+            if stage.key in {"stage_1_8", "stage_1_4"} and match.game_number > 3:
                 stage_group_done.add(match.group_number)
-        promote_n_by_key = {"stage_1_8": 3, "stage_1_4": 4, "stage_semifinal_groups": 4, "stage_final": 1}
+        promote_n_by_key = {"stage_1_8": 4, "stage_1_4": 4, "stage_final": 1}
         promote_n = promote_n_by_key.get(stage.key, 0)
         by_group_rank: dict[int, dict[int, int]] = {}
         for g in {get_stage_group_number_by_seed(p.seed) for p in participants_sorted}:
@@ -845,7 +845,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                     ),
                     0,
                 ),
-                "game_limit": 3 if stage.key in {"stage_1_8", "stage_1_4", "stage_semifinal_groups"} else "special",
+                "game_limit": 3 if stage.key in {"stage_1_8", "stage_1_4"} else "special",
             }
             for participant in sorted(
                 stage.participants,
@@ -867,7 +867,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                     (max(match.game_number, 1) for match in stage.matches if match.group_number == group_number),
                     1,
                 ),
-                "game_limit": 3 if stage.key in {"stage_1_8", "stage_1_4", "stage_semifinal_groups"} else "special",
+                "game_limit": 3 if stage.key in {"stage_1_8", "stage_1_4"} else "special",
                 "participants": [
                     {
                         "user_id": participant.user_id,
@@ -945,7 +945,6 @@ async def admin_users_page(request: Request, db: AsyncSession = Depends(get_db))
         "stage_2",
         "stage_1_8",
         "stage_1_4",
-        "stage_semifinal_groups",
         "stage_final",
     ]
 
@@ -1574,11 +1573,11 @@ async def admin_finish_playoff_group(
     if not match:
         return redirect_with_admin_msg("msg_operation_failed")
 
-    if stage.key in {"stage_1_8", "stage_1_4", "stage_semifinal_groups"} and match.game_number <= 3:
+    if stage.key in {"stage_1_8", "stage_1_4"} and match.game_number <= 3:
         return redirect_with_admin_msg("msg_operation_failed", details="group_games_not_completed")
 
     ranked = sorted(group_participants, key=playoff_sort_key, reverse=True)
-    promote_n_by_key = {"stage_1_8": 3, "stage_1_4": 4, "stage_semifinal_groups": 4, "stage_final": 1}
+    promote_n_by_key = {"stage_1_8": 4, "stage_1_4": 4, "stage_final": 1}
     promote_n = promote_n_by_key.get(stage.key, 0)
     promoted_ids = {p.user_id for p in ranked[:promote_n]}
     for participant in group_participants:
@@ -1586,10 +1585,17 @@ async def admin_finish_playoff_group(
     match.state = "finished"
     await db.commit()
 
-    group_numbers = sorted({m.group_number for m in stage.matches})
-    stage_finished = all((await db.scalar(select(PlayoffMatch).where(PlayoffMatch.stage_id == stage.id, PlayoffMatch.group_number == g))).state == "finished" for g in group_numbers)
-    if stage_finished and stage.key in {"stage_1_8", "stage_1_4", "stage_semifinal_groups"}:
-        top_n = {"stage_1_8": 3, "stage_1_4": 4, "stage_semifinal_groups": 4}[stage.key]
+    active_group_numbers = sorted({get_stage_group_number_by_seed(participant.seed) for participant in participants})
+    stage_finished = True
+    for active_group_number in active_group_numbers:
+        active_group_match = await db.scalar(
+            select(PlayoffMatch).where(PlayoffMatch.stage_id == stage.id, PlayoffMatch.group_number == active_group_number)
+        )
+        if not active_group_match or active_group_match.state != "finished":
+            stage_finished = False
+            break
+    if stage_finished and stage.key in {"stage_1_8", "stage_1_4"}:
+        top_n = {"stage_1_8": 4, "stage_1_4": 4}[stage.key]
         try:
             await promote_top_between_stages(db, stage.id, top_n)
             next_stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.stage_order == stage.stage_order + 1))
