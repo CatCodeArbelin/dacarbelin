@@ -33,7 +33,7 @@ from app.models.settings import (
     SiteSetting,
     TournamentStage,
 )
-from app.models.tournament import GroupMember, PlayoffMatch, PlayoffParticipant, PlayoffStage, TournamentGroup
+from app.models.tournament import GroupGameResult, GroupMember, PlayoffMatch, PlayoffParticipant, PlayoffStage, TournamentGroup
 from app.models.user import Basket, User
 from app.services.basket_allocator import allocate_basket
 from app.services.i18n import get_lang, t
@@ -197,6 +197,30 @@ async def validate_group_draw_integrity(db: AsyncSession) -> tuple[bool, str | N
             return False, "draw_group_size_invalid"
 
     return True, None
+
+
+async def get_group_stage_completion_status(db: AsyncSession) -> tuple[bool, str, dict[int, int]]:
+    groups = list((await db.scalars(select(TournamentGroup).where(TournamentGroup.stage == "group_stage"))).all())
+    if not groups:
+        return False, "draw_not_created", {}
+
+    group_ids = [group.id for group in groups]
+    group_games_played_rows = (
+        await db.execute(
+            select(GroupMember.group_id, func.count(func.distinct(GroupGameResult.game_number)))
+            .select_from(GroupMember)
+            .outerjoin(GroupGameResult, GroupGameResult.group_id == GroupMember.group_id)
+            .where(GroupMember.group_id.in_(group_ids))
+            .group_by(GroupMember.group_id)
+        )
+    ).all()
+    games_played_by_group = {int(group_id): int(games_count or 0) for group_id, games_count in group_games_played_rows}
+
+    for group in groups:
+        if games_played_by_group.get(group.id, 0) < 3:
+            return False, "group_stage_not_completed", games_played_by_group
+
+    return True, "group_stage_completed", games_played_by_group
 
 
 async def get_chat_settings(db: AsyncSession) -> ChatSetting:
@@ -829,6 +853,14 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
         invalid_draw_reason = None
     show_group_stage_controls = bool(tournament_started)
     groups = group_stage_groups if show_group_stage_controls else []
+    group_stage_finish_ready, group_stage_finish_status, group_stage_games_played = await get_group_stage_completion_status(db)
+    group_stage_games_summary = [
+        {
+            "name": group.name,
+            "games_played": group_stage_games_played.get(group.id, 0),
+        }
+        for group in group_stage_groups
+    ]
     group_user_choices = {
         group.id: [
             {
@@ -947,6 +979,9 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             playoff_stage_groups=playoff_stage_groups,
             active_playoff_stage=active_playoff_stage,
             show_group_stage_controls=show_group_stage_controls,
+            group_stage_finish_ready=group_stage_finish_ready,
+            group_stage_finish_status=group_stage_finish_status,
+            group_stage_games_summary=group_stage_games_summary,
         ),
     )
 
@@ -1404,10 +1439,31 @@ async def admin_group_score(
             for user_id, place in sorted(placements_map.items(), key=lambda item: item[1])
         ]
         await apply_game_results(db, group_id, ordered_user_ids)
-        await generate_playoff_from_groups(db)
         return redirect_with_admin_msg("msg_game_saved")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
+
+
+@router.post("/admin/group-stage/finish")
+async def admin_finish_group_stage(db: AsyncSession = Depends(get_db)):
+    is_completed, status, _ = await get_group_stage_completion_status(db)
+    if not is_completed:
+        return redirect_with_admin_msg("msg_operation_failed", details=status)
+
+    generated, details = await generate_playoff_from_groups(db)
+    if not generated:
+        return redirect_with_admin_msg("msg_operation_failed", details=details)
+
+    group_stage = await db.scalar(select(TournamentStage).where(TournamentStage.key == "group_stage"))
+    if group_stage:
+        group_stage.is_active = False
+
+    stage_2 = await db.scalar(select(TournamentStage).where(TournamentStage.key == "stage_2"))
+    if stage_2:
+        stage_2.is_active = True
+
+    await db.commit()
+    return redirect_with_admin_msg("msg_status_ok", details="group_stage_finished")
 
 
 @router.post("/admin/playoff/generate")
