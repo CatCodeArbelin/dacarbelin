@@ -254,7 +254,7 @@ def test_admin_playoff_start_returns_friendly_error_for_invalid_stage(monkeypatc
         response = client.post("/admin/playoff/start", data={"stage_id": "999"}, follow_redirects=False)
 
     assert response.status_code == 303
-    assert response.headers["location"] == "/admin?msg=msg_invalid_playoff_stage"
+    assert response.headers["location"] == "/admin?msg=msg_operation_failed&details=use_group_finish_flow"
 
 
 def test_admin_playoff_move_returns_friendly_error_for_invalid_stage(monkeypatch) -> None:
@@ -295,3 +295,20 @@ def test_admin_group_promote_manual_returns_friendly_error_for_invalid_stage(mon
 
     assert response.status_code == 303
     assert response.headers["location"] == "/admin?msg=msg_invalid_playoff_stage"
+
+
+def test_admin_manual_group_edit_routes_are_unavailable() -> None:
+    """Проверяет, что удаленные ручные роуты редактирования групп недоступны."""
+    routes = [
+        "/admin/group/create",
+        "/admin/group/member/add",
+        "/admin/group/member/remove",
+        "/admin/group/member/move",
+        "/admin/group/member/swap",
+    ]
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        for route in routes:
+            response = client.post(route, follow_redirects=False)
+            assert response.status_code == 404
