@@ -603,7 +603,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
     playoff_standings = build_playoff_standings(playoff_stages, user_by_id)
 
     lang = get_lang(request.cookies.get("lang"))
-    current_stage_label = resolve_current_stage_label(lang, playoff_stages, show_playoff)
+    current_stage_display = resolve_current_stage_label(lang, playoff_stages, show_playoff)
     stage_order_keys = ["group_stage", "stage_2", "stage_final"]
     active_key = "group_stage"
     if show_playoff:
@@ -625,7 +625,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             bracket_columns=bracket_columns,
             ordered_stage_columns=ordered_stage_columns,
             playoff_standings=playoff_standings,
-            current_stage_label=current_stage_label,
+            current_stage_display=current_stage_display,
             show_groups=show_groups,
             has_stage_2_playoff=stage_by_key.get("stage_2") is not None or stage_by_key.get("stage_1_8") is not None,
         ),

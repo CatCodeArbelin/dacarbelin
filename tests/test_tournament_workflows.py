@@ -1,6 +1,7 @@
 """Проверяет ключевые workflow-сценарии управления турниром."""
 
 import unittest
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
@@ -16,6 +17,7 @@ from app.services.tournament import (
     get_playoff_stage_blueprint,
     parse_manual_draw_user_ids,
 )
+from app.services.tournament_view import resolve_current_stage_label
 
 
 class TournamentWorkflowTests(unittest.TestCase):
@@ -124,6 +126,25 @@ class TournamentWorkflowTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             build_stage_2_player_ids(promoted, [21, *range(101, 111)])
+
+    def test_resolve_current_stage_label_returns_uniform_display_for_all_stages(self) -> None:
+        """Проверяет позитивный сценарий `test_resolve_current_stage_label_returns_uniform_display_for_all_stages`."""
+        stage_cases = [
+            ("group_stage", "tournament_stage_group_stage_label"),
+            ("stage_2", "tournament_stage_1_4_label"),
+            ("stage_1_8", "tournament_stage_1_8_label"),
+            ("stage_1_4", "tournament_stage_1_4_label"),
+            ("stage_final", "tournament_stage_final_label"),
+        ]
+
+        for stage_key, expected_key in stage_cases:
+            stage = SimpleNamespace(key=stage_key, is_started=True, title=f"title:{stage_key}")
+            self.assertEqual(resolve_current_stage_label("en", [stage], show_playoff=True), web.t("en", expected_key))
+
+    def test_resolve_current_stage_label_fallback_uses_stage_title_for_unknown_key(self) -> None:
+        """Проверяет граничный сценарий `test_resolve_current_stage_label_fallback_uses_stage_title_for_unknown_key`."""
+        unknown_stage = SimpleNamespace(key="unknown", is_started=True, title="Custom Stage")
+        self.assertEqual(resolve_current_stage_label("en", [unknown_stage], show_playoff=True), "Custom Stage")
 
 
 class _FakeScalarResult:
