@@ -13,20 +13,6 @@
 <div class="alert alert-secondary">{{ tr('tournament_wait_start') }}</div>
 {% endif %}
 
-{% if standings %}
-<section class="mt-4">
-  <h3>I этап</h3>
-  <div class="row g-3">
-    {% for group in groups %}
-    {% set table = standings.get(group.id, []) %}
-    {% call stage_ui.stage_panel(group.name) %}
-      {{ stage_ui.stage_standings_table(table, 'total_points', 'first_places', 'games_played') }}
-    {% endcall %}
-    {% endfor %}
-  </div>
-</section>
-{% endif %}
-
 {% if not has_stage_2_playoff and stage_2_preview and stage_2_preview.matches %}
 <section class="mt-4">
   <h3>II этап · Предварительный состав</h3>
