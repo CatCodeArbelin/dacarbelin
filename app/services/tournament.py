@@ -715,6 +715,8 @@ async def apply_playoff_match_results(
     )
     if not match:
         raise ValueError("Матч/группа для этапа не найдена")
+    if match.state == "finished":
+        raise ValueError("Матч уже завершен")
 
     if stage.key in LIMITED_PLAYOFF_STAGE_KEYS and match.game_number > GROUP_STAGE_GAME_LIMIT:
         raise ValueError(
@@ -724,20 +726,28 @@ async def apply_playoff_match_results(
     for place, user_id in enumerate(ordered_user_ids, start=1):
         apply_points_to_playoff_participant(by_user[user_id], place, stage.scoring_mode)
 
-    match.state = "in_progress"
     match.game_number += 1
+    should_finish_limited_stage = (
+        stage.key in LIMITED_PLAYOFF_STAGE_KEYS and match.game_number > GROUP_STAGE_GAME_LIMIT
+    )
+    should_finish_final_stage = False
 
     if stage.scoring_mode == FINAL_SCORING_MODE:
         ranked = sorted(participants, key=playoff_sort_key, reverse=True)
         leader = ranked[0]
         if stage.final_candidate_user_id:
             if ordered_user_ids[0] == stage.final_candidate_user_id:
-                match.state = "finished"
                 match.winner_user_id = stage.final_candidate_user_id
+                should_finish_final_stage = True
             elif leader.points >= 22:
                 stage.final_candidate_user_id = leader.user_id
         elif leader.points >= 22:
             stage.final_candidate_user_id = leader.user_id
+
+    if should_finish_limited_stage or should_finish_final_stage:
+        match.state = "finished"
+    else:
+        match.state = "in_progress"
 
     await db.commit()
 
