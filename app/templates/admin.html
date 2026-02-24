@@ -35,6 +35,12 @@
     </div></div>
 
     <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
+      <h4>Ссылка входа для судей</h4>
+      <p class="small text-contrast-muted">Одноразовая подписанная ссылка. Сгенерируйте заново, если есть риск утечки.</p>
+      <input class="form-control" type="text" readonly value="{{ judge_login_url }}" onclick="this.select()">
+    </div></div>
+
+    <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
       <h4>{{ tr('admin_stages_editor') }}</h4>
       <form action="/admin/stage" method="post" class="row g-2">
         <div class="col-6"><input class="form-control" name="key" placeholder="{{ tr('admin_key') }}"></div>

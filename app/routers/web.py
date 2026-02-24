@@ -12,7 +12,12 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.admin_session import ADMIN_SESSION_COOKIE, create_admin_session_cookie, is_admin_session
+from app.core.admin_session import (
+    ADMIN_SESSION_COOKIE,
+    create_admin_session_cookie,
+    create_judge_login_token,
+    is_admin_session,
+)
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.chat import ChatMessage
@@ -598,6 +603,9 @@ async def admin_logout():
 
 @router.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
+    judge_login_token = create_judge_login_token()
+    judge_login_url = str(request.url_for("admin_page")).rstrip("/") + f"?judge_token={judge_login_token}"
+
     manual_draw_users = (
         await db.scalars(
             select(User)
@@ -707,6 +715,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             archive_entries=archive_entries,
             chat_settings=chat_settings,
             chat_messages=chat_messages,
+            judge_login_url=judge_login_url,
             manual_draw_users=manual_draw_users,
             group_user_choices=group_user_choices,
             playoff_stage_participants=playoff_stage_participants,
