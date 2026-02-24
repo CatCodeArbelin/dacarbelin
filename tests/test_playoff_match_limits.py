@@ -44,6 +44,34 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
 
         db.commit.assert_not_called()
 
+
+    async def test_limited_stage_moves_to_finished_after_third_game(self) -> None:
+        """Проверяет завершение группы после третьей сыгранной игры на лимитируемых стадиях."""
+        ordered_user_ids = [1, 2, 3, 4, 5, 6, 7, 8]
+        participants = [
+            PlayoffParticipant(stage_id=1, user_id=user_id, seed=user_id, points=0, wins=0, top4_finishes=0, last_place=8)
+            for user_id in ordered_user_ids
+        ]
+        stage = PlayoffStage(
+            id=1,
+            key="stage_1_4",
+            title="Stage 1/4",
+            stage_size=8,
+            stage_order=1,
+            scoring_mode="standard",
+        )
+        match = PlayoffMatch(stage_id=1, match_number=1, group_number=1, game_number=3, state="in_progress")
+
+        db = AsyncMock()
+        db.scalar = AsyncMock(side_effect=[stage, match])
+        db.scalars = AsyncMock(return_value=_ScalarResult(participants))
+
+        await apply_playoff_match_results(db, stage_id=1, ordered_user_ids=ordered_user_ids, group_number=1)
+
+        self.assertEqual(match.game_number, 4)
+        self.assertEqual(match.state, "finished")
+        db.commit.assert_called_once()
+
     async def test_stage_3_group_limit_blocks_fourth_game(self) -> None:
         """Проверяет негативный сценарий `test_stage_3_group_limit_blocks_fourth_game`.
         Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
