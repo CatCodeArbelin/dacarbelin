@@ -13,25 +13,6 @@
 <div class="alert alert-secondary">{{ tr('tournament_wait_start') }}</div>
 {% endif %}
 
-{% if not has_stage_2_playoff and stage_2_preview and stage_2_preview.matches %}
-<section class="mt-4">
-  <h3>II этап · Предварительный состав</h3>
-  <div class="row g-3">
-    {% for match in stage_2_preview.matches %}
-    {% call stage_ui.stage_panel('Group ' ~ match.group_label) %}
-      <div class="p-3">
-        <ul class="list-unstyled mb-0">
-          {% for participant in match.participants %}
-          <li>#{{ participant.user_id }} · {{ participant.nickname }} <span class="badge text-bg-info">прямой инвайт</span></li>
-          {% endfor %}
-        </ul>
-      </div>
-    {% endcall %}
-    {% endfor %}
-  </div>
-</section>
-{% endif %}
-
 {% if playoff_standings %}
 <section class="mt-4">
   <h3>Playoff</h3>
@@ -59,6 +40,9 @@
               <div class="playoff-match-header d-block">
                 <div>Group {{ match.group_label }} · {{ tr('tournament_game') }} {{ match.game_number }}</div>
                 <div class="playoff-accent-row">
+                  {% if match.is_preview %}
+                  <span class="neon-accent-badge neon-accent-badge-time">предварительный состав</span>
+                  {% endif %}
                   <span class="neon-accent-badge neon-accent-badge-time">{{ tr('tournament_schedule') }}: {{ match.schedule_text or tr('tournament_tbd') }}</span>
                   <span class="neon-accent-badge neon-accent-badge-password">{{ tr('tournament_lobby_pw') }}: {{ match.lobby_password or tr('tournament_tbd') }}</span>
                 </div>

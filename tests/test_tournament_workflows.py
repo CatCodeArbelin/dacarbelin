@@ -223,9 +223,6 @@ def test_tournament_page_context_contains_expected_keys_when_started(monkeypatch
     async def fake_get_playoff_stages_with_data(db):
         return [SimpleNamespace(key="stage_2", is_started=True)]
 
-    def fake_build_group_stage_standings(groups):
-        return [{"group_name": "A", "rows": []}]
-
     def fake_build_bracket_columns(groups, playoff_stages, user_by_id, direct_invite_ids):
         return [{"key": "group_stage"}, {"key": "stage_2"}]
 
@@ -237,7 +234,6 @@ def test_tournament_page_context_contains_expected_keys_when_started(monkeypatch
 
     monkeypatch.setattr(web, "get_tournament_started", fake_get_tournament_started)
     monkeypatch.setattr(web, "get_playoff_stages_with_data", fake_get_playoff_stages_with_data)
-    monkeypatch.setattr(web, "build_group_stage_standings", fake_build_group_stage_standings)
     monkeypatch.setattr(web, "build_bracket_columns", fake_build_bracket_columns)
     monkeypatch.setattr(web, "build_playoff_standings", fake_build_playoff_standings)
     monkeypatch.setattr(web.templates, "TemplateResponse", fake_template_response)
@@ -249,7 +245,6 @@ def test_tournament_page_context_contains_expected_keys_when_started(monkeypatch
     assert response.context["playoff_stages"][0].key == "stage_2"
     assert response.context["stage_columns"] == [{"key": "group_stage"}, {"key": "stage_2"}]
     assert response.context["ordered_stage_columns"] == [{"key": "stage_2"}, {"key": "group_stage"}]
-    assert response.context["stage_2_preview"] == {"key": "stage_2"}
     assert response.context["playoff_standings"] == [{"stage_key": "stage_2", "rows": []}]
 
 def test_stage_display_order_rotates_active_stage_first() -> None:

@@ -597,7 +597,6 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
 
     users = list((await db.scalars(select(User))).all())
     user_by_id = {user.id: user for user in users}
-    stage_by_key = {stage.key: stage for stage in playoff_stages}
     stage_columns = build_bracket_columns(groups, playoff_stages, user_by_id, direct_invite_ids)
     playoff_standings = build_playoff_standings(playoff_stages, user_by_id)
 
@@ -611,8 +610,6 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             active_key = active_playoff.key
     ordered_keys = build_stage_display_order(active_key, stage_order_keys)
     columns_by_key = {column["key"]: column for column in stage_columns}
-    stage_2_preview = columns_by_key.get("stage_2")
-    stage_2_has_started = stage_by_key.get("stage_2") is not None or stage_by_key.get("stage_1_8") is not None
     ordered_stage_columns = [columns_by_key[key] for key in ordered_keys if key in columns_by_key]
 
     return templates.TemplateResponse(
@@ -624,11 +621,9 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             playoff_stages=playoff_stages,
             stage_columns=stage_columns,
             ordered_stage_columns=ordered_stage_columns,
-            stage_2_preview=stage_2_preview,
             playoff_standings=playoff_standings,
             current_stage_display=current_stage_display,
             show_groups=tournament_started,
-            has_stage_2_playoff=stage_2_has_started,
         ),
     )
 
