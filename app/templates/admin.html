@@ -146,6 +146,25 @@
 
 
       {% if show_group_stage_controls %}
+      <div class="alert {% if group_stage_finish_ready %}alert-success{% else %}alert-warning{% endif %} mb-3">
+        <div class="fw-semibold mb-2">
+          {% if group_stage_finish_ready %}
+          {{ tr('admin_group_stage_finish_ready') }}
+          {% else %}
+          {{ tr('admin_group_stage_finish_not_ready') }}
+          {% endif %}
+        </div>
+        {% if group_stage_games_summary %}
+        <div class="small mb-2">
+          {% for group_progress in group_stage_games_summary %}
+          <span class="me-2">{{ group_progress.name }}: {{ group_progress.games_played }}/3</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <form action="/admin/group-stage/finish" method="post">
+          <button class="btn btn-sm btn-danger" {% if not group_stage_finish_ready %}disabled{% endif %}>{{ tr('admin_finish_group_stage') }}</button>
+        </form>
+      </div>
       <div class="container-fluid px-0 w-100">
         <h5 class="mt-4">Результат жеребьевки</h5>
         <div class="row g-2 mb-3 w-100">
