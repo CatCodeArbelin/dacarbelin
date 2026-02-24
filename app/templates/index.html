@@ -52,8 +52,13 @@
           <div class="small text-contrast-muted">{{ tr('index_cooldown') }}: {{ chat_settings.cooldown_seconds }} sec · {{ tr('index_max_length') }}: {{ chat_settings.max_length }}</div>
         </form>
         <div class="chat-box">
+          {% set nick_palette = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff66c4", "#5ce1e6", "#f48c06", "#90be6d", "#4cc9f0"] %}
           {% for msg in chat_messages %}
-            <div><strong>{{ msg.temp_nick }}</strong>: {{ msg.message }}</div>
+            {% set nick_color = nick_palette[msg.id % (nick_palette|length)] %}
+            {% set is_admin_message = msg.temp_nick == '@Admin' %}
+            <div>
+              <strong class="chat-nick{% if is_admin_message %} chat-nick-admin{% endif %}" style="--nick-color: {{ nick_color }};">{{ msg.temp_nick }}</strong>: {{ msg.message }}
+            </div>
           {% endfor %}
         </div>
       </div>

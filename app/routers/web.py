@@ -1467,6 +1467,26 @@ async def admin_save_chat_settings(
     return redirect_with_admin_msg("msg_chat_settings_saved")
 
 
+@router.post("/admin/chat/send")
+async def admin_send_chat_message(
+    request: Request,
+    message: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if not is_admin_session(request.cookies.get(ADMIN_SESSION_COOKIE)):
+        return RedirectResponse(url="/admin/login", status_code=303)
+
+    chat_settings = await get_chat_settings(db)
+    try:
+        validate_chat_message_length(message=message, max_length=chat_settings.max_length)
+    except ValueError as exc:
+        return redirect_with_admin_msg(str(exc))
+
+    db.add(ChatMessage(temp_nick="@Admin", message=message, ip_address="admin"))
+    await db.commit()
+    return redirect_with_admin_msg("msg_admin_chat_message_saved")
+
+
 @router.post("/admin/chat/message/update")
 async def admin_update_chat_message(
     message_id: int = Form(...),
