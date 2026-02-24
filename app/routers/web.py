@@ -1,6 +1,7 @@
 """Содержит веб-маршруты для страниц турнира, админки и пользовательских действий."""
 
 import json
+import math
 import uuid
 import re
 from urllib.parse import urlencode
@@ -84,14 +85,25 @@ def build_stage_display_order(active_key: str, stage_order_keys: list[str]) -> l
     return [active_key, *after_active, *before_active]
 
 
-def get_stage_group_numbers(stage_key: str) -> list[int]:
+def get_stage_group_numbers(
+    stage_key: str,
+    stage_size: int | None = None,
+    participants_count: int | None = None,
+) -> list[int]:
     stage_group_count = {
-        "stage_2": 7,
+        "stage_2": 4,
         "stage_1_8": 4,
         "stage_1_4": 2,
         "stage_final": 1,
     }
     groups_count = stage_group_count.get(stage_key)
+    if stage_key in {"stage_2", "stage_1_8", "stage_1_4"}:
+        max_groups = max((stage_size or 0) // 8, 0)
+        participant_groups = max(math.ceil((participants_count or 0) / 8), 0)
+        if max_groups:
+            groups_count = min(participant_groups, max_groups) if participants_count is not None else max_groups
+        elif participants_count is not None:
+            groups_count = participant_groups
     if groups_count is None:
         return []
     return list(range(1, groups_count + 1))
@@ -1011,8 +1023,13 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                 ],
             }
             for group_number in (
-                get_stage_group_numbers(stage.key)
-                or sorted({get_stage_group_number_by_seed(item.seed) for item in stage.participants})
+                get_stage_group_numbers(stage.key, stage.stage_size, len(stage.participants))
+                or sorted(
+                    {
+                        *{get_stage_group_number_by_seed(item.seed) for item in stage.participants},
+                        *{match.group_number for match in stage.matches},
+                    }
+                )
             )
         ]
         for stage in playoff_stages
