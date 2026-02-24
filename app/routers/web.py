@@ -582,7 +582,9 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
                     "total_points": member.total_points,
                     "first_places": member.first_places,
                     "top4_finishes": member.top4_finishes,
+                    "games_played": member.top8_finishes,
                     "top8_finishes": member.top8_finishes,
+                    "eighth_places": member.eighth_places,
                     "status": status,
                 }
             )
@@ -722,7 +724,9 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
                 "points": participant.points,
                 "wins": participant.wins,
                 "top4_finishes": participant.top4_finishes,
+                "games_played": participant.top8_finishes,
                 "top8_finishes": participant.top8_finishes,
+                "eighth_places": getattr(participant, "eighth_places", 0),
                 "status": status,
             })
         playoff_standings.append({"title": stage.title, "participants": rows})
@@ -937,7 +941,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                 "total_points": member.total_points or 0,
                 "first_places": member.first_places or 0,
                 "top2_4_finishes": max((member.top4_finishes or 0) - (member.first_places or 0), 0),
-                "top8_finishes": member.top8_finishes or 0,
+                "eighth_places": member.eighth_places or 0,
             }
             for member in sort_members_for_table(list(group.members))
         ]
@@ -991,7 +995,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                         "total_points": participant.points or 0,
                         "first_places": participant.wins or 0,
                         "top2_4_finishes": max((participant.top4_finishes or 0) - (participant.wins or 0), 0),
-                        "top8_finishes": participant.top8_finishes or 0,
+                        "eighth_places": getattr(participant, "eighth_places", 0) or 0,
                         "group_number": group_number,
                         "group_label": get_stage_group_label(stage.key, group_number),
                     }
