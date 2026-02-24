@@ -4,6 +4,9 @@
 {% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}{% if request.query_params.get('details') %}: <span class="small">{{ request.query_params.get('details') }}</span>{% endif %}</div>{% endif %}
 <div class="d-flex justify-content-end align-items-center gap-2 mb-3">
   <a class="btn btn-sm btn-outline-info" href="/admin/users">Список участников</a>
+  <a class="btn btn-sm btn-outline-info" href="/admin/chat">Чат</a>
+  <a class="btn btn-sm btn-outline-info" href="/admin/content">Блоки контента</a>
+  <a class="btn btn-sm btn-outline-info" href="/admin/emergency">Аварийные действия</a>
   <a class="btn btn-sm btn-outline-primary" href="/participants" target="_blank">Публичный список</a>
   <a class="btn btn-sm btn-outline-warning" href="/tournament" target="_blank">Турнирная страница</a>
   <a class="btn btn-sm btn-outline-light" href="/admin/logout">{{ tr('admin_logout') }}</a>
@@ -37,130 +40,13 @@
     <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
       <h4>Ссылка входа для судей</h4>
       <p class="small text-contrast-muted">Одноразовая подписанная ссылка. Сгенерируйте заново, если есть риск утечки.</p>
-      <input class="form-control" type="text" readonly value="{{ judge_login_url }}" onclick="this.select()">
+      <form action="/admin/judge-link/regenerate" method="post" class="mb-2">
+        <button class="btn btn-sm btn-outline-warning">Сгенерировать новую ссылку</button>
+      </form>
+      <input class="form-control" type="text" readonly value="{{ judge_login_url or 'Ссылка не сгенерирована' }}" onclick="this.select()">
     </div></div>
 
-    <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
-      <h4>{{ tr('admin_stages_editor') }}</h4>
-      <form action="/admin/stage" method="post" class="row g-2">
-        <div class="col-6"><input class="form-control" name="key" placeholder="{{ tr('admin_key') }}"></div>
-        <div class="col-6"><input class="form-control" name="date_text" placeholder="{{ tr('admin_date') }}"></div>
-        <div class="col-6"><input class="form-control" name="title_ru" placeholder="{{ tr('admin_title_ru') }}"></div>
-        <div class="col-6"><input class="form-control" name="title_en" placeholder="{{ tr('admin_title_en') }}"></div>
-        <div class="col-12 form-check"><input class="form-check-input" name="is_active" type="checkbox"><label class="form-check-label">{{ tr('admin_active') }}</label></div>
-        <div class="col-12"><button class="btn btn-primary">{{ tr('admin_save_stage') }}</button></div>
-      </form>
-    </div></div>
-
-    <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
-      <h4>{{ tr('admin_chat_settings') }}</h4>
-      <form action="/admin/chat-settings" method="post" class="row g-2">
-        <div class="col-6"><input class="form-control" type="number" name="cooldown_seconds" min="0" value="{{ chat_settings.cooldown_seconds }}"></div>
-        <div class="col-6"><input class="form-control" type="number" name="max_length" min="1" value="{{ chat_settings.max_length }}"></div>
-        <div class="col-12 form-check"><input class="form-check-input" name="is_enabled" type="checkbox" {% if chat_settings.is_enabled %}checked{% endif %}><label class="form-check-label">{{ tr('admin_chat_enabled') }}</label></div>
-        <div class="col-12"><button class="btn btn-primary">{{ tr('admin_save_chat_settings') }}</button></div>
-      </form>
-      <hr>
-      <h5>{{ tr('admin_chat_send_as_admin') }}</h5>
-      <form action="/admin/chat/send" method="post" class="row g-2">
-        <div class="col-12"><textarea class="form-control" name="message" rows="3" maxlength="{{ chat_settings.max_length }}" placeholder="{{ tr('admin_chat_admin_message_placeholder') }}" required></textarea></div>
-        <div class="col-12"><button class="btn btn-outline-warning">{{ tr('admin_chat_send') }}</button></div>
-      </form>
-    </div></div>
-
-
-
-    <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
-      <h4>{{ tr('admin_chat_messages') }}</h4>
-      <div class="table-responsive">
-        <table class="table table-dark table-sm align-middle">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>{{ tr('index_temp_nick') }}</th>
-              <th>{{ tr('index_message') }}</th>
-              <th>{{ tr('admin_date') }}</th>
-              <th>{{ tr('admin_actions') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for chat_message in chat_messages %}
-            <tr>
-              <td>{{ chat_message.id }}</td>
-              <td><input class="form-control form-control-sm" form="chat-message-update-{{ chat_message.id }}" name="temp_nick" value="{{ chat_message.temp_nick }}" maxlength="120" required></td>
-              <td><textarea class="form-control form-control-sm" form="chat-message-update-{{ chat_message.id }}" name="message" rows="2" maxlength="{{ chat_settings.max_length }}" required>{{ chat_message.message }}</textarea></td>
-              <td>{{ chat_message.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-              <td>
-                <form id="chat-message-update-{{ chat_message.id }}" action="/admin/chat/message/update" method="post" class="d-inline">
-                  <input type="hidden" name="message_id" value="{{ chat_message.id }}">
-                </form>
-                <form id="chat-message-delete-{{ chat_message.id }}" action="/admin/chat/message/delete" method="post" class="d-inline">
-                  <input type="hidden" name="message_id" value="{{ chat_message.id }}">
-                </form>
-                <div class="d-flex gap-1">
-                  <button class="btn btn-sm btn-outline-info" form="chat-message-update-{{ chat_message.id }}">{{ tr('admin_save') }}</button>
-                  <button class="btn btn-sm btn-outline-danger" form="chat-message-delete-{{ chat_message.id }}">{{ tr('admin_delete') }}</button>
-                </div>
-              </td>
-            </tr>
-            {% else %}
-            <tr>
-              <td colspan="5" class="text-center text-contrast-muted">{{ tr('admin_chat_messages_empty') }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div></div>
-
-    <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
-      <h4>{{ tr('admin_rules_content') }}</h4>
-      <form action="/admin/rules" method="post">
-        <textarea class="form-control mb-2" name="body" rows="8" placeholder="{{ tr('admin_rules_text') }}">{{ rules_content.body }}</textarea>
-        <button class="btn btn-primary">{{ tr('admin_save_rules') }}</button>
-      </form>
-    </div></div>
-  </div>
-  <div class="col-lg-8">
-    <div class="card bg-black neon-border-red"><div class="card-body">
-      <h4>{{ tr('admin_content_blocks') }}</h4>
-      <p class="small text-contrast-muted mb-2">{{ tr('donate_links') }}: <code>title|url|active(1/0)</code></p>
-      <form action="/admin/donation-links" method="post" class="mb-3">
-        <textarea class="form-control" name="items" rows="4">{% for row in donation_links %}{{ row.title }}|{{ row.url }}|{{ 1 if row.is_active else 0 }}{% if not loop.last %}
-{% endif %}{% endfor %}</textarea>
-        <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_links') }}</button>
-      </form>
-
-      <p class="small text-contrast-muted mb-2">{{ tr('admin_save_donation_methods') }}: <code>card/crypto|label|details|active(1/0)</code></p>
-      <form action="/admin/donation-methods" method="post" class="mb-3">
-        <textarea class="form-control" name="items" rows="4">{% for row in donation_methods %}{{ row.method_type }}|{{ row.label }}|{{ row.details }}|{{ 1 if row.is_active else 0 }}{% if not loop.last %}
-{% endif %}{% endfor %}</textarea>
-        <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_methods') }}</button>
-      </form>
-
-      <p class="small text-contrast-muted mb-2">{{ tr('donate_prize_pool') }}: <code>place|reward</code></p>
-      <form action="/admin/prize-pool" method="post" class="mb-3">
-        <textarea class="form-control" name="items" rows="4">{% for row in prize_pool_entries %}{{ row.place_label }}|{{ row.reward }}{% if not loop.last %}
-{% endif %}{% endfor %}</textarea>
-        <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_prize_pool') }}</button>
-      </form>
-
-      <p class="small text-contrast-muted mb-2">{{ tr('donate_donors') }}: <code>name|amount|message</code></p>
-      <form action="/admin/donors" method="post" class="mb-3">
-        <textarea class="form-control" name="items" rows="4">{% for row in donors %}{{ row.name }}|{{ row.amount }}|{{ row.message }}{% if not loop.last %}
-{% endif %}{% endfor %}</textarea>
-        <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donors') }}</button>
-      </form>
-
-      <p class="small text-contrast-muted mb-2">{{ tr('archive_title') }}: <code>title|season|summary|url|champion|bracket_json|published(1/0)</code></p>
-      <form action="/admin/archive" method="post" class="mb-3">
-        <textarea class="form-control" name="items" rows="4">{% for row in archive_entries %}{{ row.title }}|{{ row.season }}|{{ row.summary }}|{{ row.link_url }}|{{ row.champion_name }}|{{ row.bracket_payload }}|{{ 1 if row.is_published else 0 }}{% if not loop.last %}
-{% endif %}{% endfor %}</textarea>
-        <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_archive') }}</button>
-      </form>
-    </div></div>
-
-    <div class="card bg-black neon-border-red mt-4"><div class="card-body">
+                <div class="card bg-black neon-border-red mt-4"><div class="card-body">
       <h4>{{ tr('admin_draw_controls') }}</h4>
       <form action="/admin/draw/auto" method="post" class="mb-3">
         <button class="btn btn-danger">{{ tr('admin_auto_draw') }}</button>
@@ -179,29 +65,7 @@
         <div class="col-md-2"><button class="btn btn-outline-danger w-100">Manual draw</button></div>
       </form>
 
-      <h5 class="mt-3">{{ tr('admin_group_manual_controls') }}</h5>
-      <form action="/admin/group/create" method="post" class="row g-2 mb-3">
-        <div class="col-md-6"><input class="form-control" name="name" placeholder="{{ tr('admin_group_name_placeholder') }}" required></div>
-        <div class="col-md-3"><input class="form-control" name="lobby_password" placeholder="{{ tr('admin_password_placeholder') }}" value="0000"></div>
-        <div class="col-md-3"><button class="btn btn-outline-info w-100">{{ tr('admin_create_group') }}</button></div>
-      </form>
-
-      <form action="/admin/group/member/move" method="post" class="row g-2 mb-2">
-        <div class="col-md-4"><select class="form-select" name="from_group_id" required>{% for g in groups %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}</select></div>
-        <div class="col-md-4"><select class="form-select" name="to_group_id" required>{% for g in groups %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}</select></div>
-        <div class="col-md-4"><select class="form-select" name="user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
-        <div class="col-12"><button class="btn btn-outline-warning w-100">{{ tr('admin_move') }}</button></div>
-      </form>
-
-      <form action="/admin/group/member/swap" method="post" class="row g-2 mb-3">
-        <div class="col-md-3"><select class="form-select" name="first_group_id" required>{% for g in groups %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}</select></div>
-        <div class="col-md-3"><select class="form-select" name="first_user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
-        <div class="col-md-3"><select class="form-select" name="second_group_id" required>{% for g in groups %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}</select></div>
-        <div class="col-md-3"><select class="form-select" name="second_user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
-        <div class="col-12"><button class="btn btn-outline-light">Поменять местами</button></div>
-      </form>
-
-      <div class="d-flex flex-column gap-2 mb-3">
+            <div class="d-flex flex-column gap-2 mb-3">
         <div>
           <span class="badge {% if draw_applied %}bg-success{% else %}bg-warning text-dark{% endif %}">
             {% if draw_applied %}Жеребьевка применена{% else %}Жеребьевка не применена{% endif %}
@@ -215,10 +79,6 @@
         </form>
       </div>
 
-      <form action="/admin/playoff/generate" method="post" class="mb-3">
-        <button class="btn btn-outline-warning" {% if not tournament_started %}disabled{% endif %}>{{ tr('admin_generate_playoff') }}</button>
-        <div class="small text-muted mt-1">{{ tr('admin_generate_playoff_help') }}</div>
-      </form>
 
       {% set has_playoff_stages = playoff_stages|length > 0 %}
       <h5 class="mt-3">{{ tr('admin_playoff_stage_management') }}</h5>
@@ -293,39 +153,15 @@
           </div>
           <button class="btn btn-success btn-sm">{{ tr('admin_save_playoff_places') }}</button>
         </form>
+        <form action="/admin/playoff/group/finish" method="post" class="mb-3">
+          <input type="hidden" name="stage_id" value="{{ stage.id }}">
+          <input type="hidden" name="group_number" value="{{ group.group_number }}">
+          <button class="btn btn-outline-success btn-sm">Закончить этап, определить победителей по очкам</button>
+        </form>
         {% endfor %}
       </div>
       {% endfor %}
 
-      <details class="mt-3">
-        <summary class="text-warning">{{ tr('admin_advanced_actions_title') }}</summary>
-        <div class="alert alert-warning mt-2 mb-2">{{ tr('admin_advanced_actions_warning') }}</div>
-        <form action="/admin/playoff/move" method="post" class="row g-2 mb-2">
-          <div class="col-md-4"><select class="form-select" name="from_stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
-          <div class="col-md-4"><select class="form-select" name="to_stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
-          <div class="col-md-4"><select class="form-select" name="user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
-          <div class="col-md-3"><button class="btn btn-outline-warning w-100" {% if not has_playoff_stages %}disabled{% endif %}>{{ tr('admin_manual_transfer') }}</button></div>
-        </form>
-        <form action="/admin/playoff/replace" method="post" class="row g-2 mb-2">
-          <div class="col-md-4"><select class="form-select" name="stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
-          <div class="col-md-4"><select class="form-select" name="from_user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
-          <div class="col-md-4"><select class="form-select" name="to_user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
-          <div class="col-md-3"><button class="btn btn-outline-danger w-100" {% if not has_playoff_stages %}disabled{% endif %}>{{ tr('admin_replace_participant') }}</button></div>
-        </form>
-        <form action="/admin/playoff/points" method="post" class="row g-2 mb-2">
-          <div class="col-md-4"><select class="form-select" name="stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
-          <div class="col-md-4"><select class="form-select" name="user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
-          <div class="col-md-3"><input class="form-control" type="number" name="points_delta" placeholder="{{ tr('admin_points_delta') }}" required></div>
-          <div class="col-md-3"><button class="btn btn-outline-secondary w-100" {% if not has_playoff_stages %}disabled{% endif %}>{{ tr('admin_adjust_points') }}</button></div>
-        </form>
-        <form action="/admin/playoff/override" method="post" class="row g-2 mb-3">
-          <div class="col-md-4"><select class="form-select" name="stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
-          <div class="col-md-2"><input class="form-control" type="number" name="group_number" value="1" required></div>
-          <div class="col-md-4"><select class="form-select" name="winner_user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
-          <div class="col-md-3"><input class="form-control" name="note" placeholder="{{ tr('admin_override_note') }}"></div>
-          <div class="col-md-2"><button class="btn btn-outline-light w-100" {% if not has_playoff_stages %}disabled{% endif %}>{{ tr('admin_set_winner') }}</button></div>
-        </form>
-      </details>
 
 
       {% if show_group_stage_controls %}

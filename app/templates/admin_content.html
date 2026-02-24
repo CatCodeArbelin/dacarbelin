@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Блоки контента</h2>
+{% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}{% if request.query_params.get('details') %}: <span class="small">{{ request.query_params.get('details') }}</span>{% endif %}</div>{% endif %}
+<div class="d-flex justify-content-end align-items-center gap-2 mb-3">
+  <a class="btn btn-sm btn-outline-secondary" href="/admin">{{ tr('admin_back_to_panel') }}</a>
+  <a class="btn btn-sm btn-outline-light" href="/admin/logout">{{ tr('admin_logout') }}</a>
+</div>
+<div class="card bg-black neon-border-blue mt-4"><div class="card-body">
+  <h4>{{ tr('admin_content_blocks') }}</h4>
+  <h5>{{ tr('admin_rules_content') }}</h5>
+  <form action="/admin/rules" method="post" class="mb-3">
+    <textarea class="form-control mb-2" name="body" rows="8" placeholder="{{ tr('admin_rules_text') }}">{{ rules_content.body }}</textarea>
+    <button class="btn btn-primary">{{ tr('admin_save_rules') }}</button>
+  </form>
+  <p class="small text-contrast-muted mb-2">{{ tr('donate_links') }}: <code>title|url|active(1/0)</code></p>
+  <form action="/admin/donation-links" method="post" class="mb-3"><textarea class="form-control" name="items" rows="4">{% for row in donation_links %}{{ row.title }}|{{ row.url }}|{{ 1 if row.is_active else 0 }}{% if not loop.last %}
+{% endif %}{% endfor %}</textarea><button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_links') }}</button></form>
+  <p class="small text-contrast-muted mb-2">{{ tr('admin_save_donation_methods') }}: <code>card/crypto|label|details|active(1/0)</code></p>
+  <form action="/admin/donation-methods" method="post" class="mb-3"><textarea class="form-control" name="items" rows="4">{% for row in donation_methods %}{{ row.method_type }}|{{ row.label }}|{{ row.details }}|{{ 1 if row.is_active else 0 }}{% if not loop.last %}
+{% endif %}{% endfor %}</textarea><button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_methods') }}</button></form>
+  <p class="small text-contrast-muted mb-2">{{ tr('donate_prize_pool') }}: <code>place|reward</code></p>
+  <form action="/admin/prize-pool" method="post" class="mb-3"><textarea class="form-control" name="items" rows="4">{% for row in prize_pool_entries %}{{ row.place_label }}|{{ row.reward }}{% if not loop.last %}
+{% endif %}{% endfor %}</textarea><button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_prize_pool') }}</button></form>
+  <p class="small text-contrast-muted mb-2">{{ tr('donate_donors') }}: <code>name|amount|message</code></p>
+  <form action="/admin/donors" method="post" class="mb-3"><textarea class="form-control" name="items" rows="4">{% for row in donors %}{{ row.name }}|{{ row.amount }}|{{ row.message }}{% if not loop.last %}
+{% endif %}{% endfor %}</textarea><button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donors') }}</button></form>
+  <p class="small text-contrast-muted mb-2">{{ tr('archive_title') }}: <code>title|season|summary|url|champion|bracket_json|published(1/0)</code></p>
+  <form action="/admin/archive" method="post" class="mb-3"><textarea class="form-control" name="items" rows="4">{% for row in archive_entries %}{{ row.title }}|{{ row.season }}|{{ row.summary }}|{{ row.link_url }}|{{ row.champion_name }}|{{ row.bracket_payload }}|{{ 1 if row.is_published else 0 }}{% if not loop.last %}
+{% endif %}{% endfor %}</textarea><button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_archive') }}</button></form>
+</div></div>
+{% endblock %}
