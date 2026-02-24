@@ -10,8 +10,8 @@ stub_web_router = types.ModuleType("app.routers.web")
 stub_web_router.router = APIRouter()
 sys.modules.setdefault("app.routers.web", stub_web_router)
 
-from app.core.admin_session import create_judge_login_token
 from app.main import app
+import app.main as main_module
 
 
 def test_admin_key_auth_works_for_admin_path_without_trailing_slash() -> None:
@@ -43,15 +43,23 @@ def test_admin_key_auth_redirects_to_login_on_invalid_admin_key() -> None:
     assert response.headers["location"] == "/admin/login?msg=msg_admin_login_failed"
 
 
-def test_judge_token_auth_works_once_then_fails() -> None:
+def test_judge_token_auth_works_once_then_fails(monkeypatch) -> None:
     client = TestClient(app)
-    judge_token = create_judge_login_token()
+    state = {"used": False}
 
-    success_response = client.get(f"/admin?judge_token={judge_token}", follow_redirects=False)
+    async def fake_consume_persisted_judge_token(token: str | None) -> bool:
+        if token != "judge-token" or state["used"]:
+            return False
+        state["used"] = True
+        return True
+
+    monkeypatch.setattr(main_module, "consume_persisted_judge_token", fake_consume_persisted_judge_token)
+
+    success_response = client.get("/admin?judge_token=judge-token", follow_redirects=False)
     assert success_response.status_code == 303
     assert success_response.headers["location"] == "/admin"
 
     client.cookies.clear()
-    replay_response = client.get(f"/admin?judge_token={judge_token}", follow_redirects=False)
+    replay_response = client.get("/admin?judge_token=judge-token", follow_redirects=False)
     assert replay_response.status_code == 303
     assert replay_response.headers["location"] == "/admin/login?msg=msg_admin_login_failed"
