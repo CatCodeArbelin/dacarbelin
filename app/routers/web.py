@@ -60,6 +60,7 @@ from app.services.tournament import (
     swap_group_members,
     adjust_stage_points,
     get_stage_group_number_by_seed,
+    get_stage_group_label,
 )
 
 router = APIRouter()
@@ -454,9 +455,6 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
     user_by_id = {user.id: user for user in users}
     stage_by_key = {stage.key: stage for stage in playoff_stages}
 
-    def _letter(group_number: int) -> str:
-        return chr(ord("A") + max(group_number - 1, 0))
-
     def _normalize_schedule(value: str | None) -> str:
         return (value or "").strip() or "TBD"
 
@@ -471,7 +469,8 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
     for group in groups:
         group_matches_vm.append(
             {
-                "label": f"Group {_letter(int(group.name))}" if str(group.name).isdigit() else f"Group {str(group.name).replace('Group ', '').strip()}",
+                "group_label": get_stage_group_label('stage_1_8', int(group.name)) if str(group.name).isdigit() else str(group.name).replace('Group ', '').strip(),
+                "label": f"Group {get_stage_group_label('stage_1_8', int(group.name))}" if str(group.name).isdigit() else f"Group {str(group.name).replace('Group ', '').strip()}",
                 "game_number": 3 if group.current_game > 3 else group.current_game,
                 "schedule_text": _normalize_schedule(group.schedule_text),
                 "lobby_password": group.lobby_password,
@@ -507,7 +506,8 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
         for match in sorted(stage.matches, key=lambda item: item.group_number):
             matches_vm.append(
                 {
-                    "label": f"Group {_letter(match.group_number)}",
+                    "group_label": get_stage_group_label(stage.key, match.group_number),
+                    "label": f"Group {get_stage_group_label(stage.key, match.group_number)}",
                     "game_number": match.game_number,
                     "schedule_text": _normalize_schedule(match.schedule_text),
                     "lobby_password": match.lobby_password,
@@ -649,6 +649,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                 "points": participant.points,
                 "seed": participant.seed,
                 "group_number": get_stage_group_number_by_seed(participant.seed),
+                "group_label": get_stage_group_label(stage.key, get_stage_group_number_by_seed(participant.seed)),
             }
             for participant in sorted(
                 stage.participants,
@@ -661,12 +662,14 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
         stage.id: [
             {
                 "group_number": group_number,
+                "group_label": get_stage_group_label(stage.key, group_number),
                 "participants": [
                     {
                         "user_id": participant.user_id,
                         "nickname": users_by_id.get(participant.user_id, f"#{participant.user_id}"),
                         "points": participant.points,
                         "group_number": group_number,
+                        "group_label": get_stage_group_label(stage.key, group_number),
                     }
                     for participant in sorted(
                         [
