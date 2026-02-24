@@ -151,14 +151,16 @@ def build_bracket_columns(
         raw_group_name = str(getattr(group, "name", "")).strip()
         fallback_label = str(getattr(group, "id", "?")).strip()
         group_name = raw_group_name or fallback_label
+        current_game = getattr(group, "current_game", 1)
+        state = "completed" if current_game > 3 else ("started" if getattr(group, "is_started", False) else "pending")
         group_matches_vm.append(
             {
                 "group_label": get_stage_group_label("stage_2", int(group_name)) if group_name.isdigit() else group_name.replace("Group ", "").strip(),
-                "game_number": 3 if getattr(group, "current_game", 1) > 3 else getattr(group, "current_game", 1),
+                "game_number": 3 if current_game > 3 else current_game,
                 "schedule_text": _normalize_schedule(getattr(group, "schedule_text", "TBD")),
                 "lobby_password": getattr(group, "lobby_password", "TBD"),
                 "participants": _participants_for_group_members(group.members),
-                "state": "started" if getattr(group, "is_started", False) else "pending",
+                "state": state,
             }
         )
     stage_columns[0]["matches"] = sorted(group_matches_vm, key=lambda item: item["group_label"])

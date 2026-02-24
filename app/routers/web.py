@@ -64,7 +64,6 @@ from app.services.tournament import (
 )
 from app.services.tournament_view import (
     build_bracket_columns,
-    build_group_stage_standings,
     build_playoff_standings,
     resolve_current_stage_label,
 )
@@ -584,7 +583,6 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             )
         ).all()
     )
-    standings = build_group_stage_standings(groups)
     playoff_stages = await get_playoff_stages_with_data(db) if tournament_started else []
 
     direct_invite_ids = list(
@@ -623,7 +621,6 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
         template_context(
             request,
             groups=groups,
-            standings=standings,
             playoff_stages=playoff_stages,
             stage_columns=stage_columns,
             ordered_stage_columns=ordered_stage_columns,
