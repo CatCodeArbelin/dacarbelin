@@ -264,7 +264,11 @@
         <form action="/admin/playoff/results/batch" method="post" class="mb-3">
           <input type="hidden" name="stage_id" value="{{ stage.id }}">
           <input type="hidden" name="group_number" value="{{ group.group_number }}">
-          <div class="small text-contrast-muted mb-2">{{ tr('admin_group') }} {{ group.group_label }}</div>
+          {% if group.game_limit == 'special' %}
+          <div class="small text-contrast-muted mb-2">{{ tr('admin_group') }} {{ group.group_label }} · {{ tr('participants_game') }} {{ group.current_game }}</div>
+          {% else %}
+          <div class="small text-contrast-muted mb-2">{{ tr('admin_group') }} {{ group.group_label }} · {{ tr('participants_game') }} {{ group.current_game }} · Сыграно {{ group.games_played }}/{{ group.game_limit }}</div>
+          {% endif %}
           <div class="table-responsive">
             <table class="table table-dark table-sm align-middle mb-2">
               <thead>

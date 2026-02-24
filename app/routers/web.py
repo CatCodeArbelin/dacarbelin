@@ -689,6 +689,15 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                 "seed": participant.seed,
                 "group_number": get_stage_group_number_by_seed(participant.seed),
                 "group_label": get_stage_group_label(stage.key, get_stage_group_number_by_seed(participant.seed)),
+                "games_played": next(
+                    (
+                        max(match.game_number - 1, 0)
+                        for match in stage.matches
+                        if match.group_number == get_stage_group_number_by_seed(participant.seed)
+                    ),
+                    0,
+                ),
+                "game_limit": 3 if stage.key in {"stage_1_8", "stage_1_4", "stage_semifinal_groups"} else "special",
             }
             for participant in sorted(
                 stage.participants,
@@ -702,6 +711,15 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             {
                 "group_number": group_number,
                 "group_label": get_stage_group_label(stage.key, group_number),
+                "games_played": next(
+                    (max(match.game_number - 1, 0) for match in stage.matches if match.group_number == group_number),
+                    0,
+                ),
+                "current_game": next(
+                    (max(match.game_number, 1) for match in stage.matches if match.group_number == group_number),
+                    1,
+                ),
+                "game_limit": 3 if stage.key in {"stage_1_8", "stage_1_4", "stage_semifinal_groups"} else "special",
                 "participants": [
                     {
                         "user_id": participant.user_id,
