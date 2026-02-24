@@ -10,13 +10,11 @@ stub_web_router = types.ModuleType("app.routers.web")
 stub_web_router.router = APIRouter()
 sys.modules.setdefault("app.routers.web", stub_web_router)
 
+from app.core.admin_session import create_judge_login_token
 from app.main import app
 
 
 def test_admin_key_auth_works_for_admin_path_without_trailing_slash() -> None:
-    """Проверяет позитивный сценарий `test_admin_key_auth_works_for_admin_path_without_trailing_slash`.
-    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
-    Запуск: `pytest tests/test_admin_middleware.py -q` и `pytest tests/test_admin_middleware.py -k "test_admin_key_auth_works_for_admin_path_without_trailing_slash" -q`."""
     client = TestClient(app)
 
     response = client.get("/admin?admin_key=test_admin", follow_redirects=False)
@@ -27,9 +25,6 @@ def test_admin_key_auth_works_for_admin_path_without_trailing_slash() -> None:
 
 
 def test_admin_key_auth_works_for_admin_path_with_trailing_slash() -> None:
-    """Проверяет позитивный сценарий `test_admin_key_auth_works_for_admin_path_with_trailing_slash`.
-    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
-    Запуск: `pytest tests/test_admin_middleware.py -q` и `pytest tests/test_admin_middleware.py -k "test_admin_key_auth_works_for_admin_path_with_trailing_slash" -q`."""
     client = TestClient(app)
 
     response = client.get("/admin/?admin_key=test_admin", follow_redirects=False)
@@ -37,3 +32,26 @@ def test_admin_key_auth_works_for_admin_path_with_trailing_slash() -> None:
     assert response.status_code == 303
     assert response.headers["location"] == "/admin"
     assert "admin_session=" in response.headers.get("set-cookie", "")
+
+
+def test_admin_key_auth_redirects_to_login_on_invalid_admin_key() -> None:
+    client = TestClient(app)
+
+    response = client.get("/admin?admin_key=invalid", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin/login?msg=msg_admin_login_failed"
+
+
+def test_judge_token_auth_works_once_then_fails() -> None:
+    client = TestClient(app)
+    judge_token = create_judge_login_token()
+
+    success_response = client.get(f"/admin?judge_token={judge_token}", follow_redirects=False)
+    assert success_response.status_code == 303
+    assert success_response.headers["location"] == "/admin"
+
+    client.cookies.clear()
+    replay_response = client.get(f"/admin?judge_token={judge_token}", follow_redirects=False)
+    assert replay_response.status_code == 303
+    assert replay_response.headers["location"] == "/admin/login?msg=msg_admin_login_failed"

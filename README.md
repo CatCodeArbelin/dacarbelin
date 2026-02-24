@@ -94,6 +94,7 @@ docker compose logs -f web
 
 Админка:
 - Основной вход: `http://0.0.0.0:8000/admin?admin_key=admin_2026_super_secret`
+- Для судей используйте одноразовую подписанную ссылку из интерфейса `/admin` (без передачи сырого `admin_key`).
 - Резервный вход через форму: `http://0.0.0.0:8000/admin/login`
 
 ### 5) Обновление версии
@@ -151,6 +152,7 @@ python scripts/seed_tournament_56_plus_11.py
 1. В `.env` задайте сложные значения `ADMIN_KEY` и `SECRET_KEY` (не оставляйте `change_me`).
 2. Базовый вход в админку: откройте `http://0.0.0.0:8000/admin?admin_key=YOUR_ADMIN_KEY`.
 3. Если `admin_key` валиден, приложение создаст signed cookie `admin_session` (подпись на базе `SECRET_KEY`) и редиректнет на `/admin` без query-параметра.
-4. Если `admin_key` невалиден и активной сессии нет, доступ к `/admin` будет отклонен.
-5. Запасной путь остаётся доступным: `/admin/login` (POST-форма с `ADMIN_KEY`).
-6. Для завершения сессии используйте `/admin/logout` (доступны GET и POST).
+4. Если `admin_key` невалиден и активной сессии нет, произойдёт редирект на `/admin/login?msg=msg_admin_login_failed`.
+5. Для судей используйте одноразовую подписанную ссылку вида `/admin?judge_token=...`, сгенерированную в админ-панели.
+6. Запасной путь остаётся доступным: `/admin/login` (POST-форма с `ADMIN_KEY`).
+7. Для завершения сессии используйте `/admin/logout` (доступны GET и POST).
