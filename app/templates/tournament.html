@@ -34,7 +34,7 @@
     {% for group in groups %}
     {% set table = standings.get(group.id, []) %}
     {% call stage_ui.stage_panel(group.name) %}
-      {{ stage_ui.stage_standings_table(table, 'total_points', 'first_places') }}
+      {{ stage_ui.stage_standings_table(table, 'total_points', 'first_places', 'games_played') }}
     {% endcall %}
     {% endfor %}
   </div>
@@ -66,7 +66,7 @@
   <div class="row g-3">
   {% for stage in playoff_standings %}
     {% call stage_ui.stage_panel(stage.title, column_class='col-12', card_extra_class='') %}
-      {{ stage_ui.stage_standings_table(stage.participants, 'points', 'wins') }}
+      {{ stage_ui.stage_standings_table(stage.participants, 'points', 'wins', 'games_played') }}
     {% endcall %}
   {% endfor %}
   </div>
