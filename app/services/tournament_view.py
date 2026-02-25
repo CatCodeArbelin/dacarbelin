@@ -12,6 +12,11 @@ from app.services.tournament import (
     playoff_sort_key,
     sort_members_for_table,
 )
+from app.services.tournament_stage_config import (
+    GROUP_STAGE_GAME_LIMIT,
+    get_promote_top_n,
+    is_limited_stage,
+)
 
 
 class GroupStageStandingRow(TypedDict):
@@ -217,7 +222,7 @@ def build_bracket_columns(
         matches_by_group = {match.group_number: match for match in sorted(stage.matches, key=lambda item: item.group_number)}
 
         stage_group_numbers = sorted({*participants_by_group.keys(), *matches_by_group.keys()})
-        if stage.key in {"stage_2", "stage_1_8", "stage_1_4"}:
+        if is_limited_stage(stage.key):
             stage_size = getattr(stage, "stage_size", None) or 0
             if stage_size:
                 stage_group_numbers = list(range(1, max(stage_size // 8, 0) + 1))
@@ -261,11 +266,10 @@ def build_playoff_standings(
         participants_sorted = sorted(stage.participants, key=playoff_sort_key, reverse=True)
         stage_group_done: set[int] = set()
         for match in stage.matches:
-            if stage.key in {"stage_2", "stage_1_8", "stage_1_4"} and match.game_number > 3:
+            if is_limited_stage(stage.key) and match.game_number > GROUP_STAGE_GAME_LIMIT:
                 stage_group_done.add(match.group_number)
 
-        promote_n_by_key = {"stage_2": 4, "stage_1_8": 2, "stage_1_4": 4, "stage_final": 1}
-        promote_n = promote_n_by_key.get(stage.key, 0)
+        promote_n = get_promote_top_n(stage.key)
         by_group_rank: dict[int, dict[int, int]] = {}
         for group_number in {get_stage_group_number_by_seed(p.seed) for p in participants_sorted}:
             group_sorted = [p for p in participants_sorted if get_stage_group_number_by_seed(p.seed) == group_number]

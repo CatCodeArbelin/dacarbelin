@@ -67,6 +67,13 @@ from app.services.tournament_view import (
     resolve_current_stage_label,
 )
 
+from app.services.tournament_stage_config import (
+    GROUP_STAGE_GAME_LIMIT,
+    get_game_limit,
+    get_promote_top_n,
+    is_limited_stage,
+)
+
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
@@ -101,7 +108,7 @@ def get_stage_group_numbers(
         "stage_final": 1,
     }
     groups_count = stage_group_count.get(stage_key)
-    if stage_key in {"stage_2", "stage_1_8", "stage_1_4"}:
+    if is_limited_stage(stage_key):
         size_groups = max((stage_size or 0) // 8, 0)
         if size_groups:
             groups_count = size_groups
@@ -822,7 +829,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                     ),
                     0,
                 ),
-                "game_limit": 3 if stage.key in {"stage_2", "stage_1_8", "stage_1_4"} else "special",
+                "game_limit": get_game_limit(stage.key) or "special",
             }
             for participant in sorted(
                 stage.participants,
@@ -844,7 +851,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                     (max(match.game_number, 1) for match in stage.matches if match.group_number == group_number),
                     1,
                 ),
-                "game_limit": 3 if stage.key in {"stage_2", "stage_1_8", "stage_1_4"} else "special",
+                "game_limit": get_game_limit(stage.key) or "special",
                 "participants": [
                     {
                         "user_id": participant.user_id,
@@ -1555,12 +1562,11 @@ async def admin_finish_playoff_group(
     if not match:
         return redirect_with_admin_msg("msg_operation_failed")
 
-    if stage.key in {"stage_2", "stage_1_8", "stage_1_4"} and match.game_number <= 3:
+    if is_limited_stage(stage.key) and match.game_number <= GROUP_STAGE_GAME_LIMIT:
         return redirect_with_admin_msg("msg_operation_failed", details="group_games_not_completed")
 
     ranked = sorted(group_participants, key=playoff_sort_key, reverse=True)
-    promote_n_by_key = {"stage_2": 4, "stage_1_8": 2, "stage_1_4": 4, "stage_final": 1}
-    promote_n = promote_n_by_key.get(stage.key, 0)
+    promote_n = get_promote_top_n(stage.key)
     promoted_ids = {p.user_id for p in ranked[:promote_n]}
     for participant in group_participants:
         participant.is_eliminated = participant.user_id not in promoted_ids
@@ -1576,8 +1582,8 @@ async def admin_finish_playoff_group(
         if not active_group_match or active_group_match.state != "finished":
             stage_finished = False
             break
-    if stage_finished and stage.key in {"stage_2", "stage_1_8", "stage_1_4"}:
-        top_n = {"stage_2": 4, "stage_1_8": 2, "stage_1_4": 4}[stage.key]
+    if stage_finished and is_limited_stage(stage.key):
+        top_n = get_promote_top_n(stage.key)
         try:
             await promote_top_between_stages(db, stage.id, top_n)
             next_stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.stage_order == stage.stage_order + 1))
