@@ -143,7 +143,7 @@ def build_bracket_columns(
     stage_columns: list[BracketColumnVM] = [
         {"key": "group_stage", "title": "I этап", "matches": []},
         {"key": "stage_2", "title": "II этап (32)", "matches": []},
-        {"key": "stage_1_4", "title": "III этап (16)", "matches": []},
+        {"key": "stage_1_4", "title": "III этап — полуфинальные группы (16)", "matches": []},
         {"key": "stage_final", "title": "Финал (8)", "matches": []},
     ]
 
@@ -261,7 +261,7 @@ def build_playoff_standings(
             if stage.key in {"stage_2", "stage_1_8", "stage_1_4"} and match.game_number > 3:
                 stage_group_done.add(match.group_number)
 
-        promote_n_by_key = {"stage_2": 2, "stage_1_8": 2, "stage_1_4": 4, "stage_final": 1}
+        promote_n_by_key = {"stage_2": 4, "stage_1_8": 2, "stage_1_4": 4, "stage_final": 1}
         promote_n = promote_n_by_key.get(stage.key, 0)
         by_group_rank: dict[int, dict[int, int]] = {}
         for group_number in {get_stage_group_number_by_seed(p.seed) for p in participants_sorted}:
@@ -299,7 +299,7 @@ def resolve_current_stage_label(lang: str, playoff_stages: Sequence[PlayoffStage
         "group_stage": "tournament_stage_group_stage_label",
         "stage_2": "tournament_stage_1_4_label",
         "stage_1_8": "tournament_stage_1_8_label",
-        "stage_1_4": "tournament_stage_1_4_label",
+        "stage_1_4": "tournament_stage_semifinal_groups_label",
         "stage_final": "tournament_stage_final_label",
     }
 

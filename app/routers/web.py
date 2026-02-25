@@ -600,7 +600,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
 
     lang = get_lang(request.cookies.get("lang"))
     current_stage_display = resolve_current_stage_label(lang, playoff_stages, tournament_started)
-    stage_order_keys = ["group_stage", "stage_2", "stage_final"]
+    stage_order_keys = ["group_stage", "stage_2", "stage_1_4", "stage_final"]
     active_key = "group_stage"
     if tournament_started:
         active_playoff = get_active_playoff_stage(playoff_stages)
@@ -1553,7 +1553,7 @@ async def admin_finish_playoff_group(
         return redirect_with_admin_msg("msg_operation_failed", details="group_games_not_completed")
 
     ranked = sorted(group_participants, key=playoff_sort_key, reverse=True)
-    promote_n_by_key = {"stage_2": 2, "stage_1_8": 2, "stage_1_4": 4, "stage_final": 1}
+    promote_n_by_key = {"stage_2": 4, "stage_1_8": 2, "stage_1_4": 4, "stage_final": 1}
     promote_n = promote_n_by_key.get(stage.key, 0)
     promoted_ids = {p.user_id for p in ranked[:promote_n]}
     for participant in group_participants:
@@ -1571,7 +1571,7 @@ async def admin_finish_playoff_group(
             stage_finished = False
             break
     if stage_finished and stage.key in {"stage_2", "stage_1_8", "stage_1_4"}:
-        top_n = {"stage_2": 2, "stage_1_8": 2, "stage_1_4": 4}[stage.key]
+        top_n = {"stage_2": 4, "stage_1_8": 2, "stage_1_4": 4}[stage.key]
         try:
             await promote_top_between_stages(db, stage.id, top_n)
             next_stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.stage_order == stage.stage_order + 1))
