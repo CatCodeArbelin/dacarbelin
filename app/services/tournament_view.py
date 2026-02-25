@@ -139,6 +139,16 @@ def build_bracket_columns(
     user_by_id: Mapping[int, User],
     direct_invite_ids: list[int],
 ) -> list[BracketColumnVM]:
+    def _empty_match(stage_key: str, group_number: int) -> BracketMatchVM:
+        return {
+            "group_label": get_stage_group_label(stage_key, group_number),
+            "game_number": 1,
+            "schedule_text": "TBD",
+            "lobby_password": "TBD",
+            "participants": [],
+            "state": "pending",
+        }
+
     stage_by_key = {stage.key: stage for stage in playoff_stages}
     stage_columns: list[BracketColumnVM] = [
         {"key": "group_stage", "title": "I этап", "matches": []},
@@ -164,6 +174,12 @@ def build_bracket_columns(
                 "state": state,
             }
         )
+    known_group_labels = {match["group_label"] for match in group_matches_vm}
+    for group_number in range(1, 8):
+        label = get_stage_group_label("stage_2", group_number)
+        if label in known_group_labels:
+            continue
+        group_matches_vm.append(_empty_match("stage_2", group_number))
     stage_columns[0]["matches"] = sorted(group_matches_vm, key=lambda item: item["group_label"])
 
     for column in stage_columns[1:]:
@@ -183,31 +199,18 @@ def build_bracket_columns(
                     )
 
                 preview_matches_vm: list[BracketMatchVM] = []
-                for group_number in sorted(participants_by_group):
-                    preview_matches_vm.append(
-                        {
-                            "group_label": get_stage_group_label("stage_2", group_number),
-                            "game_number": 1,
-                            "schedule_text": "TBD",
-                            "lobby_password": "TBD",
-                            "participants": participants_by_group[group_number],
-                            "state": "pending",
-                            "is_preview": True,
-                        }
-                    )
+                for group_number in range(1, 5):
+                    placeholder = _empty_match("stage_2", group_number)
+                    placeholder["participants"] = participants_by_group.get(group_number, [])
+                    placeholder["is_preview"] = True
+                    preview_matches_vm.append(placeholder)
                 column["matches"] = preview_matches_vm
             if column["key"] == "stage_1_4":
-                column["matches"] = [
-                    {
-                        "group_label": get_stage_group_label("stage_1_4", group_number),
-                        "game_number": 1,
-                        "schedule_text": "TBD",
-                        "lobby_password": "TBD",
-                        "participants": [],
-                        "state": "pending",
-                    }
-                    for group_number in range(1, 3)
-                ]
+                column["matches"] = [_empty_match("stage_1_4", group_number) for group_number in range(1, 3)]
+            if column["key"] == "stage_final":
+                placeholder = _empty_match("stage_final", 1)
+                placeholder["group_label"] = "Final"
+                column["matches"] = [placeholder]
             continue
 
         participants_by_group = _participants_for_playoff_members(stage.participants, user_by_id)
