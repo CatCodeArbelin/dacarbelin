@@ -244,6 +244,11 @@ def test_tournament_page_context_contains_expected_keys_when_started(monkeypatch
     assert response.context["stage_columns"] == [{"key": "group_stage"}, {"key": "stage_2"}]
     assert response.context["ordered_stage_columns"] == [{"key": "stage_2"}, {"key": "group_stage"}]
 
+def test_stage_order_constants_match_active_stage_progression_order() -> None:
+    assert web.TOURNAMENT_STAGE_KEYS_ORDER == get_public_stage_display_sequence()
+    assert web.PLAYOFF_STAGE_KEYS_ORDER == get_playoff_stage_sequence_keys()
+
+
 def test_stage_display_order_rotates_active_stage_first() -> None:
     keys = get_public_stage_display_sequence()
     assert web.build_stage_display_order("group_stage", keys) == ["group_stage", "stage_2", "stage_1_4", "stage_final"]
