@@ -7,6 +7,7 @@ from app.models.user import User
 from app.services.i18n import t
 from app.services.tournament import (
     build_stage_2_direct_invite_preview,
+    get_playoff_stage_columns,
     get_stage_group_label,
     get_stage_group_number_by_seed,
     playoff_sort_key,
@@ -155,12 +156,11 @@ def build_bracket_columns(
         }
 
     stage_by_key = {stage.key: stage for stage in playoff_stages}
-    stage_columns: list[BracketColumnVM] = [
-        {"key": "group_stage", "title": "I этап", "matches": []},
-        {"key": "stage_2", "title": "II этап (32)", "matches": []},
-        {"key": "stage_1_4", "title": "III этап — полуфинальные группы (16)", "matches": []},
-        {"key": "stage_final", "title": "Финал (8)", "matches": []},
-    ]
+    stage_columns: list[BracketColumnVM] = [{"key": "group_stage", "title": "I этап", "matches": []}]
+    stage_columns.extend(
+        {"key": stage_key, "title": stage_title, "matches": []}
+        for stage_key, stage_title in get_playoff_stage_columns()
+    )
 
     group_matches_vm: list[BracketMatchVM] = []
     for group in groups:

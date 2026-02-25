@@ -313,9 +313,26 @@ PLAYOFF_STAGE_SEQUENCE = [
     ("stage_1_4", "Stage 3", 16, "standard"),
     ("stage_final", "Final", 8, "final_22_top1"),
 ]
+PLAYOFF_STAGE_COLUMNS = [
+    ("stage_2", "II этап (32)"),
+    ("stage_1_4", "III этап — полуфинальные группы (16)"),
+    ("stage_final", "Финал (8)"),
+]
 FINAL_SCORING_MODE = "final_22_top1"
 DIRECT_INVITE_STAGE_2 = "stage_2"
 STAGE_2_DIRECT_INVITES_LIMIT = 11
+
+
+def get_playoff_stage_sequence_keys() -> list[str]:
+    return [key for key, *_ in PLAYOFF_STAGE_SEQUENCE]
+
+
+def get_public_stage_display_sequence() -> list[str]:
+    return ["group_stage", *get_playoff_stage_sequence_keys()]
+
+
+def get_playoff_stage_columns() -> list[tuple[str, str]]:
+    return list(PLAYOFF_STAGE_COLUMNS)
 
 
 def get_playoff_stage_blueprint(usable_count: int) -> list[tuple[str, str, int, str]]:
@@ -350,11 +367,12 @@ def get_group_count_for_stage(stage_size: int) -> int:
 
 
 def get_promoted_count_for_stage(stage: PlayoffStage) -> int:
-    if stage.key == "stage_2":
-        return 16
-    if stage.key in {"stage_1_8", "stage_1_4"}:
-        return 8
-    return 0
+    promote_top_n = get_promote_top_n(stage.key)
+    if not promote_top_n:
+        return 0
+
+    groups_count = get_group_count_for_stage(stage.stage_size)
+    return groups_count * promote_top_n
 
 
 def get_stage_group_number_by_seed(seed: int) -> int:
