@@ -60,7 +60,7 @@ from app.services.tournament import (
     get_stage_group_number_by_seed,
     get_stage_group_label,
     shuffle_stage_2_participants,
-    simulate_three_random_games_for_limited_stages,
+    simulate_three_random_games_for_stage,
 )
 from app.services.tournament_view import (
     build_bracket_columns,
@@ -1454,9 +1454,15 @@ async def admin_shuffle_stage_2(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/admin/playoff/debug/simulate-3-games")
-async def admin_debug_simulate_three_random_playoff_games(db: AsyncSession = Depends(get_db)):
+async def admin_debug_simulate_three_random_playoff_games(
+    stage_id: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if not await _playoff_stage_exists(db, stage_id):
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
+
     try:
-        await simulate_three_random_games_for_limited_stages(db)
+        await simulate_three_random_games_for_stage(db, stage_id)
         return redirect_with_admin_msg("msg_status_ok", details="debug_simulate_3_games_done")
     except Exception:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed", details="debug_simulate_3_games_failed")

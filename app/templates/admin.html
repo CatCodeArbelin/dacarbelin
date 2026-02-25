@@ -81,14 +81,18 @@
 
       {% if current_playoff_stage %}
       <h5 class="mt-4">Состав активного этапа плей-офф</h5>
-      {% if current_playoff_stage.key == 'stage_2' %}
+      {% set is_limited_playoff_stage = current_playoff_stage.key in ['stage_2', 'stage_1_8', 'stage_1_4'] %}
+      {% if is_limited_playoff_stage %}
       <div class="alert alert-warning py-2">
+        {% if current_playoff_stage.key == 'stage_2' %}
         Пересидирование stage_2 доступно только до старта игр (пока не сыграна ни одна игра).
         <form action="/admin/playoff/stage-2/shuffle" method="post" class="mt-2" onsubmit="return confirm('Перемешать seed 1..32 для stage_2 и переразложить по группам? После старта игр это действие недоступно.');">
           <button class="btn btn-sm btn-outline-warning">Shuffle stage_2 (seed 1..32)</button>
         </form>
-        <form action="/admin/playoff/debug/simulate-3-games" method="post" class="mt-2" onsubmit="return confirm('{{ tr('admin_playoff_debug_simulate_3_games_confirm') }}');">
-          <button class="btn btn-sm btn-outline-danger">{{ tr('admin_playoff_debug_simulate_3_games') }}</button>
+        {% endif %}
+        <form action="/admin/playoff/debug/simulate-3-games" method="post" class="mt-2" onsubmit="return confirm('Симулировать 3 случайные игры для этапа «{{ current_playoff_stage.title }}»?');">
+          <input type="hidden" name="stage_id" value="{{ current_playoff_stage.id }}">
+          <button class="btn btn-sm btn-outline-danger">Симулировать 3 случайные игры ({{ current_playoff_stage.title }})</button>
         </form>
       </div>
       {% endif %}
