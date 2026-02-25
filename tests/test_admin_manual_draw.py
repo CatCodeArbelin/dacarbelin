@@ -309,6 +309,53 @@ def test_admin_group_promote_manual_returns_friendly_error_for_invalid_stage(mon
     assert response.headers["location"] == "/admin?msg=msg_invalid_playoff_stage"
 
 
+
+def test_admin_debug_simulate_three_games_returns_friendly_error_for_invalid_stage(monkeypatch) -> None:
+    """Негативный кейс: invalid stage_id для debug-симуляции плей-офф."""
+
+    async def fake_playoff_stage_exists(db, stage_id: int) -> bool:
+        return False
+
+    monkeypatch.setattr(web, "_playoff_stage_exists", fake_playoff_stage_exists)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/playoff/debug/simulate-3-games",
+            data={"stage_id": "999"},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_invalid_playoff_stage"
+
+
+def test_admin_debug_simulate_three_games_uses_submitted_stage_id(monkeypatch) -> None:
+    """Позитивный кейс: роут передает stage_id в сервис для симуляции конкретной стадии."""
+    captured: dict[str, int] = {}
+
+    async def fake_playoff_stage_exists(db, stage_id: int) -> bool:
+        return True
+
+    async def fake_simulate_three_random_games_for_stage(db, stage_id: int) -> None:
+        captured["stage_id"] = stage_id
+
+    monkeypatch.setattr(web, "_playoff_stage_exists", fake_playoff_stage_exists)
+    monkeypatch.setattr(web, "simulate_three_random_games_for_stage", fake_simulate_three_random_games_for_stage)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/playoff/debug/simulate-3-games",
+            data={"stage_id": "123"},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_status_ok&details=debug_simulate_3_games_done"
+    assert captured == {"stage_id": 123}
+
+
 def test_admin_manual_group_edit_routes_are_unavailable() -> None:
     """Проверяет, что удаленные ручные роуты редактирования групп недоступны."""
     routes = [
