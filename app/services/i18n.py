@@ -168,8 +168,6 @@ TRANSLATIONS = {
         "tournament_pts": "PTS",
         "tournament_wins_short": "W",
         "tournament_top4": "Top4",
-        # TODO(cleanup): unused key after removing group-card promotion hint
-        "tournament_promote_rule": "Promotion rules by stage:",
         "tournament_stage_1_8_label": "Stage I 1/8 (56, 7x8, top-3)",
         "tournament_stage_1_4_label": "Stage II 1/4 (32, 4x8, top-4)",
         "tournament_stage_semifinal_groups_label": "Stage III semifinal groups (16, 2x8, top-4)",
@@ -433,8 +431,6 @@ TRANSLATIONS = {
         "tournament_pts": "Очки",
         "tournament_wins_short": "П1",
         "tournament_top4": "Топ4",
-        # TODO(cleanup): неиспользуемый ключ после удаления подсказки в карточке группы
-        "tournament_promote_rule": "Правила продвижения по этапам:",
         "tournament_stage_1_8_label": "I этап 1/8 (56, 7x8, top-3)",
         "tournament_stage_1_4_label": "II этап 1/4 (32, 4x8, top-4)",
         "tournament_stage_semifinal_groups_label": "III этап полуфинальные группы (16, 2x8, top-4)",
