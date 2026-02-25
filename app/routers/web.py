@@ -186,6 +186,7 @@ def redirect_with_admin_users_msg(msg_key: str, details: str | None = None) -> R
 
 
 async def _playoff_stage_exists(db: AsyncSession, stage_id: int) -> bool:
+    """Проверяет, что этап плей-офф с указанным `stage_id` существует в БД."""
     return await db.scalar(select(PlayoffStage.id).where(PlayoffStage.id == stage_id)) is not None
 
 
@@ -1465,6 +1466,16 @@ async def admin_debug_simulate_three_random_playoff_games(
     stage_id: int = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
+    """Отладочно симулирует 3 случайные игры для каждой полной группы (8 игроков) в этапе плей-офф.
+
+    Поддерживаются только лимитированные стадии плей-офф: ``stage_2``, ``stage_1_8`` и
+    ``stage_1_4``. Для остальных стадий сервисный вызов не вносит изменений.
+
+    Возвращаемые ошибки на уровне редиректа:
+    - ``msg_invalid_playoff_stage`` — если этап с переданным ``stage_id`` не найден;
+    - ``msg_operation_failed`` c ``details=debug_simulate_3_games_failed`` — если во время
+      симуляции произошла ошибка в сервисном слое.
+    """
     if not await _playoff_stage_exists(db, stage_id):
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
 
