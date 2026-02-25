@@ -96,6 +96,20 @@ class PlayoffPromotionTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(new_participant.last_place, 8)
             self.assertFalse(new_participant.is_eliminated)
 
+    async def test_promote_top_between_stages_validates_top_n_by_stage_config(self) -> None:
+        stage = PlayoffStage(id=50, key="stage_1_8", title="Stage 1/8", stage_order=2, stage_size=16)
+        next_stage = PlayoffStage(id=60, key="stage_1_4", title="Stage 1/4", stage_order=3, stage_size=8)
+
+        participants = [
+            PlayoffParticipant(stage_id=50, user_id=user_id, seed=user_id, points=30 - user_id, wins=1, top4_finishes=1, top8_finishes=1, last_place=8)
+            for user_id in range(1, 17)
+        ]
+
+        db = _FakeDB([stage, next_stage], participants)
+
+        with self.assertRaisesRegex(ValueError, "top-2"):
+            await promote_top_between_stages(db, stage_id=50, top_n=4)
+
 
 if __name__ == "__main__":
     unittest.main()

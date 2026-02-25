@@ -16,6 +16,11 @@ from app.models.tournament import (
     TournamentGroup,
 )
 from app.models.user import Basket, User
+from app.services.tournament_stage_config import (
+    GROUP_STAGE_GAME_LIMIT,
+    get_promote_top_n,
+    is_limited_stage,
+)
 
 POINTS_BY_PLACE = {1: 8, 2: 6, 3: 5, 4: 4, 5: 3, 6: 2, 7: 1, 8: 0}
 PRIMARY_BASKETS = [
@@ -309,8 +314,6 @@ PLAYOFF_STAGE_SEQUENCE = [
     ("stage_final", "Final", 8, "final_22_top1"),
 ]
 FINAL_SCORING_MODE = "final_22_top1"
-GROUP_STAGE_GAME_LIMIT = 3
-LIMITED_PLAYOFF_STAGE_KEYS = {"stage_2", "stage_1_8", "stage_1_4"}
 DIRECT_INVITE_STAGE_2 = "stage_2"
 STAGE_2_DIRECT_INVITES_LIMIT = 11
 
@@ -692,7 +695,7 @@ async def apply_playoff_match_results(
     if match.state == "finished":
         raise ValueError("Матч уже завершен")
 
-    if stage.key in LIMITED_PLAYOFF_STAGE_KEYS and match.game_number > GROUP_STAGE_GAME_LIMIT:
+    if is_limited_stage(stage.key) and match.game_number > GROUP_STAGE_GAME_LIMIT:
         raise ValueError(
             f"Для этапа {stage.title} достигнут лимит в {GROUP_STAGE_GAME_LIMIT} игры для группы {group_number}"
         )
@@ -702,7 +705,7 @@ async def apply_playoff_match_results(
 
     match.game_number += 1
     should_finish_limited_stage = (
-        stage.key in LIMITED_PLAYOFF_STAGE_KEYS and match.game_number > GROUP_STAGE_GAME_LIMIT
+        is_limited_stage(stage.key) and match.game_number > GROUP_STAGE_GAME_LIMIT
     )
     should_finish_final_stage = False
 
@@ -728,7 +731,7 @@ async def apply_playoff_match_results(
 
 async def simulate_three_random_games_for_stage(db: AsyncSession, stage_id: int) -> None:
     stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.id == stage_id))
-    if not stage or stage.key not in LIMITED_PLAYOFF_STAGE_KEYS:
+    if not stage or not is_limited_stage(stage.key):
         return
 
     participants = list(
@@ -787,13 +790,8 @@ async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int
     if target_size == 0:
         raise ValueError("Для этого этапа продвижение не поддерживается")
 
-    allowed_top_n_by_stage = {
-        "stage_2": 4,
-        "stage_1_8": 2,
-        "stage_1_4": 4,
-    }
-    allowed_top_n = allowed_top_n_by_stage.get(stage.key)
-    if allowed_top_n is None:
+    allowed_top_n = get_promote_top_n(stage.key)
+    if allowed_top_n == 0:
         raise ValueError("Для этого этапа нельзя выбрать количество продвигаемых из группы")
     if top_n != allowed_top_n:
         raise ValueError(f"Для этапа {stage.title} можно продвинуть только top-{allowed_top_n} из группы")
