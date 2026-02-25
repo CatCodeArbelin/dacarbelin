@@ -82,6 +82,7 @@
       {% if current_playoff_stage %}
       <h5 class="mt-4">Состав активного этапа плей-офф</h5>
       {% set is_limited_playoff_stage = current_playoff_stage.key in ['stage_2', 'stage_1_8', 'stage_1_4'] %}
+      {% set is_final_playoff_stage = current_playoff_stage.key == 'stage_final' %}
       {% if is_limited_playoff_stage %}
       <div class="alert alert-warning py-2">
         {% if current_playoff_stage.key == 'stage_2' %}
@@ -109,6 +110,7 @@
         {% endif %}
       </div>
 
+      {% if is_limited_playoff_stage %}
       <h5 class="mt-4">{{ tr('admin_playoff_match_results') }}</h5>
       <div class="border rounded p-3 mb-3">
         <div class="fw-bold mb-2">{{ current_playoff_stage.title }}</div>
@@ -166,10 +168,74 @@
         {% endfor %}
         </div>
       </div>
+      {% elif is_final_playoff_stage %}
+      {% set final_group = current_stage_groups[0] if current_stage_groups else None %}
+      {% set final_candidate_user_id = current_playoff_stage.final_candidate_user_id %}
+      {% set final_leader = final_group.participants[0] if final_group and final_group.participants else None %}
+      <h5 class="mt-4">Управление финалом (22+ и подтверждение победителя)</h5>
+      <div class="border rounded p-3 mb-3">
+        <div class="fw-bold mb-2">{{ current_playoff_stage.title }}</div>
+        <div class="small text-contrast-muted mb-2">
+          Правило финала: кандидат появляется при 22+ очках, чемпион подтверждается только после отдельного подтверждения победителя.
+        </div>
+        {% if final_group and final_group.participants %}
+        <div class="table-responsive mb-3">
+          <table class="table table-dark table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>{{ tr('participants_nick') }}</th>
+                <th>Pts</th>
+                <th>#1</th>
+                <th>#2-4</th>
+                <th>#8</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for participant in final_group.participants %}
+              <tr {% if participant.user_id == final_candidate_user_id %}class="table-success"{% endif %}>
+                <td>{{ participant.nickname }}</td>
+                <td>{{ participant.points }}</td>
+                <td>{{ participant.first_places }}</td>
+                <td>{{ participant.top2_4_finishes }}</td>
+                <td>{{ participant.eighth_places }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {% if final_candidate_user_id %}
+        <div class="alert alert-success py-2">
+          Кандидат на победу определен. Подтвердите чемпиона кнопкой ниже.
+        </div>
+        {% elif final_leader and final_leader.points >= 22 %}
+        <div class="alert alert-warning py-2">
+          Лидер набрал 22+ очков ({{ final_leader.nickname }}), сыграйте следующую игру, чтобы получить кандидата и подтвердить победителя.
+        </div>
+        {% else %}
+        <div class="alert alert-warning py-2">
+          Кандидат на победу еще не определен: нужно набрать 22+ очков.
+        </div>
+        {% endif %}
+
+        <form action="/admin/playoff/override" method="post" class="row g-2">
+          <input type="hidden" name="stage_id" value="{{ current_playoff_stage.id }}">
+          <input type="hidden" name="group_number" value="1">
+          <div class="col-md-8">
+            <input type="hidden" name="winner_user_id" value="{{ final_candidate_user_id or 0 }}">
+            <input class="form-control" value="{% if final_candidate_user_id %}{% for participant in current_stage_participants if participant.user_id == final_candidate_user_id %}{{ participant.nickname }}{% endfor %}{% else %}Кандидат не определен{% endif %}" disabled>
+          </div>
+          <div class="col-md-4">
+            <button class="btn btn-outline-success w-100" {% if not final_candidate_user_id %}disabled{% endif %}>Подтвердить победителя финала</button>
+          </div>
+        </form>
+      </div>
+      {% endif %}
       {% endif %}
 
 
-      {% if show_group_stage_controls %}
+{% if show_group_stage_controls %}
       <div class="alert {% if group_stage_finish_ready %}alert-success{% else %}alert-warning{% endif %} mb-3">
         <div class="fw-semibold mb-2">
           {% if group_stage_finish_ready %}
