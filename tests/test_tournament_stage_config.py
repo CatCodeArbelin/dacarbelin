@@ -11,6 +11,7 @@ from app.services.tournament_stage_config import (
     get_promote_top_n,
     is_limited_stage,
 )
+from app.services.tournament import get_playoff_stage_columns, get_playoff_stage_sequence_keys, get_public_stage_display_sequence
 from app.services.tournament_view import build_playoff_standings
 
 
@@ -38,6 +39,15 @@ class TournamentStageConfigTests(unittest.TestCase):
         self.assertEqual(get_promote_top_n("stage_1_8"), 2)
         self.assertEqual(get_promote_top_n("stage_1_4"), 4)
         self.assertEqual(get_promote_top_n("stage_final"), 1)
+
+
+    def test_stage_sequence_is_shared_across_service_and_view_layers(self) -> None:
+        self.assertEqual(get_playoff_stage_sequence_keys(), ["stage_2", "stage_1_4", "stage_final"])
+        self.assertEqual(
+            [stage_key for stage_key, _ in get_playoff_stage_columns()],
+            get_playoff_stage_sequence_keys(),
+        )
+        self.assertEqual(get_public_stage_display_sequence(), ["group_stage", *get_playoff_stage_sequence_keys()])
 
     def test_build_playoff_standings_marks_status_by_configured_limits_and_promotion(self) -> None:
         stage = PlayoffStage(

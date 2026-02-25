@@ -15,6 +15,8 @@ from app.services.tournament import (
     get_stage_group_number_by_seed,
     get_group_count_for_stage,
     get_playoff_stage_blueprint,
+    get_playoff_stage_sequence_keys,
+    get_public_stage_display_sequence,
     parse_manual_draw_user_ids,
 )
 from app.services.tournament_view import build_bracket_columns, resolve_current_stage_label
@@ -133,7 +135,6 @@ class TournamentWorkflowTests(unittest.TestCase):
         stage_cases = [
             ("group_stage", "tournament_stage_group_stage_label"),
             ("stage_2", "tournament_stage_1_4_label"),
-            ("stage_1_8", "tournament_stage_1_8_label"),
             ("stage_1_4", "tournament_stage_semifinal_groups_label"),
             ("stage_final", "tournament_stage_final_label"),
         ]
@@ -227,16 +228,12 @@ def test_tournament_page_context_contains_expected_keys_when_started(monkeypatch
     def fake_build_bracket_columns(groups, playoff_stages, user_by_id, direct_invite_ids):
         return [{"key": "group_stage"}, {"key": "stage_2"}]
 
-    def fake_build_playoff_standings(playoff_stages, user_by_id):
-        return [{"stage_key": "stage_2", "rows": []}]
-
     def fake_template_response(request, template_name, context):
         return _CaptureResponse(context)
 
     monkeypatch.setattr(web, "get_tournament_started", fake_get_tournament_started)
     monkeypatch.setattr(web, "get_playoff_stages_with_data", fake_get_playoff_stages_with_data)
     monkeypatch.setattr(web, "build_bracket_columns", fake_build_bracket_columns)
-    monkeypatch.setattr(web, "build_playoff_standings", fake_build_playoff_standings)
     monkeypatch.setattr(web.templates, "TemplateResponse", fake_template_response)
 
     request = SimpleNamespace(cookies={})
@@ -246,10 +243,9 @@ def test_tournament_page_context_contains_expected_keys_when_started(monkeypatch
     assert response.context["playoff_stages"][0].key == "stage_2"
     assert response.context["stage_columns"] == [{"key": "group_stage"}, {"key": "stage_2"}]
     assert response.context["ordered_stage_columns"] == [{"key": "stage_2"}, {"key": "group_stage"}]
-    assert response.context["playoff_standings"] == [{"stage_key": "stage_2", "rows": []}]
 
 def test_stage_display_order_rotates_active_stage_first() -> None:
-    keys = ["group_stage", "stage_2", "stage_1_4", "stage_final"]
+    keys = get_public_stage_display_sequence()
     assert web.build_stage_display_order("group_stage", keys) == ["group_stage", "stage_2", "stage_1_4", "stage_final"]
     assert web.build_stage_display_order("stage_2", keys) == ["stage_2", "stage_1_4", "stage_final", "group_stage"]
     assert web.build_stage_display_order("stage_final", keys) == ["stage_final", "stage_1_4", "stage_2", "group_stage"]
@@ -527,3 +523,18 @@ def test_admin_auto_apply_start_then_group_score_flow(monkeypatch) -> None:
     assert state["apply_game_results_called"] is True
     assert tournament_started_setting.value == "1"
     assert registration_open_setting.value == "0"
+
+
+def test_stage_sequences_are_identical_between_service_view_and_web() -> None:
+    playoff_keys = get_playoff_stage_sequence_keys()
+    assert playoff_keys == [stage[0] for stage in get_playoff_stage_blueprint(32)]
+
+    columns = build_bracket_columns(groups=[], playoff_stages=[], user_by_id={}, direct_invite_ids=[])
+    assert [column["key"] for column in columns] == get_public_stage_display_sequence()
+
+    ordered_keys = web.build_stage_display_order("group_stage", get_public_stage_display_sequence())
+    assert ordered_keys == get_public_stage_display_sequence()
+
+
+def test_admin_progression_uses_service_playoff_stage_sequence() -> None:
+    assert get_playoff_stage_sequence_keys() == ["stage_2", "stage_1_4", "stage_final"]
