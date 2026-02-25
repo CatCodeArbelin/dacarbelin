@@ -11,8 +11,10 @@ def test_admin_template_has_playoff_hint_without_manual_stage_controls() -> None
     assert "admin_playoff_stages_empty_hint_steps" in template
     assert "Закончить этап, определить победителей по очкам" in template
     assert "/admin/playoff/group/finish" in template
-    assert "is_limited_playoff_stage = current_playoff_stage.key in ['stage_2', 'stage_1_8', 'stage_1_4']" in template
-    assert "is_final_playoff_stage = current_playoff_stage.key == 'stage_final'" in template
+    assert "current_playoff_stage_config.game_limit" in template
+    assert "current_playoff_stage_config.is_final" in template
+    assert "current_playoff_stage_config.can_shuffle" in template
+    assert "current_playoff_stage_config.can_debug_simulate" in template
     assert "Управление финалом (22+ и подтверждение победителя)" in template
     assert "Подтвердить победителя финала" in template
     assert "Кандидат на победу" in template
