@@ -81,20 +81,20 @@
 
       {% if current_playoff_stage %}
       <h5 class="mt-4">Состав активного этапа плей-офф</h5>
-      {% set is_limited_playoff_stage = current_playoff_stage.key in ['stage_2', 'stage_1_8', 'stage_1_4'] %}
-      {% set is_final_playoff_stage = current_playoff_stage.key == 'stage_final' %}
-      {% if is_limited_playoff_stage %}
+      {% if current_playoff_stage_config.game_limit %}
       <div class="alert alert-warning py-2">
-        {% if current_playoff_stage.key == 'stage_2' %}
+        {% if current_playoff_stage_config.can_shuffle %}
         Пересидирование stage_2 доступно только до старта игр (пока не сыграна ни одна игра).
         <form action="/admin/playoff/stage-2/shuffle" method="post" class="mt-2" onsubmit="return confirm('Перемешать seed 1..32 для stage_2 и переразложить по группам? После старта игр это действие недоступно.');">
           <button class="btn btn-sm btn-outline-warning">Shuffle stage_2 (seed 1..32)</button>
         </form>
         {% endif %}
+{% if current_playoff_stage_config.can_debug_simulate %}
         <form action="/admin/playoff/debug/simulate-3-games" method="post" class="mt-2" onsubmit="return confirm('Симулировать 3 случайные игры для этапа «{{ current_playoff_stage.title }}»?');">
           <input type="hidden" name="stage_id" value="{{ current_playoff_stage.id }}">
           <button class="btn btn-sm btn-outline-danger">Симулировать 3 случайные игры ({{ current_playoff_stage.title }})</button>
         </form>
+        {% endif %}
       </div>
       {% endif %}
       <div class="border rounded p-3 mb-2">
@@ -110,7 +110,7 @@
         {% endif %}
       </div>
 
-      {% if is_limited_playoff_stage %}
+      {% if current_playoff_stage_config.game_limit %}
       <h5 class="mt-4">{{ tr('admin_playoff_match_results') }}</h5>
       <div class="border rounded p-3 mb-3">
         <div class="fw-bold mb-2">{{ current_playoff_stage.title }}</div>
@@ -168,7 +168,7 @@
         {% endfor %}
         </div>
       </div>
-      {% elif is_final_playoff_stage %}
+      {% elif current_playoff_stage_config.is_final %}
       {% set final_group = current_stage_groups[0] if current_stage_groups else None %}
       {% set final_candidate_user_id = current_playoff_stage.final_candidate_user_id %}
       {% set final_leader = final_group.participants[0] if final_group and final_group.participants else None %}
