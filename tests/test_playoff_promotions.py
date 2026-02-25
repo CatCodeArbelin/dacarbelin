@@ -39,9 +39,9 @@ class _FakeDB:
 
 
 class PlayoffPromotionTests(unittest.IsolatedAsyncioTestCase):
-    async def test_stage_2_to_stage_1_8_uses_only_top_n_plus_fill_from_current_stage(self) -> None:
+    async def test_stage_2_to_stage_3_uses_top4_per_group_and_fills_to_16(self) -> None:
         stage = PlayoffStage(id=10, key="stage_2", title="Stage 2", stage_order=1, stage_size=32)
-        next_stage = PlayoffStage(id=20, key="stage_1_8", title="Stage 1/8", stage_order=2, stage_size=16)
+        next_stage = PlayoffStage(id=20, key="stage_1_4", title="Stage 3", stage_order=2, stage_size=16)
 
         participants = [
             PlayoffParticipant(stage_id=10, user_id=1, seed=1, points=50, wins=3, top4_finishes=3, top8_finishes=3, last_place=8),
@@ -64,12 +64,11 @@ class PlayoffPromotionTests(unittest.IsolatedAsyncioTestCase):
 
         db = _FakeDB([stage, next_stage], participants)
 
-        await promote_top_between_stages(db, stage_id=10, top_n=2)
+        await promote_top_between_stages(db, stage_id=10, top_n=4)
 
         promoted_user_ids = [participant.user_id for participant in db.added]
-        self.assertEqual(len(promoted_user_ids), 8)
-        self.assertEqual(promoted_user_ids[:4], [1, 2, 9, 10])
-        self.assertEqual(promoted_user_ids[4:], [3, 4, 5, 6])
+        self.assertEqual(len(promoted_user_ids), 16)
+        self.assertEqual(promoted_user_ids[:8], [1, 2, 3, 4, 9, 10, 11, 12])
         self.assertTrue(set(promoted_user_ids).issubset({participant.user_id for participant in participants}))
         self.assertEqual(db.executed, 1)
         self.assertEqual(db.commits, 1)

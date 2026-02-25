@@ -57,11 +57,12 @@ class TournamentWorkflowTests(unittest.TestCase):
             [stage[0] for stage in stages_32],
             [
                 "stage_2",
+                "stage_1_4",
                 "stage_final",
             ],
         )
-        self.assertEqual([stage[2] for stage in stages_32], [32, 8])
-        self.assertEqual([stage[3] for stage in stages_32], ["standard", "final_22_top1"])
+        self.assertEqual([stage[2] for stage in stages_32], [32, 16, 8])
+        self.assertEqual([stage[3] for stage in stages_32], ["standard", "standard", "final_22_top1"])
 
         stages_16 = get_playoff_stage_blueprint(16)
         self.assertEqual(stages_16, [])
@@ -133,7 +134,7 @@ class TournamentWorkflowTests(unittest.TestCase):
             ("group_stage", "tournament_stage_group_stage_label"),
             ("stage_2", "tournament_stage_1_4_label"),
             ("stage_1_8", "tournament_stage_1_8_label"),
-            ("stage_1_4", "tournament_stage_1_4_label"),
+            ("stage_1_4", "tournament_stage_semifinal_groups_label"),
             ("stage_final", "tournament_stage_final_label"),
         ]
 
@@ -248,10 +249,10 @@ def test_tournament_page_context_contains_expected_keys_when_started(monkeypatch
     assert response.context["playoff_standings"] == [{"stage_key": "stage_2", "rows": []}]
 
 def test_stage_display_order_rotates_active_stage_first() -> None:
-    keys = ["group_stage", "stage_2", "stage_final"]
-    assert web.build_stage_display_order("group_stage", keys) == ["group_stage", "stage_2", "stage_final"]
-    assert web.build_stage_display_order("stage_2", keys) == ["stage_2", "stage_final", "group_stage"]
-    assert web.build_stage_display_order("stage_final", keys) == ["stage_final", "stage_2", "group_stage"]
+    keys = ["group_stage", "stage_2", "stage_1_4", "stage_final"]
+    assert web.build_stage_display_order("group_stage", keys) == ["group_stage", "stage_2", "stage_1_4", "stage_final"]
+    assert web.build_stage_display_order("stage_2", keys) == ["stage_2", "stage_1_4", "stage_final", "group_stage"]
+    assert web.build_stage_display_order("stage_final", keys) == ["stage_final", "stage_1_4", "stage_2", "group_stage"]
 
 
 def test_get_stage_group_numbers_limits_stage_2_to_real_groups() -> None:

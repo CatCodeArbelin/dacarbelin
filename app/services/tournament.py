@@ -305,6 +305,7 @@ async def apply_game_results(db: AsyncSession, group_id: int, ordered_user_ids: 
 
 PLAYOFF_STAGE_SEQUENCE = [
     ("stage_2", "Stage 2", 32, "standard"),
+    ("stage_1_4", "Stage 3", 16, "standard"),
     ("stage_final", "Final", 8, "final_22_top1"),
 ]
 FINAL_SCORING_MODE = "final_22_top1"
@@ -346,7 +347,9 @@ def get_group_count_for_stage(stage_size: int) -> int:
 
 
 def get_promoted_count_for_stage(stage: PlayoffStage) -> int:
-    if stage.key in {"stage_2", "stage_1_8", "stage_1_4"}:
+    if stage.key == "stage_2":
+        return 16
+    if stage.key in {"stage_1_8", "stage_1_4"}:
         return 8
     return 0
 
@@ -792,8 +795,9 @@ async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int
         raise ValueError("Для этого этапа продвижение не поддерживается")
 
     allowed_top_n_by_stage = {
-        "stage_2": 2,
+        "stage_2": 4,
         "stage_1_8": 2,
+        "stage_1_4": 4,
     }
     allowed_top_n = allowed_top_n_by_stage.get(stage.key)
     if allowed_top_n is None:
