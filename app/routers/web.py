@@ -84,6 +84,8 @@ ALLOWED_USER_UPDATE_FIELDS = {"nickname", "basket", "direct_invite_stage"}
 ALLOWED_DIRECT_INVITE_STAGES = {None, *get_playoff_stage_sequence_keys(), "stage_1_8"}
 TOURNAMENT_STAGE_KEYS_ORDER = get_public_stage_display_sequence()
 PLAYOFF_STAGE_KEYS_ORDER = TOURNAMENT_STAGE_KEYS_ORDER[1:]
+LIMITED_ADMIN_PLAYOFF_STAGE_KEYS = {"stage_2", "stage_1_8", "stage_1_4"}
+FINAL_ADMIN_PLAYOFF_STAGE_KEY = "stage_final"
 
 CHAT_NICK_COLORS = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff66c4", "#5ce1e6", "#f48c06", "#90be6d", "#4cc9f0"]
 FORBIDDEN_CHAT_NICKS = {"@admin"}
@@ -199,6 +201,10 @@ def redirect_with_admin_users_msg(msg_key: str, details: str | None = None) -> R
 async def _playoff_stage_exists(db: AsyncSession, stage_id: int) -> bool:
     """Проверяет, что этап плей-офф с указанным `stage_id` существует в БД."""
     return await db.scalar(select(PlayoffStage.id).where(PlayoffStage.id == stage_id)) is not None
+
+
+async def _get_playoff_stage(db: AsyncSession, stage_id: int) -> PlayoffStage | None:
+    return await db.scalar(select(PlayoffStage).where(PlayoffStage.id == stage_id))
 
 
 async def get_registration_open(db: AsyncSession) -> bool:
@@ -1487,8 +1493,11 @@ async def admin_debug_simulate_three_random_playoff_games(
     - ``msg_operation_failed`` c ``details=debug_simulate_3_games_failed`` — если во время
       симуляции произошла ошибка в сервисном слое.
     """
-    if not await _playoff_stage_exists(db, stage_id):
+    stage = await _get_playoff_stage(db, stage_id)
+    if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
+    if stage.key not in LIMITED_ADMIN_PLAYOFF_STAGE_KEYS:
+        return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
 
     try:
         await simulate_three_random_games_for_stage(db, stage_id)
@@ -1552,8 +1561,11 @@ async def admin_playoff_score(
     placements_list: list[str] | None = Form(default=None, alias="placements[]"),
     db: AsyncSession = Depends(get_db),
 ):
-    if not await _playoff_stage_exists(db, stage_id):
+    stage = await _get_playoff_stage(db, stage_id)
+    if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
+    if stage.key not in LIMITED_ADMIN_PLAYOFF_STAGE_KEYS:
+        return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
     try:
         if placements_list:
             ordered_user_ids = [int(part) for part in placements_list]
@@ -1571,9 +1583,11 @@ async def admin_finish_playoff_group(
     group_number: int = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.id == stage_id))
+    stage = await _get_playoff_stage(db, stage_id)
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
+    if stage.key not in LIMITED_ADMIN_PLAYOFF_STAGE_KEYS:
+        return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
 
     participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))).all())
     group_participants = [p for p in participants if get_stage_group_number_by_seed(p.seed) == group_number]
@@ -1625,8 +1639,11 @@ async def admin_playoff_results_batch(
     places: list[str] = Form(..., alias="places[]"),
     db: AsyncSession = Depends(get_db),
 ):
-    if not await _playoff_stage_exists(db, stage_id):
+    stage = await _get_playoff_stage(db, stage_id)
+    if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
+    if stage.key not in LIMITED_ADMIN_PLAYOFF_STAGE_KEYS:
+        return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
     try:
         if len(user_ids) != len(places):
             raise ValueError("Некорректное количество полей")
@@ -1668,8 +1685,11 @@ async def admin_playoff_override(
     note: str = Form(default=""),
     db: AsyncSession = Depends(get_db),
 ):
-    if not await _playoff_stage_exists(db, stage_id):
+    stage = await _get_playoff_stage(db, stage_id)
+    if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
+    if stage.key != FINAL_ADMIN_PLAYOFF_STAGE_KEY:
+        return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
     try:
         await override_playoff_match_winner(db, stage_id, group_number, winner_user_id, note=note)
         return redirect_with_admin_msg("msg_status_ok")
