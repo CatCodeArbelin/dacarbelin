@@ -672,6 +672,12 @@ async def apply_playoff_match_results(
     ordered_user_ids: list[int],
     group_number: int = 1,
 ) -> None:
+    """Применяет результат одной игры внутри группы плей-офф и фиксирует изменения в БД.
+
+    Функция валидирует входные данные (ровно 8 уникальных игроков нужной группы этапа),
+    начисляет очки участникам, увеличивает ``match.game_number`` и обновляет ``match.state``.
+    Транзакция завершается внутри функции через ``db.commit()``.
+    """
     stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.id == stage_id))
     if not stage:
         raise ValueError("Stage not found")
@@ -730,6 +736,22 @@ async def apply_playoff_match_results(
 
 
 async def simulate_three_random_games_for_stage(db: AsyncSession, stage_id: int) -> None:
+    """Симулирует по 3 случайные игры для каждой полной группы в лимитированном этапе.
+
+    Preconditions:
+    - этап с ``stage_id`` существует и относится к лимитированным стадиям
+      (``stage_2``, ``stage_1_8``, ``stage_1_4``);
+    - в каждой обрабатываемой группе присутствуют ровно 8 участников.
+
+    Postconditions для каждой обработанной группы:
+    - вызывается ``apply_playoff_match_results`` ровно 3 раза;
+    - после каждого вызова увеличивается ``PlayoffMatch.game_number``;
+    - ``PlayoffMatch.state`` переводится в ``in_progress`` или ``finished`` по правилам этапа;
+    - участникам начисляются очки в соответствии с ``stage.scoring_mode``.
+
+    Важно: коммит выполняется внутри ``apply_playoff_match_results`` на каждом шаге симуляции.
+    Если этап не найден или не является лимитированным, функция завершится без изменений.
+    """
     stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.id == stage_id))
     if not stage or not is_limited_stage(stage.key):
         return
