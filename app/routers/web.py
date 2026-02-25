@@ -82,6 +82,8 @@ templates = Jinja2Templates(directory="app/templates")
 
 ALLOWED_USER_UPDATE_FIELDS = {"nickname", "basket", "direct_invite_stage"}
 ALLOWED_DIRECT_INVITE_STAGES = {None, *get_playoff_stage_sequence_keys(), "stage_1_8"}
+TOURNAMENT_STAGE_KEYS_ORDER = get_public_stage_display_sequence()
+PLAYOFF_STAGE_KEYS_ORDER = TOURNAMENT_STAGE_KEYS_ORDER[1:]
 
 CHAT_NICK_COLORS = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff66c4", "#5ce1e6", "#f48c06", "#90be6d", "#4cc9f0"]
 FORBIDDEN_CHAT_NICKS = {"@admin"}
@@ -120,8 +122,16 @@ def get_stage_group_numbers(
     return list(range(1, groups_count + 1))
 
 
-def get_active_playoff_stage(playoff_stages: list[PlayoffStage]) -> PlayoffStage | None:
-    return next((stage for stage in playoff_stages if stage.is_started), None)
+def get_active_playoff_stage(playoff_stages: list[PlayoffStage], stage_order_keys: list[str] | None = None) -> PlayoffStage | None:
+    if stage_order_keys is None:
+        return next((stage for stage in playoff_stages if stage.is_started), None)
+
+    stage_by_key = {stage.key: stage for stage in playoff_stages}
+    for stage_key in stage_order_keys:
+        stage = stage_by_key.get(stage_key)
+        if stage and stage.is_started:
+            return stage
+    return None
 
 
 
@@ -609,10 +619,10 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
 
     lang = get_lang(request.cookies.get("lang"))
     current_stage_display = resolve_current_stage_label(lang, playoff_stages, tournament_started)
-    stage_order_keys = get_public_stage_display_sequence()
+    stage_order_keys = TOURNAMENT_STAGE_KEYS_ORDER
     active_key = "group_stage"
     if tournament_started:
-        active_playoff = get_active_playoff_stage(playoff_stages)
+        active_playoff = get_active_playoff_stage(playoff_stages, PLAYOFF_STAGE_KEYS_ORDER)
         if active_playoff:
             active_key = active_playoff.key
     ordered_keys = build_stage_display_order(active_key, stage_order_keys)
@@ -737,7 +747,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
         return True
 
     playoff_stage_by_key = {stage.key: stage for stage in playoff_stages}
-    stage_progression_keys = get_playoff_stage_sequence_keys()
+    stage_progression_keys = PLAYOFF_STAGE_KEYS_ORDER
     tournament_started = await get_tournament_started(db)
     group_stage_groups = list(
         (
