@@ -285,6 +285,115 @@ def test_build_bracket_columns_adds_placeholders_for_missing_stage_groups() -> N
     assert all(match["participants"] == [] for match in stage_2_column["matches"])
     assert all(match["state"] == "pending" for match in stage_2_column["matches"])
 
+
+def test_build_bracket_columns_empty_tournament_has_all_stages_and_placeholders() -> None:
+    columns = build_bracket_columns(
+        groups=[],
+        playoff_stages=[],
+        user_by_id={},
+        direct_invite_ids=[],
+    )
+
+    assert [column["key"] for column in columns] == ["group_stage", "stage_2", "stage_1_4", "stage_final"]
+
+    group_stage = next(column for column in columns if column["key"] == "group_stage")
+    assert [match["group_label"] for match in group_stage["matches"]] == ["A", "B", "C", "D", "E", "F", "G"]
+    assert all(match["participants"] == [] for match in group_stage["matches"])
+    assert all(match["game_number"] == 1 for match in group_stage["matches"])
+    assert all(match["schedule_text"] == "TBD" for match in group_stage["matches"])
+    assert all(match["state"] == "pending" for match in group_stage["matches"])
+
+    stage_2 = next(column for column in columns if column["key"] == "stage_2")
+    assert [match["group_label"] for match in stage_2["matches"]] == ["A", "B", "C", "D"]
+
+    stage_1_4 = next(column for column in columns if column["key"] == "stage_1_4")
+    assert [match["group_label"] for match in stage_1_4["matches"]] == ["A", "B"]
+
+    stage_final = next(column for column in columns if column["key"] == "stage_final")
+    assert len(stage_final["matches"]) == 1
+    assert stage_final["matches"][0]["group_label"] == "Final"
+    assert stage_final["matches"][0]["participants"] == []
+
+
+def test_stage_2_preview_without_stage_and_invites_returns_four_empty_groups() -> None:
+    columns = build_bracket_columns(
+        groups=[],
+        playoff_stages=[],
+        user_by_id={},
+        direct_invite_ids=[],
+    )
+
+    stage_2_column = next(column for column in columns if column["key"] == "stage_2")
+    assert [match["group_label"] for match in stage_2_column["matches"]] == ["A", "B", "C", "D"]
+    assert all(match["participants"] == [] for match in stage_2_column["matches"])
+    assert all(match.get("is_preview") is True for match in stage_2_column["matches"])
+
+
+def test_stage_2_preview_without_stage_keeps_four_groups_with_partial_invites() -> None:
+    direct_invite_ids = [101, 102, 103]
+    user_by_id = {
+        101: SimpleNamespace(id=101, nickname="Alpha", game_nickname=""),
+        102: SimpleNamespace(id=102, nickname="Bravo", game_nickname=""),
+        103: SimpleNamespace(id=103, nickname="Charlie", game_nickname=""),
+    }
+
+    columns = build_bracket_columns(
+        groups=[],
+        playoff_stages=[],
+        user_by_id=user_by_id,
+        direct_invite_ids=direct_invite_ids,
+    )
+
+    stage_2_column = next(column for column in columns if column["key"] == "stage_2")
+    assert [match["group_label"] for match in stage_2_column["matches"]] == ["A", "B", "C", "D"]
+    participants_by_group = {match["group_label"]: match["participants"] for match in stage_2_column["matches"]}
+
+    expected_by_group: dict[str, list[dict[str, object]]] = {"A": [], "B": [], "C": [], "D": []}
+    for invited in build_stage_2_direct_invite_preview(direct_invite_ids):
+        group_label = web.get_stage_group_label("stage_2", invited["group_number"])
+        user = user_by_id[invited["user_id"]]
+        expected_by_group[group_label].append(
+            {
+                "user_id": invited["user_id"],
+                "nickname": user.nickname,
+                "is_direct_invite_preview": True,
+            }
+        )
+
+    assert participants_by_group == expected_by_group
+
+
+def test_tournament_page_renders_stage_cards_when_database_is_empty(monkeypatch) -> None:
+    class _EmptyTournamentPageDB:
+        async def scalars(self, statement):
+            return _FakeScalarResult([])
+
+    fake_db = _EmptyTournamentPageDB()
+
+    async def override_get_db():
+        yield fake_db
+
+    async def fake_get_tournament_started(db):
+        return False
+
+    monkeypatch.setattr(web, "get_tournament_started", fake_get_tournament_started)
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            response = client.get("/tournament")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert "I этап" in response.text
+    assert "II этап (32)" in response.text
+    assert "III этап — полуфинальные группы (16)" in response.text
+    assert "Финал (8)" in response.text
+    assert response.text.count("Group A") >= 3
+    assert "Group G" in response.text
+    assert "Group Final" in response.text
+
 def test_deprecated_manual_playoff_routes_redirect_to_group_finish_flow() -> None:
     with TestClient(app) as client:
         client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
