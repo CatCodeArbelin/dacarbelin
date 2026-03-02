@@ -35,6 +35,7 @@ class GroupStageStandingRow(TypedDict):
 class BracketParticipantVM(TypedDict):
     user_id: int
     nickname: str
+    points: int
     is_direct_invite_preview: bool
 
 
@@ -116,6 +117,7 @@ def _participants_for_group_members(members: Sequence[GroupMember]) -> list[Brac
         {
             "user_id": member.user_id,
             "nickname": _display_nickname(member.user, str(member.user_id)),
+            "points": member.total_points or 0,
             "is_direct_invite_preview": False,
         }
         for member in sort_members_for_table(list(members))
@@ -133,6 +135,7 @@ def _participants_for_playoff_members(
             {
                 "user_id": participant.user_id,
                 "nickname": _display_nickname(user, str(participant.user_id)),
+                "points": participant.points or 0,
                 "is_direct_invite_preview": False,
             }
         )
@@ -199,6 +202,7 @@ def build_bracket_columns(
                         {
                             "user_id": invited["user_id"],
                             "nickname": _display_nickname(user, str(invited["user_id"])),
+                            "points": 0,
                             "is_direct_invite_preview": True,
                         }
                     )

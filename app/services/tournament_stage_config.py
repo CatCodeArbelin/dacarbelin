@@ -7,7 +7,7 @@ LIMITED_PLAYOFF_STAGE_KEYS = {"stage_2", "stage_1_8", "stage_1_4"}
 GROUP_STAGE_GAME_LIMIT = 3
 PROMOTE_TOP_N_BY_STAGE: Mapping[str, int] = {
     "stage_2": 4,
-    "stage_1_8": 2,
+    "stage_1_8": 3,
     "stage_1_4": 4,
     "stage_final": 1,
 }
@@ -32,7 +32,7 @@ ADMIN_PLAYOFF_STAGE_CONFIGS: Mapping[str, AdminPlayoffStageConfig] = {
     "stage_1_8": AdminPlayoffStageConfig(
         can_debug_simulate=True,
         game_limit=GROUP_STAGE_GAME_LIMIT,
-        promote_top_n=2,
+        promote_top_n=3,
     ),
     "stage_1_4": AdminPlayoffStageConfig(
         can_debug_simulate=True,
