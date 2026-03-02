@@ -137,6 +137,44 @@ def get_active_playoff_stage(playoff_stages: list[PlayoffStage], stage_order_key
     return None
 
 
+def build_playoff_stage_finish_status(
+    stage: PlayoffStage,
+    participants: list[PlayoffParticipant] | None = None,
+    matches: list[PlayoffMatch] | None = None,
+) -> tuple[list[dict[str, int | str]], bool]:
+    stage_participants = participants if participants is not None else list(stage.participants)
+    stage_matches = matches if matches is not None else list(stage.matches)
+    group_numbers = sorted(
+        {
+            *{get_stage_group_number_by_seed(participant.seed) for participant in stage_participants},
+            *{match.group_number for match in stage_matches},
+        }
+    )
+    progress_items: list[dict[str, int | str]] = []
+    for group_number in group_numbers:
+        games_played = max(
+            [max(match.game_number - 1, 0) for match in stage_matches if match.group_number == group_number],
+            default=0,
+        )
+        progress_items.append(
+            {
+                "name": get_stage_group_label(stage.key, group_number),
+                "games_played": games_played,
+            }
+        )
+
+    if not progress_items:
+        return [], False
+
+    if is_limited_stage(stage.key):
+        return progress_items, all(item["games_played"] >= GROUP_STAGE_GAME_LIMIT for item in progress_items)
+
+    if stage.key == "stage_final":
+        return progress_items, any(match.state == "finished" for match in stage_matches)
+
+    return progress_items, False
+
+
 
 def _normalize_direct_invite_stage(raw_value: str | None) -> str | None:
     value = (raw_value or "").strip() or None
@@ -919,6 +957,12 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     )
     current_stage_groups = playoff_stage_groups.get(current_playoff_stage.id, []) if current_playoff_stage else []
     current_stage_participants = playoff_stage_participants.get(current_playoff_stage.id, []) if current_playoff_stage else []
+    playoff_stage_finish_progress: list[dict[str, int | str]] = []
+    playoff_stage_finish_ready = False
+    playoff_stage_finish_progress_limit: int | str = GROUP_STAGE_GAME_LIMIT
+    if current_playoff_stage:
+        playoff_stage_finish_progress, playoff_stage_finish_ready = build_playoff_stage_finish_status(current_playoff_stage)
+        playoff_stage_finish_progress_limit = GROUP_STAGE_GAME_LIMIT if is_limited_stage(current_playoff_stage.key) else "∞"
     registration_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "registration_open"))
     registration_open = (registration_setting.value == "1") if registration_setting else True
     tournament_started_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_started"))
@@ -970,6 +1014,9 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             current_playoff_stage_config=current_playoff_stage_config,
             current_stage_groups=current_stage_groups,
             current_stage_participants=current_stage_participants,
+            playoff_stage_finish_progress=playoff_stage_finish_progress,
+            playoff_stage_finish_ready=playoff_stage_finish_ready,
+            playoff_stage_finish_progress_limit=playoff_stage_finish_progress_limit,
             show_group_stage_controls=show_group_stage_controls,
             group_stage_game_limit=GROUP_STAGE_GAME_LIMIT,
             group_stage_finish_ready=group_stage_finish_ready,
@@ -1726,6 +1773,45 @@ async def admin_finish_playoff_group(
                 await start_playoff_stage(db, next_stage.id)
         except Exception:
             return redirect_with_admin_msg("msg_operation_failed")
+
+    return redirect_with_admin_msg("msg_status_ok")
+
+
+@router.post("/admin/playoff/stage/finish")
+async def admin_finish_playoff_stage(
+    stage_id: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    stage = await _get_playoff_stage(db, stage_id)
+    if not stage:
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
+
+    participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))).all())
+    matches = list((await db.scalars(select(PlayoffMatch).where(PlayoffMatch.stage_id == stage_id))).all())
+    _, is_ready = build_playoff_stage_finish_status(stage, participants, matches)
+    if not is_ready:
+        return redirect_with_admin_msg("msg_operation_failed", details="group_games_not_completed")
+
+    if is_limited_stage(stage.key):
+        active_group_numbers = sorted({get_stage_group_number_by_seed(participant.seed) for participant in participants})
+        for group_number in active_group_numbers:
+            match = next((item for item in matches if item.group_number == group_number), None)
+            if not match:
+                continue
+            match.state = "finished"
+
+        try:
+            await promote_top_between_stages(db, stage.id, get_promote_top_n(stage.key))
+            next_stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.stage_order == stage.stage_order + 1))
+            if next_stage and not next_stage.is_started:
+                await start_playoff_stage(db, next_stage.id)
+        except Exception:
+            return redirect_with_admin_msg("msg_operation_failed")
+    else:
+        for match in matches:
+            if match.group_number == 1:
+                match.state = "finished"
+        await db.commit()
 
     return redirect_with_admin_msg("msg_status_ok")
 

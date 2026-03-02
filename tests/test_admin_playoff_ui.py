@@ -11,8 +11,8 @@ def test_admin_template_has_playoff_hint_without_manual_stage_controls() -> None
     assert "admin_playoff_stages_empty_hint_title" in template
     assert "admin_playoff_stages_empty_hint_steps" in template
     assert "stage_macros.stage_group_controls" in template
-    assert "Закончить этап, определить победителей по очкам" in template
-    assert "/admin/playoff/group/finish" in template
+    assert "/admin/playoff/stage/finish" in template
+    assert "playoff_stage_finish_ready" in template
     assert "/admin/playoff/results/batch" in template
     assert "admin_playoff_match_results" in template
     assert "current_playoff_stage_config.can_shuffle" in template
@@ -22,7 +22,6 @@ def test_admin_template_has_playoff_hint_without_manual_stage_controls() -> None
     assert "Подтвердить победителя этапа" in template
     assert "Кандидат на победу" in template
     assert "/admin/playoff/override" in template
-    assert "finish_disabled=(group.game_limit != 'special' and group.games_played < group.game_limit)" in template
     assert "stage_macros.stage_finish_panel" in template
     assert "/admin/group-stage/finish" in template
     assert "group_stage_game_limit" in template
