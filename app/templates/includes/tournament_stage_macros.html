@@ -57,3 +57,101 @@
   </table>
 </div>
 {%- endmacro %}
+
+{% macro stage_finish_panel(is_ready, finish_action, finish_label, progress_items=None, progress_limit=3, hidden_fields=None, card_class='mb-3') -%}
+<div class="alert {% if is_ready %}alert-success{% else %}alert-warning{% endif %} {{ card_class }}">
+  <div class="fw-semibold mb-2">
+    {% if is_ready %}
+    {{ tr('admin_group_stage_finish_ready') }}
+    {% else %}
+    {{ tr('admin_group_stage_finish_not_ready') }}
+    {% endif %}
+  </div>
+  {% if progress_items %}
+  <div class="small mb-2">
+    {% for item in progress_items %}
+    <span class="me-2">{{ item.name }}: {{ item.games_played }}/{{ progress_limit }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <form action="{{ finish_action }}" method="post">
+    {% if hidden_fields %}
+    {% for field_name, field_value in hidden_fields.items() %}
+    <input type="hidden" name="{{ field_name }}" value="{{ field_value }}">
+    {% endfor %}
+    {% endif %}
+    <button class="btn btn-sm btn-danger" {% if not is_ready %}disabled{% endif %}>{{ finish_label }}</button>
+  </form>
+</div>
+{%- endmacro %}
+
+{% macro stage_group_controls(group_title, members, score_action, score_hidden_fields=None, group_locked=False, group_hint=None, submit_label=None, place_input='select', place_max=8, progress_text=None, finish_action=None, finish_hidden_fields=None, finish_label=None, finish_disabled=False, highlight_user_id=None, wrapper_class='border rounded p-3 w-100 h-100') -%}
+<div class="{{ wrapper_class }}">
+  {% if group_title %}<div class="fw-bold mb-2">{{ group_title }}</div>{% endif %}
+  {% if progress_text %}
+  <div class="small text-contrast-muted mb-2">{{ progress_text }}</div>
+  {% endif %}
+  <form action="{{ score_action }}" method="post" class="mb-2">
+    {% if score_hidden_fields %}
+    {% for field_name, field_value in score_hidden_fields.items() %}
+    <input type="hidden" name="{{ field_name }}" value="{{ field_value }}">
+    {% endfor %}
+    {% endif %}
+    {% if group_hint %}
+    <div class="small text-muted mb-2">{{ group_hint }}</div>
+    {% endif %}
+    <div class="table-responsive">
+      <table class="table table-sm table-dark align-middle mb-2">
+        <thead>
+          <tr>
+            <th>{{ tr('participants_nick') }}</th>
+            <th>Pts</th>
+            <th>#1</th>
+            <th>#2-4</th>
+            <th>#8</th>
+            <th style="width: 180px;">{{ tr('admin_place') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for member in members %}
+          {% set member_index = loop.index %}
+          <tr {% if highlight_user_id and member.user_id == highlight_user_id %}class="table-success"{% endif %}>
+            <td>
+              {{ member.nickname }}
+              <input type="hidden" name="user_ids[]" value="{{ member.user_id }}">
+            </td>
+            <td>{{ member.total_points }}</td>
+            <td>{{ member.first_places }}</td>
+            <td>{{ member.top2_4_finishes }}</td>
+            <td>{{ member.eighth_places }}</td>
+            <td>
+              {% if place_input == 'number' %}
+              <input class="form-control form-control-sm" type="number" min="1" max="{{ place_max }}" name="places[]" value="{{ member_index }}" required {% if group_locked %}disabled{% endif %}>
+              {% else %}
+              <select class="form-select form-select-sm" name="places[]" required {% if group_locked %}disabled{% endif %}>
+                {% for place in range(1, place_max + 1) %}
+                <option value="{{ place }}" {% if place == member_index %}selected{% endif %}>{{ place }}</option>
+                {% endfor %}
+              </select>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <button class="btn btn-sm btn-success" {% if group_locked %}disabled{% endif %}>{{ submit_label or tr('admin_save_game_result') }}</button>
+  </form>
+
+  {% if finish_action and finish_label %}
+  <form action="{{ finish_action }}" method="post" class="mb-0">
+    {% if finish_hidden_fields %}
+    {% for field_name, field_value in finish_hidden_fields.items() %}
+    <input type="hidden" name="{{ field_name }}" value="{{ field_value }}">
+    {% endfor %}
+    {% endif %}
+    <button class="btn btn-outline-success btn-sm" {% if finish_disabled %}disabled{% endif %}>{{ finish_label }}</button>
+  </form>
+  {% endif %}
+</div>
+{%- endmacro %}
