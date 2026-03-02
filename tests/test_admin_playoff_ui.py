@@ -5,18 +5,29 @@ from pathlib import Path
 
 def test_admin_template_has_playoff_hint_without_manual_stage_controls() -> None:
     template = Path("app/templates/admin.html").read_text(encoding="utf-8")
+    macros = Path("app/templates/includes/tournament_stage_macros.html").read_text(encoding="utf-8")
 
     assert "has_playoff_stages = playoff_stages|length > 0" in template
     assert "admin_playoff_stages_empty_hint_title" in template
     assert "admin_playoff_stages_empty_hint_steps" in template
+    assert "stage_macros.stage_group_controls" in template
     assert "Закончить этап, определить победителей по очкам" in template
     assert "/admin/playoff/group/finish" in template
+    assert "/admin/playoff/results/batch" in template
     assert "admin_playoff_match_results" in template
     assert "current_playoff_stage_config.can_shuffle" in template
     assert "current_playoff_stage_config.can_debug_simulate" in template
+    assert "current_playoff_stage.key == 'stage_final'" in template
+    assert "current_playoff_stage.key == 'stage_2'" in template
     assert "Подтвердить победителя этапа" in template
     assert "Кандидат на победу" in template
     assert "/admin/playoff/override" in template
+    assert "finish_disabled=(group.game_limit != 'special' and group.games_played < group.game_limit)" in template
+    assert "stage_macros.stage_finish_panel" in template
+    assert "/admin/group-stage/finish" in template
+    assert "group_stage_game_limit" in template
+    assert "stage_finish_panel" in macros
+    assert "stage_group_controls" in macros
     assert "/admin/playoff/start" not in template
     assert "/admin/playoff/promote" not in template
     assert "/admin/group/create" not in template

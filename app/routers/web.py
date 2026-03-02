@@ -961,6 +961,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             current_stage_groups=current_stage_groups,
             current_stage_participants=current_stage_participants,
             show_group_stage_controls=show_group_stage_controls,
+            group_stage_game_limit=GROUP_STAGE_GAME_LIMIT,
             group_stage_finish_ready=group_stage_finish_ready,
             group_stage_finish_status=group_stage_finish_status,
             group_stage_games_summary=group_stage_games_summary,
