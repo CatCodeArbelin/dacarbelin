@@ -73,9 +73,9 @@ class PlayoffPromotionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(db.executed, 1)
         self.assertEqual(db.commits, 1)
 
-    async def test_stage_1_8_to_stage_1_4_recreates_participants_with_zero_stats(self) -> None:
-        stage = PlayoffStage(id=30, key="stage_1_8", title="Stage 1/8", stage_order=2, stage_size=16)
-        next_stage = PlayoffStage(id=40, key="stage_1_4", title="Stage 1/4", stage_order=3, stage_size=8)
+    async def test_stage_1_4_to_final_recreates_participants_with_zero_stats(self) -> None:
+        stage = PlayoffStage(id=30, key="stage_1_4", title="Stage 3", stage_order=2, stage_size=16)
+        next_stage = PlayoffStage(id=40, key="stage_final", title="Final", stage_order=3, stage_size=8)
 
         participants = [
             PlayoffParticipant(stage_id=30, user_id=user_id, seed=user_id, points=30 - user_id, wins=2, top4_finishes=2, top8_finishes=3, last_place=8)
@@ -84,7 +84,7 @@ class PlayoffPromotionTests(unittest.IsolatedAsyncioTestCase):
 
         db = _FakeDB([stage, next_stage], participants)
 
-        await promote_top_between_stages(db, stage_id=30, top_n=2)
+        await promote_top_between_stages(db, stage_id=30, top_n=4)
 
         self.assertEqual(len(db.added), 8)
         for new_participant in db.added:
@@ -97,8 +97,8 @@ class PlayoffPromotionTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(new_participant.is_eliminated)
 
     async def test_promote_top_between_stages_validates_top_n_by_stage_config(self) -> None:
-        stage = PlayoffStage(id=50, key="stage_1_8", title="Stage 1/8", stage_order=2, stage_size=16)
-        next_stage = PlayoffStage(id=60, key="stage_1_4", title="Stage 1/4", stage_order=3, stage_size=8)
+        stage = PlayoffStage(id=50, key="stage_1_4", title="Stage 3", stage_order=2, stage_size=16)
+        next_stage = PlayoffStage(id=60, key="stage_final", title="Final", stage_order=3, stage_size=8)
 
         participants = [
             PlayoffParticipant(stage_id=50, user_id=user_id, seed=user_id, points=30 - user_id, wins=1, top4_finishes=1, top8_finishes=1, last_place=8)
@@ -107,8 +107,8 @@ class PlayoffPromotionTests(unittest.IsolatedAsyncioTestCase):
 
         db = _FakeDB([stage, next_stage], participants)
 
-        with self.assertRaisesRegex(ValueError, "top-2"):
-            await promote_top_between_stages(db, stage_id=50, top_n=4)
+        with self.assertRaisesRegex(ValueError, "top-4"):
+            await promote_top_between_stages(db, stage_id=50, top_n=2)
 
 
 if __name__ == "__main__":

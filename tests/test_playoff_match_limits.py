@@ -76,8 +76,8 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(match.state, "finished")
         db.commit.assert_called_once()
 
-    async def test_stage_1_8_group_limit_blocks_fourth_game(self) -> None:
-        """Проверяет негативный сценарий `test_stage_1_8_group_limit_blocks_fourth_game`.
+    async def test_stage_1_4_group_limit_blocks_fourth_game(self) -> None:
+        """Проверяет негативный сценарий `test_stage_1_4_group_limit_blocks_fourth_game`.
         Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
         Запуск: `pytest tests/test_playoff_match_limits.py -q` и `pytest tests/test_playoff_match_limits.py -k "test_stage_3_group_limit_blocks_fourth_game" -q`."""
         ordered_user_ids = [1, 2, 3, 4, 5, 6, 7, 8]
@@ -87,8 +87,8 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
         ]
         stage = PlayoffStage(
             id=1,
-            key="stage_1_8",
-            title="Stage 1/8",
+            key="stage_1_4",
+            title="Stage 1/4",
             stage_size=8,
             stage_order=2,
             scoring_mode="standard",
@@ -193,8 +193,7 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
     async def test_debug_simulation_plays_three_games_for_full_group_in_each_limited_stage(self) -> None:
         for stage_id, stage_key, stage_title in (
             (11, "stage_2", "Stage 2"),
-            (12, "stage_1_8", "Stage 1/8"),
-            (13, "stage_1_4", "Stage 1/4"),
+            (12, "stage_1_4", "Stage 1/4"),
         ):
             stage = PlayoffStage(
                 id=stage_id,
@@ -223,8 +222,8 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
     async def test_debug_simulation_affects_only_requested_stage(self) -> None:
         selected_stage = PlayoffStage(
             id=21,
-            key="stage_1_8",
-            title="Stage 1/8",
+            key="stage_1_4",
+            title="Stage 1/4",
             stage_size=8,
             stage_order=2,
             scoring_mode="standard",

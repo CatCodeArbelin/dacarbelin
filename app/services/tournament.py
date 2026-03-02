@@ -380,7 +380,7 @@ def get_stage_group_number_by_seed(seed: int) -> int:
 
 
 def get_stage_group_label(stage_key: str, group_number: int) -> str:
-    if stage_key in {"stage_2", "stage_1_8", "stage_1_4", "stage_semifinal_groups"}:
+    if stage_key in {"stage_2", "stage_1_4", "stage_semifinal_groups"}:
         return chr(ord("A") + max(group_number - 1, 0))
     if stage_key == "stage_final":
         return "Final"
@@ -758,7 +758,7 @@ async def simulate_three_random_games_for_stage(db: AsyncSession, stage_id: int)
 
     Preconditions:
     - этап с ``stage_id`` существует и относится к лимитированным стадиям
-      (``stage_2``, ``stage_1_8``, ``stage_1_4``);
+      (``stage_2``, ``stage_1_4``);
     - в каждой обрабатываемой группе присутствуют ровно 8 участников.
 
     Postconditions для каждой обработанной группы:

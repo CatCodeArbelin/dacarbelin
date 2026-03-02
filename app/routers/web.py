@@ -82,7 +82,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 ALLOWED_USER_UPDATE_FIELDS = {"nickname", "basket", "direct_invite_stage"}
-ALLOWED_DIRECT_INVITE_STAGES = {None, *get_playoff_stage_sequence_keys(), "stage_1_8"}
+ALLOWED_DIRECT_INVITE_STAGES = {None, *get_playoff_stage_sequence_keys()}
 TOURNAMENT_STAGE_KEYS_ORDER = get_public_stage_display_sequence()
 PLAYOFF_STAGE_KEYS_ORDER = TOURNAMENT_STAGE_KEYS_ORDER[1:]
 
@@ -1488,7 +1488,7 @@ async def admin_debug_simulate_three_random_playoff_games(
 ):
     """Отладочно симулирует 3 случайные игры для каждой полной группы (8 игроков) в этапе плей-офф.
 
-    Поддерживаются только лимитированные стадии плей-офф: ``stage_2``, ``stage_1_8`` и
+    Поддерживаются только лимитированные стадии плей-офф: ``stage_2`` и
     ``stage_1_4``. Для остальных стадий сервисный вызов не вносит изменений.
 
     Возвращаемые ошибки на уровне редиректа:
