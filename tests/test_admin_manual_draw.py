@@ -45,10 +45,10 @@ def test_admin_manual_draw_accepts_user_ids_array(monkeypatch) -> None:
 
 def test_admin_manual_draw_accepts_layout_json(monkeypatch) -> None:
     """Проверяет ручную жеребьевку через layout_json."""
-    captured: dict[str, list[list[int]]] = {}
+    captured: dict[str, object] = {}
 
-    async def fake_create_manual_draw_from_layout(db, layout: list[list[int]]) -> None:
-        captured["layout"] = layout
+    async def fake_create_manual_draw_from_layout(db, layout_payload: object) -> None:
+        captured["layout"] = layout_payload
 
     async def fake_set_draw_applied(db, value: bool):
         return None
@@ -64,19 +64,19 @@ def test_admin_manual_draw_accepts_layout_json(monkeypatch) -> None:
         client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
         response = client.post(
             "/admin/draw/manual",
-            data={"layout_json": '{"A": ["11", "12"], "B": ["13"]}'},
+            data={"layout_json": '{"group_order": [1, 0], "groups": [{"group_label": "Group B", "group_index": 1, "members": ["13"]}, {"group_label": "Group A", "group_index": 0, "members": ["11", "12"]}]}'},
             follow_redirects=False,
         )
 
     assert response.status_code == 303
     assert response.headers["location"] == "/admin?msg=msg_status_ok"
-    assert captured == {"layout": [["11", "12"], ["13"]]}
+    assert captured == {"layout": {"group_order": [1, 0], "groups": [{"group_label": "Group B", "group_index": 1, "members": ["13"]}, {"group_label": "Group A", "group_index": 0, "members": ["11", "12"]}]}}
 
 
 def test_admin_manual_draw_returns_validation_details_for_layout(monkeypatch) -> None:
     """Проверяет отдачу details при ошибках валидации layout_json."""
 
-    async def fake_create_manual_draw_from_layout(db, layout: list[list[int]]) -> None:
+    async def fake_create_manual_draw_from_layout(db, layout_payload: object) -> None:
         raise web.ManualDrawValidationError("duplicate_user:11")
 
     monkeypatch.setattr(web, "create_manual_draw_from_layout", fake_create_manual_draw_from_layout)

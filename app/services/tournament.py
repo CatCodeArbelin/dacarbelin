@@ -284,8 +284,49 @@ async def create_manual_draw(
     await db.commit()
 
 
-async def create_manual_draw_from_layout(db: AsyncSession, layout: list[list[int]]) -> None:
-    if not isinstance(layout, list) or not layout:
+def _normalize_manual_layout_payload(layout_payload: object) -> list[list[int]]:
+    if isinstance(layout_payload, dict):
+        groups_payload = layout_payload.get("groups")
+        group_order_payload = layout_payload.get("group_order")
+        if not isinstance(groups_payload, list) or not groups_payload:
+            raise ManualDrawValidationError("invalid_layout")
+
+        groups_by_index: dict[int, list[int]] = {}
+        for group_payload in groups_payload:
+            if not isinstance(group_payload, dict):
+                raise ManualDrawValidationError("invalid_layout")
+            group_index = group_payload.get("group_index")
+            members = group_payload.get("members")
+            if not isinstance(group_index, int) or group_index < 0 or not isinstance(members, list):
+                raise ManualDrawValidationError("invalid_layout")
+            if group_index in groups_by_index:
+                raise ManualDrawValidationError("invalid_layout")
+            groups_by_index[group_index] = members
+
+        if isinstance(group_order_payload, list) and group_order_payload:
+            if len(group_order_payload) != len(groups_by_index):
+                raise ManualDrawValidationError("invalid_layout")
+            try:
+                group_order = [int(item) for item in group_order_payload]
+            except (TypeError, ValueError) as exc:
+                raise ManualDrawValidationError("invalid_layout") from exc
+            if len(group_order) != len(set(group_order)):
+                raise ManualDrawValidationError("invalid_layout")
+            if any(index not in groups_by_index for index in group_order):
+                raise ManualDrawValidationError("invalid_layout")
+            return [groups_by_index[index] for index in group_order]
+
+        return [groups_by_index[index] for index in sorted(groups_by_index)]
+
+    if isinstance(layout_payload, list):
+        return layout_payload
+
+    raise ManualDrawValidationError("invalid_layout")
+
+
+async def create_manual_draw_from_layout(db: AsyncSession, layout_payload: object) -> None:
+    layout = _normalize_manual_layout_payload(layout_payload)
+    if not layout:
         raise ManualDrawValidationError("invalid_layout")
 
     group_count = len(layout)

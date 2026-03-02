@@ -1309,14 +1309,7 @@ async def admin_manual_draw(
     try:
         if layout_json.strip():
             raw_layout = json.loads(layout_json)
-            if isinstance(raw_layout, dict):
-                layout_groups = list(raw_layout.values())
-            elif isinstance(raw_layout, list):
-                layout_groups = raw_layout
-            else:
-                raise ManualDrawValidationError("invalid_layout")
-
-            await create_manual_draw_from_layout(db, layout_groups)
+            await create_manual_draw_from_layout(db, raw_layout)
         else:
             parsed_user_ids = parse_manual_draw_user_ids(user_ids_list if user_ids_list else user_ids)
             await create_manual_draw(
