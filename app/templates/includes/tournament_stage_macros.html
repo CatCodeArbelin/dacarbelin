@@ -23,7 +23,7 @@
   </div>
   <ul class="playoff-participants list-unstyled mb-0 mt-2">
     {% for participant in match.participants %}
-    <li>#{{ participant.user_id }} · {{ participant.nickname }}{% if participant.is_direct_invite_preview %} <span class="badge text-bg-info">прямой инвайт</span>{% endif %}</li>
+    <li>#{{ participant.user_id }} · {{ participant.nickname }} — <strong>{{ participant.points }}</strong> pts{% if participant.is_direct_invite_preview %} <span class="badge text-bg-info">прямой инвайт</span>{% endif %}</li>
     {% endfor %}
   </ul>
 </article>

@@ -22,7 +22,7 @@ class TournamentStageConfigTests(unittest.TestCase):
         self.assertEqual(GROUP_STAGE_GAME_LIMIT, 3)
         self.assertEqual(LIMITED_PLAYOFF_STAGE_KEYS, {"stage_2", "stage_1_8", "stage_1_4"})
         self.assertEqual(PROMOTE_TOP_N_BY_STAGE["stage_2"], 4)
-        self.assertEqual(PROMOTE_TOP_N_BY_STAGE["stage_1_8"], 2)
+        self.assertEqual(PROMOTE_TOP_N_BY_STAGE["stage_1_8"], 3)
         self.assertEqual(PROMOTE_TOP_N_BY_STAGE["stage_1_4"], 4)
         self.assertEqual(PROMOTE_TOP_N_BY_STAGE["stage_final"], 1)
 
@@ -39,7 +39,7 @@ class TournamentStageConfigTests(unittest.TestCase):
                 "can_shuffle": False,
                 "can_debug_simulate": True,
                 "game_limit": GROUP_STAGE_GAME_LIMIT,
-                "promote_top_n": 2,
+                "promote_top_n": 3,
                 "is_final": False,
             },
             "stage_1_4": {
@@ -88,7 +88,7 @@ class TournamentStageConfigTests(unittest.TestCase):
         self.assertIsNone(get_game_limit("stage_final"))
 
         self.assertEqual(get_promote_top_n("stage_2"), 4)
-        self.assertEqual(get_promote_top_n("stage_1_8"), 2)
+        self.assertEqual(get_promote_top_n("stage_1_8"), 3)
         self.assertEqual(get_promote_top_n("stage_1_4"), 4)
         self.assertEqual(get_promote_top_n("stage_final"), 1)
 
@@ -116,13 +116,14 @@ class TournamentStageConfigTests(unittest.TestCase):
             PlayoffParticipant(stage_id=1, user_id=1, seed=1, points=100, wins=3, top4_finishes=3, top8_finishes=3, last_place=8),
             PlayoffParticipant(stage_id=1, user_id=2, seed=2, points=90, wins=2, top4_finishes=3, top8_finishes=3, last_place=8),
             PlayoffParticipant(stage_id=1, user_id=3, seed=3, points=80, wins=1, top4_finishes=2, top8_finishes=3, last_place=8),
+            PlayoffParticipant(stage_id=1, user_id=4, seed=4, points=70, wins=1, top4_finishes=2, top8_finishes=3, last_place=8),
         ]
 
         standings = build_playoff_standings([stage], user_by_id={})
         statuses = [row["status"] for row in standings[0]["participants"]]
 
-        self.assertEqual(statuses[:2], ["promoted", "promoted"])
-        self.assertEqual(statuses[2], "eliminated")
+        self.assertEqual(statuses[:3], ["promoted", "promoted", "promoted"])
+        self.assertEqual(statuses[3], "eliminated")
 
 
 if __name__ == "__main__":
