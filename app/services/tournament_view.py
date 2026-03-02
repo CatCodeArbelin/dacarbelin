@@ -309,7 +309,6 @@ def resolve_current_stage_label(lang: str, playoff_stages: Sequence[PlayoffStage
     stage_display_key_by_stage_key = {
         "group_stage": "tournament_stage_group_stage_label",
         "stage_2": "tournament_stage_1_4_label",
-        "stage_1_8": "tournament_stage_1_8_label",
         "stage_1_4": "tournament_stage_semifinal_groups_label",
         "stage_final": "tournament_stage_final_label",
     }

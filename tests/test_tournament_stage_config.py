@@ -14,15 +14,14 @@ from app.services.tournament_stage_config import (
     is_limited_stage,
 )
 from app.services.tournament import get_playoff_stage_columns, get_playoff_stage_sequence_keys, get_public_stage_display_sequence
-from app.services.tournament_view import build_playoff_standings
+from app.services.tournament_view import build_playoff_standings, resolve_current_stage_label
 
 
 class TournamentStageConfigTests(unittest.TestCase):
     def test_stage_config_values_are_correct(self) -> None:
         self.assertEqual(GROUP_STAGE_GAME_LIMIT, 3)
-        self.assertEqual(LIMITED_PLAYOFF_STAGE_KEYS, {"stage_2", "stage_1_8", "stage_1_4"})
+        self.assertEqual(LIMITED_PLAYOFF_STAGE_KEYS, {"stage_2", "stage_1_4"})
         self.assertEqual(PROMOTE_TOP_N_BY_STAGE["stage_2"], 4)
-        self.assertEqual(PROMOTE_TOP_N_BY_STAGE["stage_1_8"], 3)
         self.assertEqual(PROMOTE_TOP_N_BY_STAGE["stage_1_4"], 4)
         self.assertEqual(PROMOTE_TOP_N_BY_STAGE["stage_final"], 1)
 
@@ -33,13 +32,6 @@ class TournamentStageConfigTests(unittest.TestCase):
                 "can_debug_simulate": True,
                 "game_limit": GROUP_STAGE_GAME_LIMIT,
                 "promote_top_n": 4,
-                "is_final": False,
-            },
-            "stage_1_8": {
-                "can_shuffle": False,
-                "can_debug_simulate": True,
-                "game_limit": GROUP_STAGE_GAME_LIMIT,
-                "promote_top_n": 3,
                 "is_final": False,
             },
             "stage_1_4": {
@@ -70,7 +62,7 @@ class TournamentStageConfigTests(unittest.TestCase):
 
         non_final_configs = [
             get_admin_playoff_stage_config(stage_key)
-            for stage_key in ["stage_2", "stage_1_8", "stage_1_4"]
+            for stage_key in ["stage_2", "stage_1_4"]
         ]
         self.assertTrue(all(not config.is_final for config in non_final_configs))
         self.assertTrue(all(config.game_limit == GROUP_STAGE_GAME_LIMIT for config in non_final_configs))
@@ -78,17 +70,14 @@ class TournamentStageConfigTests(unittest.TestCase):
 
     def test_stage_helpers_handle_required_stage_keys(self) -> None:
         self.assertTrue(is_limited_stage("stage_2"))
-        self.assertTrue(is_limited_stage("stage_1_8"))
         self.assertTrue(is_limited_stage("stage_1_4"))
         self.assertFalse(is_limited_stage("stage_final"))
 
         self.assertEqual(get_game_limit("stage_2"), GROUP_STAGE_GAME_LIMIT)
-        self.assertEqual(get_game_limit("stage_1_8"), GROUP_STAGE_GAME_LIMIT)
         self.assertEqual(get_game_limit("stage_1_4"), GROUP_STAGE_GAME_LIMIT)
         self.assertIsNone(get_game_limit("stage_final"))
 
         self.assertEqual(get_promote_top_n("stage_2"), 4)
-        self.assertEqual(get_promote_top_n("stage_1_8"), 3)
         self.assertEqual(get_promote_top_n("stage_1_4"), 4)
         self.assertEqual(get_promote_top_n("stage_final"), 1)
 
@@ -103,8 +92,8 @@ class TournamentStageConfigTests(unittest.TestCase):
     def test_build_playoff_standings_marks_status_by_configured_limits_and_promotion(self) -> None:
         stage = PlayoffStage(
             id=1,
-            key="stage_1_8",
-            title="Stage 1/8",
+            key="stage_1_4",
+            title="Stage 3",
             stage_order=2,
             stage_size=8,
             scoring_mode="standard",
@@ -122,8 +111,23 @@ class TournamentStageConfigTests(unittest.TestCase):
         standings = build_playoff_standings([stage], user_by_id={})
         statuses = [row["status"] for row in standings[0]["participants"]]
 
-        self.assertEqual(statuses[:3], ["promoted", "promoted", "promoted"])
-        self.assertEqual(statuses[3], "eliminated")
+        self.assertEqual(statuses, ["promoted", "promoted", "promoted", "promoted"])
+
+    def test_resolve_current_stage_label_supports_existing_stage_keys(self) -> None:
+        stages = [
+            PlayoffStage(id=1, key="stage_2", title="Stage 2", stage_order=1, stage_size=32, is_started=False),
+            PlayoffStage(id=2, key="stage_1_4", title="Stage 3", stage_order=2, stage_size=16, is_started=False),
+            PlayoffStage(id=3, key="stage_final", title="Final", stage_order=3, stage_size=8, is_started=False),
+        ]
+
+        self.assertEqual(resolve_current_stage_label("ru", stages, show_playoff=True), "II этап 1/4 (32, 4x8, top-4)")
+
+        stages[1].is_started = True
+        self.assertEqual(resolve_current_stage_label("ru", stages, show_playoff=True), "III этап полуфинальные группы (16, 2x8, top-4)")
+
+        stages[1].is_started = False
+        stages[2].is_started = True
+        self.assertEqual(resolve_current_stage_label("ru", stages, show_playoff=True), "Финал (8, правило 22+победа)")
 
 
 if __name__ == "__main__":
