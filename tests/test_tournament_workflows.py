@@ -149,6 +149,28 @@ class TournamentWorkflowTests(unittest.TestCase):
         self.assertEqual(resolve_current_stage_label("en", [unknown_stage], show_playoff=True), "Custom Stage")
 
 
+    def test_get_default_playoff_stage_key_prefers_first_stage_in_progression(self) -> None:
+        stages = [
+            SimpleNamespace(key="stage_2", is_started=False),
+            SimpleNamespace(key="stage_1_4", is_started=False),
+            SimpleNamespace(key="stage_final", is_started=False),
+        ]
+
+        stage_key = web.get_default_playoff_stage_key(stages, web.PLAYOFF_STAGE_KEYS_ORDER)
+
+        self.assertEqual(stage_key, "stage_2")
+
+    def test_get_default_playoff_stage_key_falls_back_to_first_known_stage(self) -> None:
+        stages = [
+            SimpleNamespace(key="custom_stage", is_started=False),
+            SimpleNamespace(key="stage_final", is_started=False),
+        ]
+
+        stage_key = web.get_default_playoff_stage_key(stages, ["stage_2", "stage_1_4"])
+
+        self.assertEqual(stage_key, "custom_stage")
+
+
 class _FakeScalarResult:
     def __init__(self, rows):
         self._rows = rows
