@@ -138,6 +138,14 @@ def get_active_playoff_stage(playoff_stages: list[PlayoffStage], stage_order_key
     return None
 
 
+def get_default_playoff_stage_key(playoff_stages: list[PlayoffStage], stage_order_keys: list[str]) -> str | None:
+    if not playoff_stages:
+        return None
+
+    stage_by_key = {stage.key: stage for stage in playoff_stages}
+    return next((stage_key for stage_key in stage_order_keys if stage_key in stage_by_key), playoff_stages[0].key)
+
+
 def build_playoff_stage_finish_status(
     stage: PlayoffStage,
     participants: list[PlayoffParticipant] | None = None,
@@ -855,7 +863,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
 
         if active_stage_key is None and playoff_stages:
             started_stage = get_active_playoff_stage(playoff_stages, stage_progression_keys)
-            active_stage_key = started_stage.key if started_stage else playoff_stages[-1].key
+            active_stage_key = started_stage.key if started_stage else get_default_playoff_stage_key(playoff_stages, stage_progression_keys)
 
     show_group_stage_controls = active_stage_key == "group_stage"
     groups = group_stage_groups if show_group_stage_controls else []
