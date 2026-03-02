@@ -20,18 +20,38 @@
         <button class="btn btn-danger">{{ tr('admin_auto_draw') }}</button>
       </form>
       <p class="small text-contrast-muted">После жеребьевки состав групп будет показан ниже в виде карточек.</p>
-      <form action="/admin/draw/manual" method="post" class="row g-2 mb-3">
-        <div class="col-md-3"><input class="form-control" type="number" min="1" max="8" name="group_count" value="8" required></div>
-        <div class="col-md-7">
-          <select class="form-select" name="user_ids[]" multiple size="8">
-            {% for user in manual_draw_users %}
-            <option value="{{ user.id }}">{{ user.nickname }} (+ {{ user.steam_id }})</option>
-            {% endfor %}
-          </select>
-          <div class="form-text text-contrast-muted">Если никого не выбрать, жеребьевка пройдет по всем доступным участникам.</div>
+      <div class="border rounded p-3 mb-3" id="visual-draw-root">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-2">
+          <h5 class="mb-0">Визуальная жеребьёвка</h5>
+          <div class="small text-contrast-muted">Лимит: 8 участников на группу</div>
         </div>
-        <div class="col-md-2"><button class="btn btn-outline-danger w-100">{{ tr('admin_manual_draw') }}</button></div>
-      </form>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <button type="button" class="btn btn-sm btn-outline-light" id="visual-add-group">Добавить группу</button>
+          <button type="button" class="btn btn-sm btn-outline-warning" id="visual-remove-empty-group">Удалить пустую группу</button>
+        </div>
+        <form action="/admin/draw/manual" method="post" id="visual-draw-form">
+          <input type="hidden" name="group_count" id="visual-group-count" value="8">
+          <input type="hidden" name="layout_json" id="visual-layout-json" value="{}">
+          <div class="row g-3 mb-3" id="visual-draw-columns"></div>
+          <div class="alert alert-danger py-2 d-none" id="visual-overflow-alert">В одной или нескольких группах превышен лимит в 8 участников.</div>
+          <button class="btn btn-outline-danger">Сохранить раскладку</button>
+        </form>
+        <details class="mt-3">
+          <summary class="small text-contrast-muted">Резервная форма ручной жеребьёвки</summary>
+          <form action="/admin/draw/manual" method="post" class="row g-2 mt-2">
+            <div class="col-md-3"><input class="form-control" type="number" min="1" max="8" name="group_count" value="8" required></div>
+            <div class="col-md-7">
+              <select class="form-select" name="user_ids[]" multiple size="8">
+                {% for user in manual_draw_users %}
+                <option value="{{ user.id }}">{{ user.nickname }} (+ {{ user.steam_id }})</option>
+                {% endfor %}
+              </select>
+              <div class="form-text text-contrast-muted">Если никого не выбрать, жеребьевка пройдет по всем доступным участникам.</div>
+            </div>
+            <div class="col-md-2"><button class="btn btn-outline-danger w-100">{{ tr('admin_manual_draw') }}</button></div>
+          </form>
+        </details>
+      </div>
 
             <div class="d-flex flex-column gap-2 mb-3">
         <div>
@@ -297,6 +317,137 @@
 
 
 <script>
+
+const visualDrawRoot = document.getElementById('visual-draw-root');
+if (visualDrawRoot) {
+  const columnsContainer = document.getElementById('visual-draw-columns');
+  const layoutInput = document.getElementById('visual-layout-json');
+  const groupCountInput = document.getElementById('visual-group-count');
+  const overflowAlert = document.getElementById('visual-overflow-alert');
+  const addGroupButton = document.getElementById('visual-add-group');
+  const removeEmptyGroupButton = document.getElementById('visual-remove-empty-group');
+  const form = document.getElementById('visual-draw-form');
+  const maxGroups = 8;
+  const maxMembersPerGroup = 8;
+  const users = [
+    {% for user in manual_draw_users %}
+    { id: {{ user.id }}, nickname: {{ user.nickname|tojson }}, steam: {{ user.steam_id|tojson }} },
+    {% endfor %}
+  ];
+  const initialGroups = [
+    {% for group in groups|sort(attribute='name') %}
+    {
+      name: {{ group.name|tojson }},
+      members: [{% for member in group.members|sort(attribute='seat') %}{{ member.user_id }}{% if not loop.last %}, {% endif %}{% endfor %}],
+    },
+    {% endfor %}
+  ];
+
+  const state = {
+    groups: initialGroups.length ? initialGroups : Array.from({ length: 8 }, (_, index) => ({ name: `Group ${String.fromCharCode(65 + index)}`, members: [] })),
+    unassigned: [],
+  };
+
+  const assignedIds = new Set(state.groups.flatMap((group) => group.members));
+  state.unassigned = users.filter((user) => !assignedIds.has(user.id)).map((user) => user.id);
+
+  function nextGroupName() {
+    const suffix = String.fromCharCode(65 + state.groups.length);
+    return `Group ${suffix}`;
+  }
+
+  function cardMarkup(userId) {
+    const user = users.find((item) => item.id === userId);
+    if (!user) return '';
+    return `<div class="border rounded p-2 bg-dark" draggable="true" data-user-id="${user.id}"><div class="fw-semibold">${user.nickname}</div><div class="small text-contrast-muted">${user.steam}</div></div>`;
+  }
+
+  function render() {
+    columnsContainer.innerHTML = '';
+    const makeColumn = (title, key, memberIds, isGroup = false) => {
+      const col = document.createElement('div');
+      col.className = 'col-12 col-md-6 col-xl-3';
+      const overflow = isGroup && memberIds.length > maxMembersPerGroup;
+      col.innerHTML = `<div class="border rounded p-2 h-100 ${overflow ? 'border-danger' : ''}"><div class="d-flex justify-content-between align-items-center mb-2"><strong>${title}</strong>${isGroup ? `<span class="badge ${overflow ? 'bg-danger' : 'bg-secondary'}">${memberIds.length}/${maxMembersPerGroup}</span>` : ''}</div><div class="d-flex flex-column gap-2" data-dropzone="${key}">${memberIds.map(cardMarkup).join('')}</div></div>`;
+      columnsContainer.appendChild(col);
+    };
+
+    state.groups.forEach((group, index) => makeColumn(group.name, `group:${index}`, group.members, true));
+    makeColumn('Нераспределённые', 'unassigned', state.unassigned);
+
+    const hasOverflow = state.groups.some((group) => group.members.length > maxMembersPerGroup);
+    overflowAlert.classList.toggle('d-none', !hasOverflow);
+    form.querySelector('button[type="submit"]').disabled = hasOverflow;
+
+    groupCountInput.value = String(state.groups.length);
+    layoutInput.value = JSON.stringify(Object.fromEntries(state.groups.map((group) => [group.name, group.members])));
+
+    columnsContainer.querySelectorAll('[draggable="true"]').forEach((card) => {
+      card.addEventListener('dragstart', (event) => {
+        event.dataTransfer?.setData('text/plain', card.dataset.userId || '');
+      });
+    });
+
+    columnsContainer.querySelectorAll('[data-dropzone]').forEach((zone) => {
+      zone.addEventListener('dragover', (event) => event.preventDefault());
+      zone.addEventListener('drop', (event) => {
+        event.preventDefault();
+        const rawUserId = event.dataTransfer?.getData('text/plain') || '';
+        const userId = Number.parseInt(rawUserId, 10);
+        if (!userId) return;
+
+        const targetZone = zone.dataset.dropzone;
+        const sourceGroupIndex = state.groups.findIndex((group) => group.members.includes(userId));
+        if (sourceGroupIndex >= 0) {
+          state.groups[sourceGroupIndex].members = state.groups[sourceGroupIndex].members.filter((id) => id !== userId);
+        } else {
+          state.unassigned = state.unassigned.filter((id) => id !== userId);
+        }
+
+        if (targetZone === 'unassigned') {
+          state.unassigned.push(userId);
+          render();
+          return;
+        }
+
+        const targetGroupIndex = Number.parseInt(targetZone.replace('group:', ''), 10);
+        if (Number.isNaN(targetGroupIndex) || !state.groups[targetGroupIndex]) {
+          render();
+          return;
+        }
+
+        if (state.groups[targetGroupIndex].members.length >= maxMembersPerGroup) {
+          if (sourceGroupIndex >= 0) {
+            state.groups[sourceGroupIndex].members.push(userId);
+          } else {
+            state.unassigned.push(userId);
+          }
+          render();
+          return;
+        }
+
+        state.groups[targetGroupIndex].members.push(userId);
+        render();
+      });
+    });
+  }
+
+  addGroupButton?.addEventListener('click', () => {
+    if (state.groups.length >= maxGroups) return;
+    state.groups.push({ name: nextGroupName(), members: [] });
+    render();
+  });
+
+  removeEmptyGroupButton?.addEventListener('click', () => {
+    const emptyIndex = state.groups.map((group, index) => ({ group, index })).reverse().find((item) => item.group.members.length === 0)?.index;
+    if (emptyIndex === undefined || state.groups.length <= 1) return;
+    state.groups.splice(emptyIndex, 1);
+    render();
+  });
+
+  render();
+}
+
 document.querySelectorAll('.js-generate-pin').forEach((button) => {
   button.addEventListener('click', () => {
     const form = button.closest('form');

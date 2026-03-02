@@ -228,7 +228,12 @@ def parse_manual_draw_user_ids(raw_user_ids: str | list[str] | tuple[str, ...] |
     return parsed
 
 
-async def create_manual_draw(db: AsyncSession, group_count: int, user_ids: list[int]) -> None:
+async def create_manual_draw(
+    db: AsyncSession,
+    group_count: int,
+    user_ids: list[int],
+    layout_by_group: list[list[int]] | None = None,
+) -> None:
     if group_count < 1 or group_count > 8:
         raise ValueError("Количество групп должно быть от 1 до 8")
     if len(user_ids) > group_count * 8:
@@ -247,11 +252,28 @@ async def create_manual_draw(db: AsyncSession, group_count: int, user_ids: list[
         groups.append(group)
     await db.flush()
 
-    for offset, user_id in enumerate(user_ids):
-        group = groups[offset % group_count]
-        await validate_group_member_constraints(db, group_id=group.id, user_id=user_id)
-        seat = 1 + len(list((await db.scalars(select(GroupMember.id).where(GroupMember.group_id == group.id))).all()))
-        db.add(GroupMember(group_id=group.id, user_id=user_id, seat=seat))
+    if layout_by_group is not None:
+        if len(layout_by_group) != group_count:
+            raise ValueError("Количество групп в раскладке не совпадает с group_count")
+
+        for members in layout_by_group:
+            if len(members) > 8:
+                raise ValueError("Группа уже заполнена (максимум 8 участников)")
+
+        flattened_ids = [user_id for members in layout_by_group for user_id in members]
+        if len(flattened_ids) != len(set(flattened_ids)):
+            raise ValueError("ID участников в раскладке должны быть уникальны")
+
+        for group, members in zip(groups, layout_by_group, strict=True):
+            for seat, user_id in enumerate(members, start=1):
+                await validate_group_member_constraints(db, group_id=group.id, user_id=user_id)
+                db.add(GroupMember(group_id=group.id, user_id=user_id, seat=seat))
+    else:
+        for offset, user_id in enumerate(user_ids):
+            group = groups[offset % group_count]
+            await validate_group_member_constraints(db, group_id=group.id, user_id=user_id)
+            seat = 1 + len(list((await db.scalars(select(GroupMember.id).where(GroupMember.group_id == group.id))).all()))
+            db.add(GroupMember(group_id=group.id, user_id=user_id, seat=seat))
 
     await db.commit()
 
