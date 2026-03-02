@@ -1730,7 +1730,7 @@ async def admin_playoff_score(
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     stage_config = get_admin_playoff_stage_config(stage.key)
-    if stage_config.game_limit is None:
+    if stage_config.game_limit is None and not stage_config.is_final:
         return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
     try:
         if placements_list:
@@ -1738,11 +1738,6 @@ async def admin_playoff_score(
         else:
             ordered_user_ids = [int(part.strip()) for part in placements.split(",") if part.strip()]
         await apply_playoff_match_results(db, stage_id, ordered_user_ids, group_number=group_number)
-        if stage.key in {"stage_2", "stage_1_4"}:
-            try:
-                await finalize_limited_playoff_stage_if_ready(db, stage_id)
-            except ValueError:
-                pass
         return redirect_with_admin_msg("msg_playoff_game_saved")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
@@ -1758,7 +1753,7 @@ async def admin_finish_playoff_group(
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     stage_config = get_admin_playoff_stage_config(stage.key)
-    if stage_config.game_limit is None:
+    if stage_config.game_limit is None and not stage_config.is_final:
         return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
 
     participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))).all())
@@ -1869,11 +1864,6 @@ async def admin_playoff_results_batch(
             for user_id, place in sorted(placements_map.items(), key=lambda item: item[1])
         ]
         await apply_playoff_match_results(db, stage_id, ordered_user_ids, group_number=group_number)
-        if stage.key in {"stage_2", "stage_1_4"}:
-            try:
-                await finalize_limited_playoff_stage_if_ready(db, stage_id)
-            except ValueError:
-                pass
         return redirect_with_admin_msg("msg_playoff_game_saved")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
