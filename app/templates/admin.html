@@ -154,6 +154,8 @@
         {% if current_stage_groups %}
         <div class="row g-3">
         {% for group in current_stage_groups %}
+          {% set group_locked = group.game_limit != 'special' and group.games_played >= group.game_limit %}
+          {% set display_current_game = group.game_limit if group.game_limit != 'special' and group.current_game > group.game_limit else group.current_game %}
           <div class="col-12 col-lg-6">
             <div class="border rounded p-3 h-100">
               {{ stage_macros.stage_group_controls(
@@ -161,10 +163,11 @@
                 members=group.participants,
                 score_action='/admin/playoff/results/batch',
                 score_hidden_fields={'stage_id': current_playoff_stage.id, 'group_number': group.group_number},
+                group_locked=group_locked,
                 submit_label=tr('admin_save_playoff_places'),
                 place_input='number',
                 place_max=8,
-                progress_text=(tr('admin_group') ~ ' ' ~ group.group_label ~ ' · ' ~ tr('participants_game') ~ ' ' ~ group.current_game ~ (' · Сыграно ' ~ group.games_played ~ '/' ~ group.game_limit if group.game_limit != 'special' else '')),
+                progress_text=(tr('admin_group') ~ ' ' ~ group.group_label ~ ' · ' ~ tr('participants_game') ~ ' ' ~ display_current_game ~ (' · Сыграно ' ~ group.games_played ~ '/' ~ group.game_limit if group.game_limit != 'special' else '')),
                 finish_action='/admin/playoff/group/finish',
                 finish_hidden_fields={'stage_id': current_playoff_stage.id, 'group_number': group.group_number},
                 finish_label='Закончить этап, определить победителей по очкам',
