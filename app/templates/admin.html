@@ -144,6 +144,15 @@
       {% set final_candidate_user_id = current_playoff_stage.final_candidate_user_id %}
       {% set final_leader = final_group.participants[0] if final_group and final_group.participants else None %}
       <h5 class="mt-4">{{ tr('admin_playoff_match_results') }}</h5>
+      {{ stage_macros.stage_finish_panel(
+        is_ready=playoff_stage_finish_ready,
+        finish_action='/admin/playoff/stage/finish',
+        finish_label='Завершить текущую playoff-стадию',
+        progress_items=playoff_stage_finish_progress,
+        progress_limit=playoff_stage_finish_progress_limit,
+        hidden_fields={'stage_id': current_playoff_stage.id},
+        card_class='mb-2'
+      ) }}
       <div class="border rounded p-3 mb-3">
         <div class="fw-bold mb-2">{{ current_playoff_stage.title }}</div>
         {% if final_candidate_user_id is not none %}
@@ -184,10 +193,6 @@
                 place_input='number',
                 place_max=8,
                 progress_text=(tr('admin_group') ~ ' ' ~ group.group_label ~ ': ' ~ group.games_played ~ '/' ~ (group.game_limit if group.game_limit != 'special' else '∞')),
-                finish_action='/admin/playoff/group/finish',
-                finish_hidden_fields={'stage_id': current_playoff_stage.id, 'group_number': group.group_number},
-                finish_label='Закончить этап, определить победителей по очкам',
-                finish_disabled=(group.game_limit != 'special' and group.games_played < group.game_limit),
                 highlight_user_id=final_candidate_user_id,
                 wrapper_class='w-100 h-100'
               ) }}
