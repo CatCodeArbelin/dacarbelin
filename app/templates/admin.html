@@ -16,6 +16,7 @@
   <div class="col-12 col-xl-8 mx-auto">
     <div class="card bg-black neon-border-red"><div class="card-body">
       <h4>{{ tr('admin_draw_controls') }}</h4>
+      {% if not tournament_started %}
       <form action="/admin/draw/auto" method="post" class="mb-3">
         <button class="btn btn-danger">{{ tr('admin_auto_draw') }}</button>
       </form>
@@ -53,6 +54,11 @@
           </form>
         </details>
       </div>
+      {% else %}
+      <div class="alert alert-info py-2 mb-3">
+        Жеребьёвка уже закрыта: турнир запущен. Ниже доступны только сформированные группы и результаты.
+      </div>
+      {% endif %}
 
             <div class="d-flex flex-column gap-2 mb-3">
         <div>
@@ -73,12 +79,14 @@
 
         <div class="small text-contrast-muted">Групп найдено: {{ groups_count }}</div>
 
+        {% if not tournament_started %}
         <form action="/admin/draw/apply" method="post">
           <button class="btn btn-success w-100" {% if not draw_exists or invalid_draw_reason %}disabled{% endif %}>Применить жеребьевку</button>
         </form>
         <form action="/admin/tournament/start" method="post">
           <button class="btn btn-danger w-100" {% if tournament_started or not draw_applied or invalid_draw_reason %}disabled{% endif %}>Начать турнир</button>
         </form>
+        {% endif %}
       </div>
     </div></div>
   </div>
