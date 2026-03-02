@@ -87,6 +87,8 @@ class PlayoffPromotionTests(unittest.IsolatedAsyncioTestCase):
         await promote_top_between_stages(db, stage_id=30, top_n=4)
 
         self.assertEqual(len(db.added), 8)
+        promoted_ids = [participant.user_id for participant in db.added]
+        self.assertEqual(promoted_ids, [1, 2, 3, 4, 9, 10, 11, 12])
         for new_participant in db.added:
             self.assertEqual(new_participant.stage_id, 40)
             self.assertEqual(new_participant.points, 0)

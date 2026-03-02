@@ -178,6 +178,36 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(match.state, "finished")
         self.assertEqual(match.winner_user_id, 1)
 
+
+    async def test_final_candidate_is_set_at_22_points_threshold(self) -> None:
+        ordered_user_ids = [1, 2, 3, 4, 5, 6, 7, 8]
+        participants = [
+            PlayoffParticipant(stage_id=1, user_id=user_id, seed=user_id, points=0, wins=0, top4_finishes=0, last_place=8)
+            for user_id in ordered_user_ids
+        ]
+        participants[0].points = 21
+
+        stage = PlayoffStage(
+            id=1,
+            key="stage_final",
+            title="Final",
+            stage_size=8,
+            stage_order=4,
+            scoring_mode="final_22_top1",
+            final_candidate_user_id=None,
+        )
+        match = PlayoffMatch(stage_id=1, match_number=1, group_number=1, game_number=1, state="in_progress")
+
+        db = AsyncMock()
+        db.scalar = AsyncMock(side_effect=[stage, match])
+        db.scalars = AsyncMock(return_value=_ScalarResult(participants))
+
+        await apply_playoff_match_results(db, stage_id=1, ordered_user_ids=[2, 3, 4, 5, 6, 7, 1, 8], group_number=1)
+
+        self.assertEqual(participants[0].points, 22)
+        self.assertEqual(stage.final_candidate_user_id, 1)
+        self.assertEqual(match.state, "in_progress")
+
     def test_playoff_sort_key_prioritizes_points_for_remaining_places(self) -> None:
         """Проверяет `playoff_sort_key` для распределения мест по сумме очков."""
         p1 = PlayoffParticipant(stage_id=1, user_id=1, seed=1, points=16, wins=2, top4_finishes=2, last_place=2)
