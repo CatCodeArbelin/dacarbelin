@@ -437,6 +437,7 @@ PLAYOFF_STAGE_COLUMNS = [
     ("stage_final", "Финал (8)"),
 ]
 FINAL_SCORING_MODE = "final_22_top1"
+FINAL_CANDIDATE_POINTS_THRESHOLD = 22
 DIRECT_INVITE_STAGE_2 = "stage_2"
 STAGE_2_DIRECT_INVITES_LIMIT = 11
 
@@ -858,9 +859,9 @@ async def apply_playoff_match_results(
             if ordered_user_ids[0] == stage.final_candidate_user_id:
                 match.winner_user_id = stage.final_candidate_user_id
                 should_finish_final_stage = True
-            elif leader.points >= 22:
+            elif leader.points >= FINAL_CANDIDATE_POINTS_THRESHOLD:
                 stage.final_candidate_user_id = leader.user_id
-        elif leader.points >= 22:
+        elif leader.points >= FINAL_CANDIDATE_POINTS_THRESHOLD:
             stage.final_candidate_user_id = leader.user_id
 
     if should_finish_limited_stage or should_finish_final_stage:
