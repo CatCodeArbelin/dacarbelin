@@ -376,7 +376,7 @@ if (visualDrawRoot) {
   function cardMarkup(userId) {
     const user = users.find((item) => item.id === userId);
     if (!user) return '';
-    return `<div class="border rounded p-2 bg-dark" draggable="true" data-user-id="${user.id}"><div class="fw-semibold">${user.nickname}</div><div class="small text-contrast-muted">${user.steam}</div></div>`;
+    return `<div class="border rounded p-2 bg-dark visual-draw-card" draggable="true" data-user-id="${user.id}"><div class="fw-semibold">${user.nickname}</div><div class="small text-contrast-muted">${user.steam}</div></div>`;
   }
 
   function render() {
@@ -385,7 +385,7 @@ if (visualDrawRoot) {
       const col = document.createElement('div');
       col.className = 'col-12 col-md-6 col-xl-3';
       const overflow = isGroup && memberIds.length > maxMembersPerGroup;
-      col.innerHTML = `<div class="border rounded p-2 h-100 ${overflow ? 'border-danger' : ''}"><div class="d-flex justify-content-between align-items-center mb-2"><strong>${title}</strong>${isGroup ? `<span class="badge ${overflow ? 'bg-danger' : 'bg-secondary'}">${memberIds.length}/${maxMembersPerGroup}</span>` : ''}</div><div class="d-flex flex-column gap-2" data-dropzone="${key}">${memberIds.map(cardMarkup).join('')}</div></div>`;
+      col.innerHTML = `<div class="border rounded p-2 h-100 ${overflow ? 'border-danger' : ''}"><div class="d-flex justify-content-between align-items-center mb-2"><strong>${title}</strong>${isGroup ? `<span class="badge ${overflow ? 'bg-danger' : 'bg-secondary'}">${memberIds.length}/${maxMembersPerGroup}</span>` : ''}</div><div class="d-flex flex-column gap-2 visual-draw-dropzone" data-dropzone="${key}">${memberIds.length ? memberIds.map(cardMarkup).join('') : '<div class="small text-contrast-muted visual-draw-drop-hint">Перетащите участника сюда</div>'}</div></div>`;
       columnsContainer.appendChild(col);
     };
 
@@ -409,14 +409,30 @@ if (visualDrawRoot) {
 
     columnsContainer.querySelectorAll('[draggable="true"]').forEach((card) => {
       card.addEventListener('dragstart', (event) => {
+        card.classList.add('visual-draw-card-dragging');
         event.dataTransfer?.setData('text/plain', card.dataset.userId || '');
+      });
+      card.addEventListener('dragend', () => {
+        card.classList.remove('visual-draw-card-dragging');
       });
     });
 
     columnsContainer.querySelectorAll('[data-dropzone]').forEach((zone) => {
-      zone.addEventListener('dragover', (event) => event.preventDefault());
+      zone.addEventListener('dragenter', (event) => {
+        event.preventDefault();
+        zone.classList.add('visual-draw-dropzone-active');
+      });
+      zone.addEventListener('dragleave', (event) => {
+        if (!zone.contains(event.relatedTarget)) {
+          zone.classList.remove('visual-draw-dropzone-active');
+        }
+      });
+      zone.addEventListener('dragover', (event) => {
+        event.preventDefault();
+      });
       zone.addEventListener('drop', (event) => {
         event.preventDefault();
+        zone.classList.remove('visual-draw-dropzone-active');
         const rawUserId = event.dataTransfer?.getData('text/plain') || '';
         const userId = Number.parseInt(rawUserId, 10);
         if (!userId) return;
@@ -500,6 +516,37 @@ if (visualDrawRoot) {
 
   render();
 }
+
+const visualDrawStyles = document.createElement('style');
+visualDrawStyles.textContent = `
+  .visual-draw-dropzone {
+    min-height: 6rem;
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .visual-draw-dropzone-active {
+    border-color: rgba(255, 255, 255, 0.7);
+    background-color: rgba(255, 255, 255, 0.06);
+  }
+
+  .visual-draw-card {
+    cursor: grab;
+  }
+
+  .visual-draw-card-dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+  }
+
+  .visual-draw-drop-hint {
+    margin: auto 0;
+    text-align: center;
+  }
+`;
+document.head.appendChild(visualDrawStyles);
 
 document.querySelectorAll('.js-generate-pin').forEach((button) => {
   button.addEventListener('click', () => {
