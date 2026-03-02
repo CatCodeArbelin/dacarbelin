@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-{% import "includes/tournament_stage_macros.html" as stage_ui %}
+{% import "includes/tournament_stage_macros.html" as stage_ui with context %}
 <h2>{{ tr('tournament_title') }}</h2>
 <div class="alert alert-contrast mt-3">
   {{ tr('tournament_current_stage') }}:
