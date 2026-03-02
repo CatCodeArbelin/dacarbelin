@@ -407,10 +407,27 @@ if (visualDrawRoot) {
     return maxIndex + 1;
   }
 
-  function cardMarkup(userId) {
+  function moveUserWithinZone(zoneKey, userId, direction) {
+    if (!direction) return;
+    const members = zoneKey === 'unassigned'
+      ? state.unassigned
+      : state.groups[Number.parseInt(zoneKey.replace('group:', ''), 10)]?.members;
+    if (!members) return;
+
+    const currentIndex = members.indexOf(userId);
+    if (currentIndex < 0) return;
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= members.length) return;
+
+    [members[currentIndex], members[targetIndex]] = [members[targetIndex], members[currentIndex]];
+    render();
+  }
+
+  function cardMarkup(userId, zoneKey) {
     const user = users.find((item) => item.id === userId);
     if (!user) return '';
-    return `<div class="border rounded p-2 bg-dark visual-draw-card" draggable="true" data-user-id="${user.id}"><div class="fw-semibold">${user.nickname}</div><div class="small text-contrast-muted">${user.steam}</div></div>`;
+    return `<div class="border rounded p-2 bg-dark visual-draw-card" draggable="true" data-user-id="${user.id}" data-zone-key="${zoneKey}"><div class="d-flex justify-content-between align-items-start gap-2"><div><div class="fw-semibold">${user.nickname}</div><div class="small text-contrast-muted">${user.steam}</div></div><div class="btn-group btn-group-sm" role="group"><button type="button" class="btn btn-outline-light visual-draw-move" data-move="up" title="Переместить выше" aria-label="Переместить выше">↑</button><button type="button" class="btn btn-outline-light visual-draw-move" data-move="down" title="Переместить ниже" aria-label="Переместить ниже">↓</button></div></div></div>`;
   }
 
   function render() {
@@ -419,7 +436,7 @@ if (visualDrawRoot) {
       const col = document.createElement('div');
       col.className = 'col-12 col-md-6 col-xl-3';
       const overflow = isGroup && memberIds.length > maxMembersPerGroup;
-      col.innerHTML = `<div class="border rounded p-2 h-100 ${overflow ? 'border-danger' : ''}"><div class="d-flex justify-content-between align-items-center mb-2"><strong>${title}</strong>${isGroup ? `<span class="badge ${overflow ? 'bg-danger' : 'bg-secondary'}">${memberIds.length}/${maxMembersPerGroup}</span>` : ''}</div><div class="d-flex flex-column gap-2 visual-draw-dropzone" data-dropzone="${key}">${memberIds.length ? memberIds.map(cardMarkup).join('') : '<div class="small text-contrast-muted visual-draw-drop-hint">Перетащите участника сюда</div>'}</div></div>`;
+      col.innerHTML = `<div class="border rounded p-2 h-100 ${overflow ? 'border-danger' : ''}"><div class="d-flex justify-content-between align-items-center mb-2"><strong>${title}</strong>${isGroup ? `<span class="badge ${overflow ? 'bg-danger' : 'bg-secondary'}">${memberIds.length}/${maxMembersPerGroup}</span>` : ''}</div><div class="d-flex flex-column gap-2 visual-draw-dropzone" data-dropzone="${key}">${memberIds.length ? memberIds.map((id) => cardMarkup(id, key)).join('') : '<div class="small text-contrast-muted visual-draw-drop-hint">Перетащите участника сюда</div>'}</div></div>`;
       columnsContainer.appendChild(col);
     };
 
@@ -448,6 +465,20 @@ if (visualDrawRoot) {
       });
       card.addEventListener('dragend', () => {
         card.classList.remove('visual-draw-card-dragging');
+      });
+    });
+
+    columnsContainer.querySelectorAll('.visual-draw-move').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const card = button.closest('.visual-draw-card');
+        const rawUserId = card?.dataset.userId || '';
+        const zoneKey = card?.dataset.zoneKey || '';
+        const direction = button.dataset.move || '';
+        const userId = Number.parseInt(rawUserId, 10);
+        if (!userId || !zoneKey) return;
+        moveUserWithinZone(zoneKey, userId, direction);
       });
     });
 

@@ -24,6 +24,9 @@ def test_admin_template_has_playoff_hint_without_manual_stage_controls() -> None
     assert "/admin/playoff/override" in template
     assert "stage_macros.stage_finish_panel" in template
     assert "playoff_empty_active_stage_alert" in template
+    assert "visual-draw-move" in template
+    assert "Переместить выше" in template
+    assert "Переместить ниже" in template
     assert "/admin/group-stage/finish" in template
     assert "group_stage_game_limit" in template
     assert "stage_finish_panel" in macros
