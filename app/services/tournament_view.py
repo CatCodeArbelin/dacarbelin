@@ -127,18 +127,28 @@ def _participants_for_group_members(members: Sequence[GroupMember]) -> list[Brac
 def _participants_for_playoff_members(
     participants: Sequence[PlayoffParticipant], user_by_id: Mapping[int, User]
 ) -> dict[int, list[BracketParticipantVM]]:
-    participants_by_group: dict[int, list[BracketParticipantVM]] = {}
-    for participant in sorted(participants, key=lambda item: item.seed):
+    grouped_participants: dict[int, list[PlayoffParticipant]] = {}
+    for participant in participants:
         group_number = get_stage_group_number_by_seed(participant.seed)
-        user = user_by_id.get(participant.user_id)
-        participants_by_group.setdefault(group_number, []).append(
-            {
-                "user_id": participant.user_id,
-                "nickname": _display_nickname(user, str(participant.user_id)),
-                "points": participant.points or 0,
-                "is_direct_invite_preview": False,
-            }
+        grouped_participants.setdefault(group_number, []).append(participant)
+
+    participants_by_group: dict[int, list[BracketParticipantVM]] = {}
+    for group_number in sorted(grouped_participants):
+        group_participants = sorted(
+            grouped_participants[group_number],
+            key=lambda participant: (*playoff_sort_key(participant), -participant.seed),
+            reverse=True,
         )
+        for participant in group_participants:
+            user = user_by_id.get(participant.user_id)
+            participants_by_group.setdefault(group_number, []).append(
+                {
+                    "user_id": participant.user_id,
+                    "nickname": _display_nickname(user, str(participant.user_id)),
+                    "points": participant.points or 0,
+                    "is_direct_invite_preview": False,
+                }
+            )
     return participants_by_group
 
 

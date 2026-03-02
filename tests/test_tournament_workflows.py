@@ -287,6 +287,34 @@ def test_build_bracket_columns_adds_placeholders_for_missing_stage_groups() -> N
     assert all(match["state"] == "pending" for match in stage_2_column["matches"])
 
 
+
+
+def test_build_bracket_columns_sorts_stage_2_participants_by_points_within_group() -> None:
+    stage = SimpleNamespace(
+        key="stage_2",
+        stage_size=32,
+        participants=[
+            SimpleNamespace(user_id=30, seed=1, points=10, wins=1, top4_finishes=1, top8_finishes=1, last_place=2),
+            SimpleNamespace(user_id=20, seed=2, points=12, wins=0, top4_finishes=1, top8_finishes=1, last_place=3),
+            SimpleNamespace(user_id=10, seed=8, points=12, wins=0, top4_finishes=1, top8_finishes=1, last_place=3),
+        ],
+        matches=[
+            SimpleNamespace(group_number=1, game_number=1, schedule_text="TBD", lobby_password="0000", state="pending"),
+        ],
+    )
+
+    columns = build_bracket_columns(
+        groups=[],
+        playoff_stages=[stage],
+        user_by_id={},
+        direct_invite_ids=[],
+    )
+
+    stage_2_column = next(column for column in columns if column["key"] == "stage_2")
+    group_a = next(match for match in stage_2_column["matches"] if match["group_label"] == "A")
+
+    assert [participant["user_id"] for participant in group_a["participants"]] == [10, 20, 30]
+
 def test_build_bracket_columns_empty_tournament_has_all_stages_and_placeholders() -> None:
     columns = build_bracket_columns(
         groups=[],
