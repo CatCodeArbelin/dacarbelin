@@ -73,6 +73,85 @@ def test_admin_manual_draw_accepts_layout_json(monkeypatch) -> None:
     assert captured == {"layout": {"group_order": [1, 0], "groups": [{"group_label": "Group B", "group_index": 1, "members": ["13"]}, {"group_label": "Group A", "group_index": 0, "members": ["11", "12"]}]}}
 
 
+def test_admin_manual_draw_layout_allows_group_count_change(monkeypatch) -> None:
+    """Проверяет, что при layout_json число групп берется из раскладки, а не из group_count."""
+    captured: dict[str, object] = {}
+
+    async def fake_create_manual_draw_from_layout(db, layout_payload: object) -> None:
+        captured["layout"] = layout_payload
+
+    async def fake_set_draw_applied(db, value: bool):
+        return None
+
+    async def fake_commit(self):
+        return None
+
+    monkeypatch.setattr(web, "create_manual_draw_from_layout", fake_create_manual_draw_from_layout)
+    monkeypatch.setattr(web, "set_draw_applied", fake_set_draw_applied)
+    monkeypatch.setattr(web.AsyncSession, "commit", fake_commit, raising=False)
+
+    payload = {
+        "group_order": [0, 1, 2, 3, 4, 5],
+        "groups": [
+            {"group_label": "Group A", "group_index": 0, "members": ["11", "12"]},
+            {"group_label": "Group B", "group_index": 1, "members": ["13", "14"]},
+            {"group_label": "Group C", "group_index": 2, "members": ["15", "16"]},
+            {"group_label": "Group D", "group_index": 3, "members": ["17", "18"]},
+            {"group_label": "Group E", "group_index": 4, "members": ["19", "20"]},
+            {"group_label": "Group F", "group_index": 5, "members": ["21", "22"]},
+        ],
+    }
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/draw/manual",
+            data={"group_count": "7", "layout_json": str(payload).replace("'", '"')},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_status_ok"
+    assert captured["layout"] == payload
+
+
+def test_admin_manual_draw_layout_preserves_member_order_for_seats(monkeypatch) -> None:
+    """Проверяет передачу порядка участников в layout_json для дальнейшего seat=1..N."""
+    captured: dict[str, object] = {}
+
+    async def fake_create_manual_draw_from_layout(db, layout_payload: object) -> None:
+        captured["layout"] = layout_payload
+
+    async def fake_set_draw_applied(db, value: bool):
+        return None
+
+    async def fake_commit(self):
+        return None
+
+    monkeypatch.setattr(web, "create_manual_draw_from_layout", fake_create_manual_draw_from_layout)
+    monkeypatch.setattr(web, "set_draw_applied", fake_set_draw_applied)
+    monkeypatch.setattr(web.AsyncSession, "commit", fake_commit, raising=False)
+
+    payload = {
+        "group_order": [0],
+        "groups": [
+            {"group_label": "Group A", "group_index": 0, "members": ["18", "11", "15", "12"]},
+        ],
+    }
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/draw/manual",
+            data={"layout_json": str(payload).replace("'", '"')},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_status_ok"
+    assert captured["layout"] == payload
+
+
 def test_admin_manual_draw_returns_validation_details_for_layout(monkeypatch) -> None:
     """Проверяет отдачу details при ошибках валидации layout_json."""
 
@@ -91,6 +170,26 @@ def test_admin_manual_draw_returns_validation_details_for_layout(monkeypatch) ->
 
     assert response.status_code == 303
     assert response.headers["location"] == "/admin?msg=msg_operation_failed&details=duplicate_user%3A11"
+
+
+def test_admin_manual_draw_returns_group_overflow_details_for_layout(monkeypatch) -> None:
+    """Проверяет details при превышении лимита участников в группе."""
+
+    async def fake_create_manual_draw_from_layout(db, layout_payload: object) -> None:
+        raise web.ManualDrawValidationError("group_overflow")
+
+    monkeypatch.setattr(web, "create_manual_draw_from_layout", fake_create_manual_draw_from_layout)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/draw/manual",
+            data={"layout_json": '{"group_order": [0], "groups": [{"group_label": "Group A", "group_index": 0, "members": ["1", "2", "3", "4", "5", "6", "7", "8", "9"]}]}'},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_operation_failed&details=group_overflow"
 
 
 def test_admin_manual_draw_returns_invalid_layout_for_bad_json() -> None:
@@ -202,6 +301,36 @@ def test_admin_manual_draw_resets_draw_applied(monkeypatch) -> None:
     with TestClient(app) as client:
         client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
         response = client.post("/admin/draw/manual", data={"group_count": "2", "user_ids[]": ["11", "12"]}, follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_status_ok"
+    assert state == {"set_false": True, "committed": True}
+
+
+def test_admin_manual_draw_layout_resets_draw_applied(monkeypatch) -> None:
+    """Проверяет сброс draw_applied=False после сохранения раскладки через layout_json."""
+    state: dict[str, bool] = {"set_false": False, "committed": False}
+
+    async def fake_create_manual_draw_from_layout(db, layout_payload: object) -> None:
+        return None
+
+    async def fake_set_draw_applied(db, value: bool):
+        state["set_false"] = (value is False)
+
+    async def fake_commit(self):
+        state["committed"] = True
+
+    monkeypatch.setattr(web, "create_manual_draw_from_layout", fake_create_manual_draw_from_layout)
+    monkeypatch.setattr(web, "set_draw_applied", fake_set_draw_applied)
+    monkeypatch.setattr(web.AsyncSession, "commit", fake_commit, raising=False)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/draw/manual",
+            data={"layout_json": '{"group_order": [0], "groups": [{"group_label": "Group A", "group_index": 0, "members": ["11", "12"]}]}'},
+            follow_redirects=False,
+        )
 
     assert response.status_code == 303
     assert response.headers["location"] == "/admin?msg=msg_status_ok"
