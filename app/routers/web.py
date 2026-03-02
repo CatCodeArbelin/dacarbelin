@@ -799,6 +799,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
 
     show_group_stage_controls = active_stage_key == "group_stage"
     groups = group_stage_groups if show_group_stage_controls else []
+    draw_groups = group_stage_groups
     group_stage_finish_ready, group_stage_finish_status, group_stage_games_played = await get_group_stage_completion_status(db)
     group_stage_games_summary = [
         {
@@ -934,6 +935,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             request,
             stages=stages,
             groups=groups,
+            draw_groups=draw_groups,
             playoff_stages=playoff_stages,
             score_hint="user_id1,user_id2,...,user_id8",
             registration_open=registration_open,
