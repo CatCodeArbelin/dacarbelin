@@ -27,13 +27,14 @@
         </div>
         <div class="d-flex flex-wrap gap-2 mb-3">
           <button type="button" class="btn btn-sm btn-outline-light" id="visual-add-group">Добавить группу</button>
-          <button type="button" class="btn btn-sm btn-outline-warning" id="visual-remove-empty-group">Удалить пустую группу</button>
+          <button type="button" class="btn btn-sm btn-outline-warning" id="visual-remove-group">Удалить группу</button>
         </div>
         <form action="/admin/draw/manual" method="post" id="visual-draw-form">
           <input type="hidden" name="group_count" id="visual-group-count" value="8">
           <input type="hidden" name="layout_json" id="visual-layout-json" value="{}">
           <div class="row g-3 mb-3" id="visual-draw-columns"></div>
           <div class="alert alert-danger py-2 d-none" id="visual-overflow-alert">В одной или нескольких группах превышен лимит в 8 участников.</div>
+          <div class="alert alert-warning py-2 d-none" id="visual-unassigned-alert">Есть нераспределённые участники. Их нужно распределить по группам перед сохранением.</div>
           <button class="btn btn-outline-danger">Сохранить раскладку</button>
         </form>
         <details class="mt-3">
@@ -325,7 +326,8 @@ if (visualDrawRoot) {
   const groupCountInput = document.getElementById('visual-group-count');
   const overflowAlert = document.getElementById('visual-overflow-alert');
   const addGroupButton = document.getElementById('visual-add-group');
-  const removeEmptyGroupButton = document.getElementById('visual-remove-empty-group');
+  const removeGroupButton = document.getElementById('visual-remove-group');
+  const unassignedAlert = document.getElementById('visual-unassigned-alert');
   const form = document.getElementById('visual-draw-form');
   const maxGroups = 8;
   const maxMembersPerGroup = 8;
@@ -344,16 +346,31 @@ if (visualDrawRoot) {
   ];
 
   const state = {
-    groups: initialGroups.length ? initialGroups : Array.from({ length: 8 }, (_, index) => ({ name: `Group ${String.fromCharCode(65 + index)}`, members: [] })),
+    groups: initialGroups.length
+      ? initialGroups.map((group, index) => ({
+          group_label: group.name,
+          group_index: index,
+          members: [...group.members],
+        }))
+      : Array.from({ length: 8 }, (_, index) => ({
+          group_label: `Group ${String.fromCharCode(65 + index)}`,
+          group_index: index,
+          members: [],
+        })),
     unassigned: [],
   };
 
   const assignedIds = new Set(state.groups.flatMap((group) => group.members));
   state.unassigned = users.filter((user) => !assignedIds.has(user.id)).map((user) => user.id);
 
-  function nextGroupName() {
+  function nextGroupLabel() {
     const suffix = String.fromCharCode(65 + state.groups.length);
     return `Group ${suffix}`;
+  }
+
+  function nextGroupIndex() {
+    const maxIndex = state.groups.reduce((acc, group) => Math.max(acc, group.group_index), -1);
+    return maxIndex + 1;
   }
 
   function cardMarkup(userId) {
@@ -372,15 +389,23 @@ if (visualDrawRoot) {
       columnsContainer.appendChild(col);
     };
 
-    state.groups.forEach((group, index) => makeColumn(group.name, `group:${index}`, group.members, true));
+    state.groups.forEach((group, index) => makeColumn(group.group_label, `group:${index}`, group.members, true));
     makeColumn('Нераспределённые', 'unassigned', state.unassigned);
 
     const hasOverflow = state.groups.some((group) => group.members.length > maxMembersPerGroup);
+    const hasUnassigned = state.unassigned.length > 0;
     overflowAlert.classList.toggle('d-none', !hasOverflow);
-    form.querySelector('button[type="submit"]').disabled = hasOverflow;
+    unassignedAlert?.classList.toggle('d-none', !hasUnassigned);
 
     groupCountInput.value = String(state.groups.length);
-    layoutInput.value = JSON.stringify(Object.fromEntries(state.groups.map((group) => [group.name, group.members])));
+    layoutInput.value = JSON.stringify({
+      group_order: state.groups.map((group) => group.group_index),
+      groups: state.groups.map((group) => ({
+        group_label: group.group_label,
+        group_index: group.group_index,
+        members: [...group.members],
+      })),
+    });
 
     columnsContainer.querySelectorAll('[draggable="true"]').forEach((card) => {
       card.addEventListener('dragstart', (event) => {
@@ -434,15 +459,43 @@ if (visualDrawRoot) {
 
   addGroupButton?.addEventListener('click', () => {
     if (state.groups.length >= maxGroups) return;
-    state.groups.push({ name: nextGroupName(), members: [] });
+    state.groups.push({
+      group_label: nextGroupLabel(),
+      group_index: nextGroupIndex(),
+      members: [],
+    });
     render();
   });
 
-  removeEmptyGroupButton?.addEventListener('click', () => {
-    const emptyIndex = state.groups.map((group, index) => ({ group, index })).reverse().find((item) => item.group.members.length === 0)?.index;
-    if (emptyIndex === undefined || state.groups.length <= 1) return;
-    state.groups.splice(emptyIndex, 1);
+  removeGroupButton?.addEventListener('click', () => {
+    if (state.groups.length <= 1) return;
+
+    const lastGroup = state.groups[state.groups.length - 1];
+    if (!lastGroup) return;
+
+    if (lastGroup.members.length > 0) {
+      const shouldMoveMembers = window.confirm(`Группа ${lastGroup.group_label} не пуста. Перенести её участников в «Нераспределённые» и удалить группу?`);
+      if (!shouldMoveMembers) return;
+      state.unassigned.push(...lastGroup.members);
+    }
+
+    state.groups.pop();
     render();
+  });
+
+  form?.addEventListener('submit', (event) => {
+    const hasOverflow = state.groups.some((group) => group.members.length > maxMembersPerGroup);
+    if (hasOverflow) {
+      event.preventDefault();
+      return;
+    }
+
+    if (state.unassigned.length > 0) {
+      const confirmed = window.confirm('Есть нераспределённые участники. Сохранить раскладку в текущем виде?');
+      if (!confirmed) {
+        event.preventDefault();
+      }
+    }
   });
 
   render();
