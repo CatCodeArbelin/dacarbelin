@@ -45,6 +45,8 @@ from app.services.tournament import (
     apply_playoff_match_results,
     create_auto_draw,
     create_manual_draw,
+    create_manual_draw_from_layout,
+    ManualDrawValidationError,
     generate_playoff_from_groups,
     get_playoff_stages_with_data,
     override_playoff_match_winner,
@@ -1305,37 +1307,32 @@ async def admin_manual_draw(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        parsed_layout: list[list[int]] | None = None
         if layout_json.strip():
             raw_layout = json.loads(layout_json)
-            if not isinstance(raw_layout, dict) or not raw_layout:
-                raise ValueError("Некорректная раскладка")
+            if isinstance(raw_layout, dict):
+                layout_groups = list(raw_layout.values())
+            elif isinstance(raw_layout, list):
+                layout_groups = raw_layout
+            else:
+                raise ManualDrawValidationError("invalid_layout")
 
-            parsed_layout = []
-            seen_user_ids: set[int] = set()
-            for members in raw_layout.values():
-                if not isinstance(members, list):
-                    raise ValueError("Некорректная раскладка")
-
-                parsed_members = parse_manual_draw_user_ids(members)
-                for user_id in parsed_members:
-                    if user_id in seen_user_ids:
-                        raise ValueError("ID участников в раскладке должны быть уникальны")
-                    seen_user_ids.add(user_id)
-                parsed_layout.append(parsed_members)
-
-            group_count = len(parsed_layout)
-
-        parsed_user_ids = parse_manual_draw_user_ids(user_ids_list if user_ids_list else user_ids)
-        await create_manual_draw(
-            db,
-            group_count=group_count,
-            user_ids=parsed_user_ids,
-            layout_by_group=parsed_layout,
-        )
+            await create_manual_draw_from_layout(db, layout_groups)
+        else:
+            parsed_user_ids = parse_manual_draw_user_ids(user_ids_list if user_ids_list else user_ids)
+            await create_manual_draw(
+                db,
+                group_count=group_count,
+                user_ids=parsed_user_ids,
+            )
         await set_draw_applied(db, False)
         await db.commit()
         return redirect_with_admin_msg("msg_status_ok")
+    except ManualDrawValidationError as exc:
+        return redirect_with_admin_msg("msg_operation_failed", details=exc.details)
+    except json.JSONDecodeError:
+        return redirect_with_admin_msg("msg_operation_failed", details="invalid_layout")
+    except ValueError:
+        return redirect_with_admin_msg("msg_operation_failed", details="invalid_layout")
     except Exception:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
 

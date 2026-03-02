@@ -41,6 +41,70 @@ def test_admin_manual_draw_accepts_user_ids_array(monkeypatch) -> None:
     assert captured == {"group_count": 2, "user_ids": [11, 12]}
 
 
+
+
+def test_admin_manual_draw_accepts_layout_json(monkeypatch) -> None:
+    """Проверяет ручную жеребьевку через layout_json."""
+    captured: dict[str, list[list[int]]] = {}
+
+    async def fake_create_manual_draw_from_layout(db, layout: list[list[int]]) -> None:
+        captured["layout"] = layout
+
+    async def fake_set_draw_applied(db, value: bool):
+        return None
+
+    async def fake_commit(self):
+        return None
+
+    monkeypatch.setattr(web, "create_manual_draw_from_layout", fake_create_manual_draw_from_layout)
+    monkeypatch.setattr(web, "set_draw_applied", fake_set_draw_applied)
+    monkeypatch.setattr(web.AsyncSession, "commit", fake_commit, raising=False)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/draw/manual",
+            data={"layout_json": '{"A": ["11", "12"], "B": ["13"]}'},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_status_ok"
+    assert captured == {"layout": [["11", "12"], ["13"]]}
+
+
+def test_admin_manual_draw_returns_validation_details_for_layout(monkeypatch) -> None:
+    """Проверяет отдачу details при ошибках валидации layout_json."""
+
+    async def fake_create_manual_draw_from_layout(db, layout: list[list[int]]) -> None:
+        raise web.ManualDrawValidationError("duplicate_user:11")
+
+    monkeypatch.setattr(web, "create_manual_draw_from_layout", fake_create_manual_draw_from_layout)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/draw/manual",
+            data={"layout_json": '{"A": ["11", "11"]}'},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_operation_failed&details=duplicate_user%3A11"
+
+
+def test_admin_manual_draw_returns_invalid_layout_for_bad_json() -> None:
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/draw/manual",
+            data={"layout_json": "{invalid-json"},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_operation_failed&details=invalid_layout"
+
 def test_admin_auto_draw_redirect_contains_details_on_error(monkeypatch) -> None:
     """Проверяет негативный сценарий `test_admin_auto_draw_redirect_contains_details_on_error`.
     Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.

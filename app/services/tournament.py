@@ -45,6 +45,12 @@ PRIMARY_DRAW_BASKETS_WITH_RESERVE = {
 }
 
 
+class ManualDrawValidationError(ValueError):
+    def __init__(self, details: str):
+        super().__init__(details)
+        self.details = details
+
+
 def generate_password() -> str:
     # Генерируем четырехзначный пароль лобби.
     return f"{random.randint(0, 9999):04d}"
@@ -273,6 +279,55 @@ async def create_manual_draw(
             group = groups[offset % group_count]
             await validate_group_member_constraints(db, group_id=group.id, user_id=user_id)
             seat = 1 + len(list((await db.scalars(select(GroupMember.id).where(GroupMember.group_id == group.id))).all()))
+            db.add(GroupMember(group_id=group.id, user_id=user_id, seat=seat))
+
+    await db.commit()
+
+
+async def create_manual_draw_from_layout(db: AsyncSession, layout: list[list[int]]) -> None:
+    if not isinstance(layout, list) or not layout:
+        raise ManualDrawValidationError("invalid_layout")
+
+    group_count = len(layout)
+    if group_count < 1 or group_count > 8:
+        raise ManualDrawValidationError("invalid_layout")
+
+    seen_user_ids: set[int] = set()
+    normalized_layout: list[list[int]] = []
+    for members in layout:
+        if not isinstance(members, list):
+            raise ManualDrawValidationError("invalid_layout")
+        if len(members) > 8:
+            raise ManualDrawValidationError("group_overflow")
+
+        try:
+            parsed_members = parse_manual_draw_user_ids(members)
+        except ValueError as exc:
+            raise ManualDrawValidationError("invalid_layout") from exc
+
+        for user_id in parsed_members:
+            if user_id in seen_user_ids:
+                raise ManualDrawValidationError(f"duplicate_user:{user_id}")
+            seen_user_ids.add(user_id)
+
+        normalized_layout.append(parsed_members)
+
+    await clear_group_stage(db)
+    groups: list[TournamentGroup] = []
+    for idx in range(group_count):
+        group = TournamentGroup(
+            name=f"Group {chr(65 + idx)}",
+            lobby_password=generate_password(),
+            schedule_text="TBD",
+            draw_mode="manual",
+        )
+        db.add(group)
+        groups.append(group)
+    await db.flush()
+
+    for group, members in zip(groups, normalized_layout, strict=True):
+        for seat, user_id in enumerate(members, start=1):
+            await validate_group_member_constraints(db, group_id=group.id, user_id=user_id)
             db.add(GroupMember(group_id=group.id, user_id=user_id, seat=seat))
 
     await db.commit()
