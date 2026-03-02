@@ -158,21 +158,38 @@
           {% set display_current_game = group.game_limit if group.game_limit != 'special' and group.current_game > group.game_limit else group.current_game %}
           <div class="col-12 col-lg-6">
             <div class="border rounded p-3 h-100">
+              <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2">
+                <strong>{{ current_playoff_stage.title }} · {{ tr('admin_group') }} {{ group.group_label }} ({{ tr('tournament_game') }} {{ display_current_game }})</strong>
+                <form action="/admin/playoff/group/password" method="post" class="d-flex flex-wrap gap-2 align-items-center w-100 admin-password-form">
+                  <input type="hidden" name="stage_id" value="{{ current_playoff_stage.id }}">
+                  <input type="hidden" name="group_number" value="{{ group.group_number }}">
+                  <input class="form-control form-control-sm js-group-password" style="width:120px" name="password" value="{{ group.lobby_password }}" pattern="[0-9]{4}" inputmode="numeric" maxlength="4" title="4 digits" {% if group_locked %}disabled{% endif %}>
+                  <button type="button" class="btn btn-sm btn-outline-secondary js-generate-pin" {% if group_locked %}disabled{% endif %}>{{ tr('admin_generate_pin') }}</button>
+                  <button class="btn btn-sm btn-outline-info" {% if group_locked %}disabled{% endif %}>{{ tr('admin_save_pw') }}</button>
+                </form>
+              </div>
+              <form action="/admin/playoff/group/schedule" method="post" class="row g-2 mt-2 mb-2">
+                <input type="hidden" name="stage_id" value="{{ current_playoff_stage.id }}">
+                <input type="hidden" name="group_number" value="{{ group.group_number }}">
+                <div class="col-12 col-md-10"><input class="form-control form-control-sm" name="schedule_text" value="{{ group.schedule_text or tr('tournament_tbd') }}" placeholder="{{ tr('tournament_tbd') }}" {% if group_locked %}disabled{% endif %}></div>
+                <div class="col-12 col-md-2"><button class="btn btn-sm btn-outline-light w-100" {% if group_locked %}disabled{% endif %}>{{ tr('admin_save_time') }}</button></div>
+              </form>
               {{ stage_macros.stage_group_controls(
-                group_title=current_playoff_stage.title ~ ' · ' ~ tr('admin_group') ~ ' ' ~ group.group_label,
+                group_title=None,
                 members=group.participants,
                 score_action='/admin/playoff/results/batch',
                 score_hidden_fields={'stage_id': current_playoff_stage.id, 'group_number': group.group_number},
                 group_locked=group_locked,
-                submit_label=tr('admin_save_playoff_places'),
+                submit_label=tr('admin_save_game_result'),
                 place_input='number',
                 place_max=8,
-                progress_text=(tr('admin_group') ~ ' ' ~ group.group_label ~ ' · ' ~ tr('participants_game') ~ ' ' ~ display_current_game ~ (' · Сыграно ' ~ group.games_played ~ '/' ~ group.game_limit if group.game_limit != 'special' else '')),
+                progress_text=(tr('admin_group') ~ ' ' ~ group.group_label ~ ': ' ~ group.games_played ~ '/' ~ (group.game_limit if group.game_limit != 'special' else '∞')),
                 finish_action='/admin/playoff/group/finish',
                 finish_hidden_fields={'stage_id': current_playoff_stage.id, 'group_number': group.group_number},
                 finish_label='Закончить этап, определить победителей по очкам',
                 finish_disabled=(group.game_limit != 'special' and group.games_played < group.game_limit),
-                highlight_user_id=final_candidate_user_id
+                highlight_user_id=final_candidate_user_id,
+                wrapper_class='w-100 h-100'
               ) }}
             </div>
           </div>

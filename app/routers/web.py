@@ -858,55 +858,61 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
         ]
         for stage in playoff_stages
     }
-    playoff_stage_groups = {
-        stage.id: [
-            {
-                "group_number": group_number,
-                "group_label": get_stage_group_label(stage.key, group_number),
-                "games_played": next(
-                    (max(match.game_number - 1, 0) for match in stage.matches if match.group_number == group_number),
-                    0,
-                ),
-                "current_game": next(
-                    (max(match.game_number, 1) for match in stage.matches if match.group_number == group_number),
-                    1,
-                ),
-                "game_limit": get_game_limit(stage.key) or "special",
-                "participants": [
-                    {
-                        "user_id": participant.user_id,
-                        "nickname": users_by_id.get(participant.user_id, f"#{participant.user_id}"),
-                        "points": participant.points,
-                        "total_points": participant.points or 0,
-                        "first_places": participant.wins or 0,
-                        "top2_4_finishes": max((participant.top4_finishes or 0) - (participant.wins or 0), 0),
-                        "eighth_places": getattr(participant, "eighth_places", 0) or 0,
-                        "group_number": group_number,
-                        "group_label": get_stage_group_label(stage.key, group_number),
-                    }
-                    for participant in sorted(
-                        [
-                            item
-                            for item in stage.participants
-                            if get_stage_group_number_by_seed(item.seed) == group_number
-                        ],
-                        key=playoff_sort_key,
-                        reverse=True,
-                    )
-                ],
-            }
-            for group_number in (
-                get_stage_group_numbers(stage.key, stage.stage_size, len(stage.participants))
-                or sorted(
-                    {
-                        *{get_stage_group_number_by_seed(item.seed) for item in stage.participants},
-                        *{match.group_number for match in stage.matches},
-                    }
-                )
+    playoff_stage_groups: dict[int, list[dict[str, object]]] = {}
+    for stage in playoff_stages:
+        stage_group_numbers = (
+            get_stage_group_numbers(stage.key, stage.stage_size, len(stage.participants))
+            or sorted(
+                {
+                    *{get_stage_group_number_by_seed(item.seed) for item in stage.participants},
+                    *{match.group_number for match in stage.matches},
+                }
             )
-        ]
-        for stage in playoff_stages
-    }
+        )
+        groups_payload: list[dict[str, object]] = []
+        for group_number in stage_group_numbers:
+            group_matches = [match for match in stage.matches if match.group_number == group_number]
+            active_match = max(group_matches, key=lambda match: match.game_number, default=None)
+            groups_payload.append(
+                {
+                    "group_number": group_number,
+                    "group_label": get_stage_group_label(stage.key, group_number),
+                    "games_played": next(
+                        (max(match.game_number - 1, 0) for match in stage.matches if match.group_number == group_number),
+                        0,
+                    ),
+                    "current_game": next(
+                        (max(match.game_number, 1) for match in stage.matches if match.group_number == group_number),
+                        1,
+                    ),
+                    "game_limit": get_game_limit(stage.key) or "special",
+                    "lobby_password": active_match.lobby_password if active_match else "0000",
+                    "schedule_text": active_match.schedule_text if active_match else "TBD",
+                    "participants": [
+                        {
+                            "user_id": participant.user_id,
+                            "nickname": users_by_id.get(participant.user_id, f"#{participant.user_id}"),
+                            "points": participant.points,
+                            "total_points": participant.points or 0,
+                            "first_places": participant.wins or 0,
+                            "top2_4_finishes": max((participant.top4_finishes or 0) - (participant.wins or 0), 0),
+                            "eighth_places": getattr(participant, "eighth_places", 0) or 0,
+                            "group_number": group_number,
+                            "group_label": get_stage_group_label(stage.key, group_number),
+                        }
+                        for participant in sorted(
+                            [
+                                item
+                                for item in stage.participants
+                                if get_stage_group_number_by_seed(item.seed) == group_number
+                            ],
+                            key=playoff_sort_key,
+                            reverse=True,
+                        )
+                    ],
+                }
+            )
+        playoff_stage_groups[stage.id] = groups_payload
     current_playoff_stage = playoff_stage_by_key.get(active_stage_key) if active_stage_key else None
     current_playoff_stage_config = (
         get_admin_playoff_stage_config(current_playoff_stage.key) if current_playoff_stage else None
@@ -1371,6 +1377,73 @@ async def admin_group_schedule(
 
     group.scheduled_at = parsed_scheduled_at
     group.schedule_text = schedule_text.strip() or "TBD"
+    await db.commit()
+    return redirect_with_admin_msg("msg_status_ok")
+
+
+@router.post("/admin/playoff/group/password")
+async def admin_playoff_group_password(
+    stage_id: int = Form(...),
+    group_number: int = Form(...),
+    password: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    stage = await _get_playoff_stage(db, stage_id)
+    if not stage:
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
+
+    match = await db.scalar(
+        select(PlayoffMatch)
+        .where(PlayoffMatch.stage_id == stage_id, PlayoffMatch.group_number == group_number)
+    )
+    if not match:
+        return redirect_with_admin_msg("msg_operation_failed")
+
+    stage_config = get_admin_playoff_stage_config(stage.key)
+    if stage_config.game_limit is not None and match.game_number > stage_config.game_limit:
+        return redirect_with_admin_msg("msg_operation_failed", details="group_games_not_completed")
+
+    normalized_password = (password or "").strip()
+    if not re.fullmatch(r"^[0-9]{4}$", normalized_password):
+        return redirect_with_admin_msg("msg_invalid_lobby_password")
+
+    match.lobby_password = normalized_password
+    await db.commit()
+    return redirect_with_admin_msg("msg_lobby_password_updated")
+
+
+@router.post("/admin/playoff/group/schedule")
+async def admin_playoff_group_schedule(
+    stage_id: int = Form(...),
+    group_number: int = Form(...),
+    schedule_text: str = Form(default=""),
+    scheduled_at: str = Form(default=""),
+    db: AsyncSession = Depends(get_db),
+):
+    stage = await _get_playoff_stage(db, stage_id)
+    if not stage:
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
+
+    match = await db.scalar(
+        select(PlayoffMatch)
+        .where(PlayoffMatch.stage_id == stage_id, PlayoffMatch.group_number == group_number)
+    )
+    if not match:
+        return redirect_with_admin_msg("msg_operation_failed")
+
+    stage_config = get_admin_playoff_stage_config(stage.key)
+    if stage_config.game_limit is not None and match.game_number > stage_config.game_limit:
+        return redirect_with_admin_msg("msg_operation_failed", details="group_games_not_completed")
+
+    parsed_scheduled_at = None
+    if scheduled_at.strip():
+        try:
+            parsed_scheduled_at = datetime.fromisoformat(scheduled_at.strip())
+        except ValueError:
+            parsed_scheduled_at = None
+
+    match.scheduled_at = parsed_scheduled_at
+    match.schedule_text = schedule_text.strip() or "TBD"
     await db.commit()
     return redirect_with_admin_msg("msg_status_ok")
 
