@@ -1,6 +1,7 @@
 """Проверяет правила продвижения участников между стадиями плей-офф."""
 
 import unittest
+from unittest.mock import patch
 
 from app.models.tournament import PlayoffParticipant, PlayoffStage
 from app.services.tournament import promote_top_between_stages
@@ -111,6 +112,36 @@ class PlayoffPromotionTests(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaisesRegex(ValueError, "top-4"):
             await promote_top_between_stages(db, stage_id=50, top_n=2)
+
+    async def test_promote_top_between_stages_breaks_cutoff_ties_randomly(self) -> None:
+        stage = PlayoffStage(id=70, key="stage_1_4", title="Stage 3", stage_order=2, stage_size=16)
+        next_stage = PlayoffStage(id=80, key="stage_final", title="Final", stage_order=3, stage_size=8)
+
+        participants = [
+            PlayoffParticipant(stage_id=70, user_id=1, seed=1, points=100, wins=3, top4_finishes=3, top8_finishes=3, last_place=8),
+            PlayoffParticipant(stage_id=70, user_id=2, seed=2, points=99, wins=3, top4_finishes=3, top8_finishes=3, last_place=8),
+            PlayoffParticipant(stage_id=70, user_id=3, seed=3, points=98, wins=3, top4_finishes=3, top8_finishes=3, last_place=8),
+            PlayoffParticipant(stage_id=70, user_id=4, seed=4, points=97, wins=2, top4_finishes=2, top8_finishes=3, last_place=8),
+            # Группа B: ничья на границе top-4 между user_id=12 и user_id=13.
+            PlayoffParticipant(stage_id=70, user_id=9, seed=9, points=100, wins=3, top4_finishes=3, top8_finishes=3, last_place=8),
+            PlayoffParticipant(stage_id=70, user_id=10, seed=10, points=99, wins=3, top4_finishes=3, top8_finishes=3, last_place=8),
+            PlayoffParticipant(stage_id=70, user_id=11, seed=11, points=98, wins=3, top4_finishes=3, top8_finishes=3, last_place=8),
+            PlayoffParticipant(stage_id=70, user_id=12, seed=12, points=97, wins=2, top4_finishes=2, top8_finishes=3, last_place=8),
+            PlayoffParticipant(stage_id=70, user_id=13, seed=13, points=97, wins=2, top4_finishes=2, top8_finishes=3, last_place=8),
+        ]
+
+        db = _FakeDB([stage, next_stage], participants)
+
+        def _reverse_shuffle(items):
+            items.reverse()
+
+        with patch("app.services.tournament.random.shuffle", side_effect=_reverse_shuffle) as shuffle_mock:
+            await promote_top_between_stages(db, stage_id=70, top_n=4)
+
+        promoted_ids = [participant.user_id for participant in db.added]
+        self.assertIn(13, promoted_ids)
+        self.assertNotIn(12, promoted_ids)
+        self.assertGreaterEqual(shuffle_mock.call_count, 1)
 
 
 if __name__ == "__main__":

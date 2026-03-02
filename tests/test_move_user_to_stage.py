@@ -34,10 +34,11 @@ class MoveUserToStageTests(unittest.IsolatedAsyncioTestCase):
         db.scalar = AsyncMock(side_effect=[source_participant, target_stage, None])
         db.scalars = AsyncMock(side_effect=[_ScalarResult(target_participants)])
         db.add = Mock()
+        db.delete = AsyncMock()
 
         await move_user_to_stage(db, from_stage_id=10, to_stage_id=20, user_id=100)
 
-        self.assertTrue(source_participant.is_eliminated)
+        db.delete.assert_awaited_once_with(source_participant)
         db.add.assert_called_once()
         added = db.add.call_args.args[0]
         self.assertEqual(added.stage_id, 20)
@@ -77,11 +78,13 @@ class MoveUserToStageTests(unittest.IsolatedAsyncioTestCase):
         db.scalar = AsyncMock(side_effect=[source_participant, target_stage, None])
         db.scalars = AsyncMock(return_value=_ScalarResult(target_participants))
         db.add = Mock()
+        db.delete = AsyncMock()
 
         with self.assertRaisesRegex(ValueError, "Вместимость целевого этапа превышена"):
             await move_user_to_stage(db, from_stage_id=10, to_stage_id=20, user_id=100)
 
         db.add.assert_not_called()
+        db.delete.assert_not_awaited()
         db.commit.assert_not_called()
 
 

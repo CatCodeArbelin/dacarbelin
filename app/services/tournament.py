@@ -471,6 +471,17 @@ def playoff_sort_key(participant: PlayoffParticipant) -> tuple[int, int, int, in
     )
 
 
+def playoff_tie_key(participant: PlayoffParticipant) -> tuple[int, int, int, int, int]:
+    """Ключ равенства результатов без учета seed (seed используется только как стабильный fallback)."""
+    return (
+        participant.points,
+        participant.wins,
+        participant.top4_finishes,
+        participant.top8_finishes,
+        -participant.last_place,
+    )
+
+
 def apply_points_to_playoff_participant(participant: PlayoffParticipant, place: int, scoring_mode: str) -> None:
     participant.points += POINTS_BY_PLACE[place]
     if place == 1:
@@ -742,7 +753,7 @@ async def move_user_to_stage(db: AsyncSession, from_stage_id: int, to_stage_id: 
 
     next_seed = max((stage_participant.seed for stage_participant in stage_participants), default=0) + 1
 
-    participant.is_eliminated = True
+    await db.delete(participant)
     db.add(PlayoffParticipant(stage_id=to_stage_id, user_id=user_id, seed=next_seed))
     await db.commit()
 
@@ -1009,10 +1020,39 @@ async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int
     if top_n != allowed_top_n:
         raise ValueError(f"Для этапа {stage.title} можно продвинуть только top-{allowed_top_n} из группы")
 
+    def _select_top_with_random_tie(group_ranked: list[PlayoffParticipant], limit: int) -> list[PlayoffParticipant]:
+        if len(group_ranked) <= limit:
+            return list(group_ranked)
+
+        selected = list(group_ranked[:limit])
+        cutoff = selected[-1]
+        tie_tail: list[PlayoffParticipant] = []
+        boundary_idx = limit - 1
+        cutoff_tie_key = playoff_tie_key(cutoff)
+        while boundary_idx >= 0 and playoff_tie_key(selected[boundary_idx]) == cutoff_tie_key:
+            tie_tail.append(selected[boundary_idx])
+            boundary_idx -= 1
+        tie_tail.reverse()
+
+        tie_candidates: list[PlayoffParticipant] = []
+        scan_idx = limit
+        while scan_idx < len(group_ranked) and playoff_tie_key(group_ranked[scan_idx]) == cutoff_tie_key:
+            tie_candidates.append(group_ranked[scan_idx])
+            scan_idx += 1
+
+        if not tie_candidates:
+            return selected
+
+        keep_before_tie = selected[: boundary_idx + 1]
+        tie_pool = [*tie_tail, *tie_candidates]
+        random.shuffle(tie_pool)
+        tie_slots = limit - len(keep_before_tie)
+        return [*keep_before_tie, *tie_pool[:tie_slots]]
+
     top_players: list[PlayoffParticipant] = []
     for group_number in sorted(stage_grouped.keys()):
         group_ranked = sorted(stage_grouped[group_number], key=playoff_sort_key, reverse=True)
-        top_players.extend(group_ranked[:top_n])
+        top_players.extend(_select_top_with_random_tie(group_ranked, top_n))
 
     if len(top_players) < target_size:
         selected_ids = {participant.user_id for participant in top_players}
