@@ -337,7 +337,7 @@ if (visualDrawRoot) {
     {% endfor %}
   ];
   const initialGroups = [
-    {% for group in groups|sort(attribute='name') %}
+    {% for group in draw_groups|sort(attribute='name') %}
     {
       name: {{ group.name|tojson }},
       members: [{% for member in group.members|sort(attribute='seat') %}{{ member.user_id }}{% if not loop.last %}, {% endif %}{% endfor %}],
