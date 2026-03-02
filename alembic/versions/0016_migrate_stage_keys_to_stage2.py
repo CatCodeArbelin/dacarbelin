@@ -16,39 +16,36 @@ depends_on = None
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
+    op.execute(
+        sa.text(
+            """
+            DO $$
+            DECLARE
+                legacy_stage_id INTEGER;
+                stage_2_id INTEGER;
+            BEGIN
+                SELECT id INTO legacy_stage_id FROM playoff_stages WHERE key='stage_1_8' LIMIT 1;
+                SELECT id INTO stage_2_id FROM playoff_stages WHERE key='stage_2' LIMIT 1;
 
-    legacy_stage_id = bind.execute(sa.text("SELECT id FROM playoff_stages WHERE key='stage_1_8' LIMIT 1")).scalar()
-    stage_2_id = bind.execute(sa.text("SELECT id FROM playoff_stages WHERE key='stage_2' LIMIT 1")).scalar()
-
-    if legacy_stage_id and not stage_2_id:
-        bind.execute(
-            sa.text(
-                """
-                UPDATE playoff_stages
-                SET key='stage_2',
-                    title='Stage 2',
-                    stage_size=32,
-                    stage_order=0,
-                    stage_code='stage_2'
-                WHERE id=:stage_id
-                """
-            ),
-            {"stage_id": int(legacy_stage_id)},
+                IF legacy_stage_id IS NOT NULL AND stage_2_id IS NULL THEN
+                    UPDATE playoff_stages
+                    SET key='stage_2',
+                        title='Stage 2',
+                        stage_size=32,
+                        stage_order=0,
+                        stage_code='stage_2'
+                    WHERE id=legacy_stage_id;
+                ELSIF legacy_stage_id IS NOT NULL AND stage_2_id IS NOT NULL THEN
+                    DELETE FROM playoff_stages
+                    WHERE id=legacy_stage_id;
+                END IF;
+            END
+            $$;
+            """
         )
-    elif legacy_stage_id and stage_2_id:
-        bind.execute(
-            sa.text(
-                """
-                DELETE FROM playoff_stages
-                WHERE id=:legacy_stage_id
-                """
-            ),
-            {"legacy_stage_id": int(legacy_stage_id)},
-        )
+    )
 
-
-    bind.execute(
+    op.execute(
         sa.text(
             """
             UPDATE users
@@ -60,8 +57,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    bind = op.get_bind()
-    bind.execute(
+    op.execute(
         sa.text(
             """
             UPDATE playoff_stages
@@ -72,7 +68,7 @@ def downgrade() -> None:
             """
         )
     )
-    bind.execute(
+    op.execute(
         sa.text(
             """
             UPDATE users
