@@ -845,14 +845,17 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                 break
 
         if active_stage_key is None:
+            # Не перескакиваем на следующую стадию до явного запуска через Stage Finish.
+            # Показываем первую незавершённую стадию только среди уже стартовавших.
             for stage_key in stage_progression_keys:
                 stage = playoff_stage_by_key.get(stage_key)
-                if stage and not _is_stage_finished(stage):
+                if stage and stage.is_started and not _is_stage_finished(stage):
                     active_stage_key = stage_key
                     break
 
         if active_stage_key is None and playoff_stages:
-            active_stage_key = playoff_stages[-1].key
+            started_stage = get_active_playoff_stage(playoff_stages, stage_progression_keys)
+            active_stage_key = started_stage.key if started_stage else playoff_stages[-1].key
 
     show_group_stage_controls = active_stage_key == "group_stage"
     groups = group_stage_groups if show_group_stage_controls else []
