@@ -871,6 +871,60 @@ async def apply_playoff_match_results(
     await db.commit()
 
 
+async def finalize_limited_playoff_stage_if_ready(db: AsyncSession, stage_id: int) -> bool:
+    """Завершает лимитированную стадию и запускает следующую, если все группы доиграны.
+
+    Raises:
+        ValueError: с кодом причины (``stage_groups_missing``, ``group_games_not_completed``,
+        ``next_stage_missing``, ``promoted_size_mismatch``), если автозавершение невозможно.
+
+    Повторный вызов безопасен: если стадия уже завершена и следующая запущена,
+    функция завершится без ошибок и без повторного продвижения.
+    """
+    stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.id == stage_id))
+    if not stage or not is_limited_stage(stage.key):
+        return False
+
+    participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))).all())
+    matches = list((await db.scalars(select(PlayoffMatch).where(PlayoffMatch.stage_id == stage_id))).all())
+    expected_group_count = max((stage.stage_size or 0) // 8, 0)
+    expected_group_numbers = list(range(1, expected_group_count + 1))
+    if not expected_group_numbers:
+        raise ValueError("stage_groups_missing")
+
+    participant_groups = {get_stage_group_number_by_seed(participant.seed) for participant in participants}
+    match_by_group = {match.group_number: match for match in matches}
+    for group_number in expected_group_numbers:
+        if group_number not in participant_groups or group_number not in match_by_group:
+            raise ValueError("stage_groups_missing")
+
+    for group_number in expected_group_numbers:
+        games_played = max(match_by_group[group_number].game_number - 1, 0)
+        if games_played < GROUP_STAGE_GAME_LIMIT:
+            raise ValueError("group_games_not_completed")
+
+    next_stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.stage_order == stage.stage_order + 1))
+    if not next_stage:
+        raise ValueError("next_stage_missing")
+
+    promote_top_n = get_promote_top_n(stage.key)
+    expected_promoted_count = len(expected_group_numbers) * promote_top_n
+    if expected_promoted_count != next_stage.stage_size:
+        raise ValueError("promoted_size_mismatch")
+
+    all_groups_finished = all(match_by_group[group_number].state == "finished" for group_number in expected_group_numbers)
+    if all_groups_finished and next_stage.is_started:
+        return False
+
+    for group_number in expected_group_numbers:
+        match_by_group[group_number].state = "finished"
+    await db.commit()
+
+    await promote_top_between_stages(db, stage.id, promote_top_n)
+    await start_playoff_stage(db, next_stage.id)
+    return True
+
+
 async def simulate_three_random_games_for_stage(db: AsyncSession, stage_id: int) -> None:
     """Симулирует по 3 случайные игры для каждой полной группы в лимитированном этапе.
 

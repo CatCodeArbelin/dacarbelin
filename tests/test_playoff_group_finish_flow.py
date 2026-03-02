@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 from app.models.tournament import PlayoffMatch, PlayoffParticipant, PlayoffStage
 from app.routers import web
+from app.services import tournament
 
 
 class _ScalarResult:
@@ -45,75 +46,75 @@ class PlayoffGroupFinishFlowTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_finish_active_playoff_stage_promotes_and_starts_next(self) -> None:
         stage = PlayoffStage(id=20, key="stage_2", title="Stage 2", stage_order=1, is_started=True)
-        participants = [
-            PlayoffParticipant(stage_id=20, user_id=user_id, seed=seed, points=0, wins=0, top4_finishes=0, top8_finishes=0, last_place=8)
-            for seed, user_id in enumerate(range(1, 33), start=1)
-        ]
-        matches = [
-            PlayoffMatch(stage_id=20, group_number=group_number, game_number=4, state="in_progress")
-            for group_number in range(1, 5)
-        ]
-        next_stage = PlayoffStage(id=21, key="stage_1_4", title="Stage 1/4", stage_order=2, is_started=False, stage_size=16)
-
         db = AsyncMock()
-        db.scalars = AsyncMock(side_effect=[_ScalarResult(participants), _ScalarResult(matches)])
-        db.scalar = AsyncMock(side_effect=[stage, next_stage])
+        db.scalar = AsyncMock(side_effect=[stage])
 
-        with (
-            patch.object(web, "promote_top_between_stages", new=AsyncMock()) as promote_mock,
-            patch.object(web, "start_playoff_stage", new=AsyncMock()) as start_mock,
-        ):
+        with patch.object(web, "finalize_limited_playoff_stage_if_ready", new=AsyncMock(return_value=True)) as finalize_mock:
             response = await web.admin_finish_playoff_stage(stage_id=20, db=db)
 
         self.assertEqual(response.status_code, 303)
         self.assertIn("msg=msg_status_ok", response.headers["location"])
-        promote_mock.assert_awaited_once_with(db, 20, 4)
-        start_mock.assert_awaited_once_with(db, 21)
-
+        finalize_mock.assert_awaited_once_with(db, 20)
 
     async def test_finish_stage_requires_expected_group_coverage(self) -> None:
         stage = PlayoffStage(id=30, key="stage_2", title="Stage 2", stage_order=1, is_started=True, stage_size=32)
-        participants = [
-            PlayoffParticipant(stage_id=30, user_id=user_id, seed=seed, points=0, wins=0, top4_finishes=0, top8_finishes=0, last_place=8)
-            for seed, user_id in enumerate(range(1, 25), start=1)
-        ]
-        matches = [
-            PlayoffMatch(stage_id=30, group_number=group_number, game_number=4, state="in_progress")
-            for group_number in range(1, 4)
-        ]
-
         db = AsyncMock()
-        db.scalars = AsyncMock(side_effect=[_ScalarResult(participants), _ScalarResult(matches)])
         db.scalar = AsyncMock(side_effect=[stage])
 
-        response = await web.admin_finish_playoff_stage(stage_id=30, db=db)
+        with patch.object(
+            web,
+            "finalize_limited_playoff_stage_if_ready",
+            new=AsyncMock(side_effect=ValueError("stage_groups_missing")),
+        ):
+            response = await web.admin_finish_playoff_stage(stage_id=30, db=db)
 
         self.assertEqual(response.status_code, 303)
         self.assertIn("details=stage_groups_missing", response.headers["location"])
 
-
     async def test_finish_stage_blocks_promote_size_mismatch(self) -> None:
         stage = PlayoffStage(id=40, key="stage_2", title="Stage 2", stage_order=1, is_started=True, stage_size=32)
-        participants = [
-            PlayoffParticipant(stage_id=40, user_id=user_id, seed=seed, points=0, wins=0, top4_finishes=0, top8_finishes=0, last_place=8)
-            for seed, user_id in enumerate(range(1, 33), start=1)
-        ]
-        matches = [
-            PlayoffMatch(stage_id=40, group_number=group_number, game_number=4, state="in_progress")
-            for group_number in range(1, 5)
-        ]
-        next_stage = PlayoffStage(id=41, key="stage_1_4", title="Stage 1/4", stage_order=2, is_started=False, stage_size=8)
-
         db = AsyncMock()
-        db.scalars = AsyncMock(side_effect=[_ScalarResult(participants), _ScalarResult(matches)])
-        db.scalar = AsyncMock(side_effect=[stage, next_stage])
+        db.scalar = AsyncMock(side_effect=[stage])
 
-        with patch.object(web, "promote_top_between_stages", new=AsyncMock()) as promote_mock:
+        with patch.object(
+            web,
+            "finalize_limited_playoff_stage_if_ready",
+            new=AsyncMock(side_effect=ValueError("promoted_size_mismatch")),
+        ):
             response = await web.admin_finish_playoff_stage(stage_id=40, db=db)
 
         self.assertEqual(response.status_code, 303)
         self.assertIn("details=promoted_size_mismatch", response.headers["location"])
-        promote_mock.assert_not_awaited()
+
+    async def test_stage_2_last_score_auto_promotes_and_starts_stage_3(self) -> None:
+        stage_2 = PlayoffStage(id=50, key="stage_2", title="Stage 2", stage_order=1, stage_size=32)
+        stage_3 = PlayoffStage(id=51, key="stage_1_4", title="Stage 3", stage_order=2, stage_size=16, is_started=False)
+        participants = [
+            PlayoffParticipant(stage_id=50, user_id=user_id, seed=seed, points=0, wins=0, top4_finishes=0, top8_finishes=0, last_place=8)
+            for seed, user_id in enumerate(range(1, 33), start=1)
+        ]
+        matches = [PlayoffMatch(stage_id=50, group_number=group_number, game_number=4, state="in_progress") for group_number in range(1, 5)]
+
+        db = AsyncMock()
+        db.scalar = AsyncMock(side_effect=[stage_2, stage_2, stage_3])
+        db.scalars = AsyncMock(side_effect=[_ScalarResult(participants), _ScalarResult(matches)])
+
+        with (
+            patch.object(web, "apply_playoff_match_results", new=AsyncMock()),
+            patch.object(tournament, "promote_top_between_stages", new=AsyncMock()) as promote_mock,
+            patch.object(tournament, "start_playoff_stage", new=AsyncMock()) as start_mock,
+        ):
+            await web.admin_playoff_score(
+                stage_id=50,
+                group_number=4,
+                placements_list=[str(user_id) for user_id in range(1, 9)],
+                placements="",
+                db=db,
+            )
+
+        promote_mock.assert_awaited_once_with(db, 50, 4)
+        start_mock.assert_awaited_once_with(db, 51)
+        self.assertEqual(stage_3.stage_size, 16)
 
 
 if __name__ == "__main__":
