@@ -1869,6 +1869,11 @@ async def admin_playoff_results_batch(
             for user_id, place in sorted(placements_map.items(), key=lambda item: item[1])
         ]
         await apply_playoff_match_results(db, stage_id, ordered_user_ids, group_number=group_number)
+        if stage.key in {"stage_2", "stage_1_4"}:
+            try:
+                await finalize_limited_playoff_stage_if_ready(db, stage_id)
+            except ValueError:
+                pass
         return redirect_with_admin_msg("msg_playoff_game_saved")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")

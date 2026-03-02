@@ -116,6 +116,36 @@ class PlayoffGroupFinishFlowTests(unittest.IsolatedAsyncioTestCase):
         start_mock.assert_awaited_once_with(db, 51)
         self.assertEqual(stage_3.stage_size, 16)
 
+    async def test_stage_2_last_batch_score_auto_promotes_and_starts_stage_3(self) -> None:
+        stage_2 = PlayoffStage(id=60, key="stage_2", title="Stage 2", stage_order=1, stage_size=32)
+        stage_3 = PlayoffStage(id=61, key="stage_1_4", title="Stage 3", stage_order=2, stage_size=16, is_started=False)
+        participants = [
+            PlayoffParticipant(stage_id=60, user_id=user_id, seed=seed, points=0, wins=0, top4_finishes=0, top8_finishes=0, last_place=8)
+            for seed, user_id in enumerate(range(1, 33), start=1)
+        ]
+        matches = [PlayoffMatch(stage_id=60, group_number=group_number, game_number=4, state="in_progress") for group_number in range(1, 5)]
+
+        db = AsyncMock()
+        db.scalar = AsyncMock(side_effect=[stage_2, stage_2, stage_3])
+        db.scalars = AsyncMock(side_effect=[_ScalarResult(participants), _ScalarResult(matches)])
+
+        with (
+            patch.object(web, "apply_playoff_match_results", new=AsyncMock()),
+            patch.object(tournament, "promote_top_between_stages", new=AsyncMock()) as promote_mock,
+            patch.object(tournament, "start_playoff_stage", new=AsyncMock()) as start_mock,
+        ):
+            await web.admin_playoff_results_batch(
+                stage_id=60,
+                group_number=4,
+                user_ids=[str(user_id) for user_id in range(1, 9)],
+                places=[str(place) for place in range(1, 9)],
+                db=db,
+            )
+
+        promote_mock.assert_awaited_once_with(db, 60, 4)
+        start_mock.assert_awaited_once_with(db, 61)
+        self.assertEqual(stage_3.stage_size, 16)
+
 
 if __name__ == "__main__":
     unittest.main()
