@@ -48,6 +48,7 @@ from app.services.tournament import (
     create_manual_draw_from_layout,
     ManualDrawValidationError,
     generate_playoff_from_groups,
+    finalize_limited_playoff_stage_if_ready,
     get_playoff_stages_with_data,
     override_playoff_match_winner,
     parse_manual_draw_user_ids,
@@ -1737,6 +1738,11 @@ async def admin_playoff_score(
         else:
             ordered_user_ids = [int(part.strip()) for part in placements.split(",") if part.strip()]
         await apply_playoff_match_results(db, stage_id, ordered_user_ids, group_number=group_number)
+        if stage.key in {"stage_2", "stage_1_4"}:
+            try:
+                await finalize_limited_playoff_stage_if_ready(db, stage_id)
+            except ValueError:
+                pass
         return redirect_with_admin_msg("msg_playoff_game_saved")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
@@ -1799,45 +1805,19 @@ async def admin_finish_playoff_stage(
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
 
-    participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))).all())
-    matches = list((await db.scalars(select(PlayoffMatch).where(PlayoffMatch.stage_id == stage_id))).all())
-
     if is_limited_stage(stage.key):
-        expected_group_numbers = get_stage_group_numbers(stage.key, stage.stage_size, len(participants))
-        if not expected_group_numbers:
-            return redirect_with_admin_msg("msg_operation_failed", details="stage_groups_missing")
-
-        participant_groups = {get_stage_group_number_by_seed(participant.seed) for participant in participants}
-        match_groups = {match.group_number for match in matches}
-        for group_number in expected_group_numbers:
-            if group_number not in participant_groups or group_number not in match_groups:
-                return redirect_with_admin_msg("msg_operation_failed", details="stage_groups_missing")
-
-        match_by_group = {match.group_number: match for match in matches}
-        for group_number in expected_group_numbers:
-            match = match_by_group[group_number]
-            games_played = max(match.game_number - 1, 0)
-            if games_played < GROUP_STAGE_GAME_LIMIT:
-                return redirect_with_admin_msg("msg_operation_failed", details="group_games_not_completed")
-
-        next_stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.stage_order == stage.stage_order + 1))
-        if not next_stage:
-            return redirect_with_admin_msg("msg_operation_failed", details="next_stage_missing")
-
-        promote_top_n = get_promote_top_n(stage.key)
-        expected_promoted_count = len(expected_group_numbers) * promote_top_n
-        if expected_promoted_count != next_stage.stage_size:
-            return redirect_with_admin_msg("msg_operation_failed", details="promoted_size_mismatch")
-
-        for group_number in expected_group_numbers:
-            match_by_group[group_number].state = "finished"
-
         try:
-            await promote_top_between_stages(db, stage.id, promote_top_n)
-            await start_playoff_stage(db, next_stage.id)
+            finalized = await finalize_limited_playoff_stage_if_ready(db, stage.id)
+        except ValueError as exc:
+            details = str(exc) or "group_games_not_completed"
+            return redirect_with_admin_msg("msg_operation_failed", details=details)
         except Exception:
             return redirect_with_admin_msg("msg_operation_failed")
+        if not finalized:
+            return redirect_with_admin_msg("msg_status_ok")
     else:
+        participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))).all())
+        matches = list((await db.scalars(select(PlayoffMatch).where(PlayoffMatch.stage_id == stage_id))).all())
         _, is_ready = build_playoff_stage_finish_status(stage, participants, matches)
         if not is_ready:
             return redirect_with_admin_msg("msg_operation_failed", details="group_games_not_completed")
