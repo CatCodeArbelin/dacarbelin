@@ -23,6 +23,7 @@ def test_admin_template_has_playoff_hint_without_manual_stage_controls() -> None
     assert "Кандидат на победу" in template
     assert "/admin/playoff/override" in template
     assert "stage_macros.stage_finish_panel" in template
+    assert "playoff_empty_active_stage_alert" in template
     assert "/admin/group-stage/finish" in template
     assert "group_stage_game_limit" in template
     assert "stage_finish_panel" in macros
@@ -42,3 +43,9 @@ def test_admin_users_template_has_group_sections() -> None:
     assert "{% for section in group_sections %}" in template
     assert "{% for user in section.users %}" in template
     assert "Группы отображаются, потому что жеребьевка применена и турнир запущен." in template
+
+
+def test_tournament_template_has_empty_active_stage_alert() -> None:
+    template = Path("app/templates/tournament.html").read_text(encoding="utf-8")
+
+    assert "playoff_empty_active_stage_alert" in template

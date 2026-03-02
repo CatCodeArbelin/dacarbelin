@@ -13,6 +13,10 @@
 <div class="alert alert-secondary">{{ tr('tournament_wait_start') }}</div>
 {% endif %}
 
+{% if playoff_empty_active_stage_alert %}
+<div class="alert alert-warning">{{ playoff_empty_active_stage_alert }}</div>
+{% endif %}
+
 {% if ordered_stage_columns %}
 <section class="mt-4">
   <h3>Стадии турнира</h3>
