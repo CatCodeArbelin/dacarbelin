@@ -110,6 +110,7 @@ class PlayoffParticipant(Base):
     wins: Mapped[int] = mapped_column(Integer, default=0)
     top4_finishes: Mapped[int] = mapped_column(Integer, default=0)
     top8_finishes: Mapped[int] = mapped_column(Integer, default=0)
+    eighth_places: Mapped[int] = mapped_column(Integer, default=0)
     last_place: Mapped[int] = mapped_column(Integer, default=8)
     is_eliminated: Mapped[bool] = mapped_column(Boolean, default=False)
 

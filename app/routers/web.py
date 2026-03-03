@@ -965,7 +965,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                             "total_points": participant.points or 0,
                             "first_places": participant.wins or 0,
                             "top2_4_finishes": max((participant.top4_finishes or 0) - (participant.wins or 0), 0),
-                            "eighth_places": getattr(participant, "eighth_places", 0) or 0,
+                            "eighth_places": participant.eighth_places or 0,
                             "group_number": group_number,
                             "group_label": get_stage_group_label(stage.key, group_number),
                         }

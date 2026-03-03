@@ -194,6 +194,48 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(stage.final_candidate_user_id)
         self.assertEqual(match.state, "in_progress")
 
+    async def test_apply_playoff_match_results_increments_eighth_places_for_each_stage(self) -> None:
+        """Проверяет инкремент 8-х мест во всех стадиях плей-офф."""
+        ordered_user_ids = [1, 2, 3, 4, 5, 6, 7, 8]
+
+        for stage_key, scoring_mode in (("stage_2", "standard"), ("stage_1_4", "standard"), ("stage_final", "final_22_top1")):
+            with self.subTest(stage_key=stage_key):
+                participants = [
+                    PlayoffParticipant(
+                        stage_id=1,
+                        user_id=user_id,
+                        seed=user_id,
+                        points=0,
+                        wins=0,
+                        top4_finishes=0,
+                        top8_finishes=0,
+                        eighth_places=0,
+                        last_place=8,
+                    )
+                    for user_id in ordered_user_ids
+                ]
+                stage = PlayoffStage(
+                    id=1,
+                    key=stage_key,
+                    title=stage_key,
+                    stage_size=8,
+                    stage_order=1,
+                    scoring_mode=scoring_mode,
+                )
+                match = PlayoffMatch(stage_id=1, match_number=1, group_number=1, game_number=1, state="pending")
+
+                db = AsyncMock()
+                db.scalar = AsyncMock(side_effect=[stage, match])
+                db.scalars = AsyncMock(return_value=_ScalarResult(participants))
+
+                await apply_playoff_match_results(db, stage_id=1, ordered_user_ids=ordered_user_ids, group_number=1)
+
+                eighth_place_participant = next(item for item in participants if item.user_id == 8)
+                self.assertEqual(eighth_place_participant.eighth_places, 1)
+
+                non_eighth_place_participants = [item for item in participants if item.user_id != 8]
+                self.assertTrue(all(item.eighth_places == 0 for item in non_eighth_place_participants))
+
     def test_playoff_sort_key_prioritizes_points_for_remaining_places(self) -> None:
         """Проверяет `playoff_sort_key` для распределения мест по сумме очков."""
         p1 = PlayoffParticipant(stage_id=1, user_id=1, seed=1, points=16, wins=2, top4_finishes=2, last_place=2)
