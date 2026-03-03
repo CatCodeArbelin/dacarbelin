@@ -86,6 +86,28 @@ class TournamentPointsTests(unittest.IsolatedAsyncioTestCase):
 
                 self.assertEqual(participant.points, expected_points)
                 self.assertEqual(participant.top8_finishes, 1)
+                self.assertEqual(participant.eighth_places, 1 if place == 8 else 0)
+
+    def test_apply_points_to_playoff_participant_increments_eighth_places_for_place_8(self) -> None:
+        """Проверяет отдельный инкремент счетчика 8-х мест в плей-офф."""
+        participant = PlayoffParticipant(
+            stage_id=1,
+            user_id=1,
+            seed=1,
+            points=0,
+            wins=0,
+            top4_finishes=0,
+            top8_finishes=0,
+            eighth_places=0,
+            last_place=8,
+            is_eliminated=False,
+        )
+
+        apply_points_to_playoff_participant(participant, place=7, scoring_mode="standard")
+        self.assertEqual(participant.eighth_places, 0)
+
+        apply_points_to_playoff_participant(participant, place=8, scoring_mode="standard")
+        self.assertEqual(participant.eighth_places, 1)
 
 
     def test_apply_points_to_playoff_participant_final_stage_uses_points_by_place(self) -> None:
@@ -110,6 +132,7 @@ class TournamentPointsTests(unittest.IsolatedAsyncioTestCase):
 
                 self.assertEqual(participant.points, expected_points)
                 self.assertEqual(participant.top8_finishes, 1)
+                self.assertEqual(participant.eighth_places, 1 if place == 8 else 0)
 
 
 if __name__ == "__main__":

@@ -488,6 +488,7 @@ def apply_points_to_playoff_participant(participant: PlayoffParticipant, place: 
     if place <= 4:
         participant.top4_finishes += 1
     participant.top8_finishes = (participant.top8_finishes or 0) + 1
+    participant.eighth_places = (participant.eighth_places or 0) + (1 if place == 8 else 0)
     participant.last_place = place
 
 
