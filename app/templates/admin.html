@@ -142,8 +142,6 @@
       </div>
 
       {% set final_group = current_stage_groups[0] if current_stage_groups else None %}
-      {% set final_candidate_user_id = current_playoff_stage.final_candidate_user_id %}
-      {% set final_leader = final_group.participants[0] if final_group and final_group.participants else None %}
       <h5 class="mt-4">{{ tr('admin_playoff_match_results') }}</h5>
       {{ stage_macros.stage_finish_panel(
         is_ready=playoff_stage_finish_ready,
@@ -156,11 +154,6 @@
       ) }}
       <div class="border rounded p-3 mb-3">
         <div class="fw-bold mb-2">{{ current_playoff_stage.title }}</div>
-        {% if final_candidate_user_id is not none %}
-        <div class="small text-contrast-muted mb-2">
-          Кандидат появляется при 22+ очках, победитель подтверждается отдельно.
-        </div>
-        {% endif %}
         {% if current_stage_groups %}
         <div class="row g-3">
         {% for group in current_stage_groups %}
@@ -194,7 +187,8 @@
                 place_input='number',
                 place_max=8,
                 progress_text=(tr('admin_group') ~ ' ' ~ group.group_label ~ ': ' ~ group.games_played ~ '/' ~ (group.game_limit if group.game_limit != 'special' else '∞')),
-                highlight_user_id=final_candidate_user_id,
+                highlight_user_id=(none if current_playoff_stage.key == 'stage_final' else current_playoff_stage.final_candidate_user_id),
+                highlight_winner_eligible=(current_playoff_stage.key == 'stage_final'),
                 wrapper_class='w-100 h-100'
               ) }}
             </div>
@@ -203,31 +197,22 @@
         </div>
         {% endif %}
 
-        {% if current_playoff_stage.key == 'stage_final' and final_candidate_user_id is not none %}
-        <div class="mt-3">
-          {% if final_candidate_user_id %}
-          <div class="alert alert-success py-2">
-            Кандидат на победу определен. Подтвердите чемпиона кнопкой ниже.
-          </div>
-          {% elif final_leader and final_leader.points >= 22 %}
-          <div class="alert alert-warning py-2">
-            Лидер набрал 22+ очков ({{ final_leader.nickname }}), сыграйте следующую игру, чтобы получить кандидата и подтвердить победителя.
-          </div>
-          {% else %}
-          <div class="alert alert-warning py-2">
-            Кандидат на победу еще не определен: нужно набрать 22+ очков.
-          </div>
-          {% endif %}
-
+        {% if current_playoff_stage.key == 'stage_final' and final_group %}
+        <div class="mt-3 border rounded p-3">
+          <div class="fw-bold mb-2">Назначение победителя финала</div>
+          <div class="small text-contrast-muted mb-2">Выберите победителя из 8 участников текущего финала. Победителем можно назначить только игрока с 22+ очками.</div>
           <form action="/admin/playoff/override" method="post" class="row g-2">
             <input type="hidden" name="stage_id" value="{{ current_playoff_stage.id }}">
             <input type="hidden" name="group_number" value="1">
             <div class="col-md-8">
-              <input type="hidden" name="winner_user_id" value="{{ final_candidate_user_id or 0 }}">
-              <input class="form-control" value="{% if final_candidate_user_id %}{% for participant in current_stage_participants if participant.user_id == final_candidate_user_id %}{{ participant.nickname }}{% endfor %}{% else %}Кандидат не определен{% endif %}" disabled>
+              <select class="form-select" name="winner_user_id" required>
+                {% for participant in final_group.participants %}
+                <option value="{{ participant.user_id }}">{{ participant.nickname }} ({{ participant.points }} pts)</option>
+                {% endfor %}
+              </select>
             </div>
             <div class="col-md-4">
-              <button class="btn btn-outline-success w-100" {% if not final_candidate_user_id %}disabled{% endif %}>Подтвердить победителя этапа</button>
+              <button class="btn btn-outline-success w-100">Подтвердить победителя этапа</button>
             </div>
           </form>
         </div>

@@ -85,7 +85,7 @@
 </div>
 {%- endmacro %}
 
-{% macro stage_group_controls(group_title, members, score_action, score_hidden_fields=None, group_locked=False, group_hint=None, submit_label=None, place_input='select', place_max=8, progress_text=None, finish_action=None, finish_hidden_fields=None, finish_label=None, finish_disabled=False, highlight_user_id=None, wrapper_class='border rounded p-3 w-100 h-100') -%}
+{% macro stage_group_controls(group_title, members, score_action, score_hidden_fields=None, group_locked=False, group_hint=None, submit_label=None, place_input='select', place_max=8, progress_text=None, finish_action=None, finish_hidden_fields=None, finish_label=None, finish_disabled=False, highlight_user_id=None, highlight_winner_eligible=False, wrapper_class='border rounded p-3 w-100 h-100') -%}
 <div class="{{ wrapper_class }}">
   {% if group_title %}<div class="fw-bold mb-2">{{ group_title }}</div>{% endif %}
   {% if progress_text %}
@@ -115,7 +115,7 @@
         <tbody>
           {% for member in members %}
           {% set member_index = loop.index %}
-          <tr {% if highlight_user_id and member.user_id == highlight_user_id %}class="table-success"{% endif %}>
+          <tr {% if (highlight_winner_eligible and member.is_winner_eligible) or (highlight_user_id and member.user_id == highlight_user_id) %}class="table-success"{% endif %}>
             <td>
               {{ member.nickname }}
               <input type="hidden" name="user_ids[]" value="{{ member.user_id }}">
