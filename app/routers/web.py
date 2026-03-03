@@ -1847,7 +1847,7 @@ async def admin_playoff_results_batch(
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     stage_config = get_admin_playoff_stage_config(stage.key)
-    if stage_config.game_limit is None:
+    if stage_config.game_limit is None and not stage_config.is_final:
         return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
     try:
         if len(user_ids) != len(places):
