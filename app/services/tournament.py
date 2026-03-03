@@ -437,7 +437,6 @@ PLAYOFF_STAGE_COLUMNS = [
     ("stage_final", "Финал (8)"),
 ]
 FINAL_SCORING_MODE = "final_22_top1"
-FINAL_CANDIDATE_POINTS_THRESHOLD = 22
 DIRECT_INVITE_STAGE_2 = "stage_2"
 STAGE_2_DIRECT_INVITES_LIMIT = 11
 
@@ -858,24 +857,9 @@ async def apply_playoff_match_results(
         apply_points_to_playoff_participant(by_user[user_id], place, stage.scoring_mode)
 
     match.game_number += 1
-    should_finish_limited_stage = (
-        is_limited_stage(stage.key) and match.game_number > GROUP_STAGE_GAME_LIMIT
-    )
-    should_finish_final_stage = False
+    should_finish_limited_stage = is_limited_stage(stage.key) and match.game_number > GROUP_STAGE_GAME_LIMIT
 
-    if stage.scoring_mode == FINAL_SCORING_MODE:
-        ranked = sorted(participants, key=playoff_sort_key, reverse=True)
-        leader = ranked[0]
-        if stage.final_candidate_user_id:
-            if ordered_user_ids[0] == stage.final_candidate_user_id:
-                match.winner_user_id = stage.final_candidate_user_id
-                should_finish_final_stage = True
-            elif leader.points >= FINAL_CANDIDATE_POINTS_THRESHOLD:
-                stage.final_candidate_user_id = leader.user_id
-        elif leader.points >= FINAL_CANDIDATE_POINTS_THRESHOLD:
-            stage.final_candidate_user_id = leader.user_id
-
-    if should_finish_limited_stage or should_finish_final_stage:
+    if should_finish_limited_stage:
         match.state = "finished"
     else:
         match.state = "in_progress"

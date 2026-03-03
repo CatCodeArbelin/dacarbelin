@@ -134,10 +134,8 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
         db.commit.assert_called_once()
 
 
-    async def test_final_candidate_becomes_winner_only_after_next_top1(self) -> None:
-        """Проверяет граничный сценарий `test_final_candidate_becomes_winner_only_after_next_top1`.
-        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
-        Запуск: `pytest tests/test_playoff_match_limits.py -q` и `pytest tests/test_playoff_match_limits.py -k "test_final_candidate_becomes_winner_only_after_next_top1" -q`."""
+    async def test_final_stage_does_not_auto_finish_after_threshold_or_extra_games(self) -> None:
+        """Проверяет, что финал не закрывается автоматически по порогу очков."""
         ordered_user_ids = [1, 2, 3, 4, 5, 6, 7, 8]
         participants = [
             PlayoffParticipant(stage_id=1, user_id=user_id, seed=user_id, points=0, wins=0, top4_finishes=0, last_place=8)
@@ -158,28 +156,16 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
         db.scalar = AsyncMock(side_effect=[stage, match, stage, match, stage, match, stage, match, stage, match])
         db.scalars = AsyncMock(return_value=_ScalarResult(participants))
 
-        for _ in range(3):
+        for _ in range(5):
             await apply_playoff_match_results(db, stage_id=1, ordered_user_ids=ordered_user_ids, group_number=1)
 
-        self.assertEqual(participants[0].points, 24)
-        self.assertEqual(stage.final_candidate_user_id, 1)
+        self.assertEqual(participants[0].points, 40)
+        self.assertEqual(stage.final_candidate_user_id, None)
         self.assertEqual(match.state, "in_progress")
         self.assertIsNone(match.winner_user_id)
 
-        second_order = [2, 1, 3, 4, 5, 6, 7, 8]
-        await apply_playoff_match_results(db, stage_id=1, ordered_user_ids=second_order, group_number=1)
 
-        self.assertEqual(stage.final_candidate_user_id, 1)
-        self.assertEqual(match.state, "in_progress")
-        self.assertIsNone(match.winner_user_id)
-
-        await apply_playoff_match_results(db, stage_id=1, ordered_user_ids=ordered_user_ids, group_number=1)
-
-        self.assertEqual(match.state, "finished")
-        self.assertEqual(match.winner_user_id, 1)
-
-
-    async def test_final_candidate_is_set_at_22_points_threshold(self) -> None:
+    async def test_final_stage_does_not_set_candidate_at_22_points_threshold(self) -> None:
         ordered_user_ids = [1, 2, 3, 4, 5, 6, 7, 8]
         participants = [
             PlayoffParticipant(stage_id=1, user_id=user_id, seed=user_id, points=0, wins=0, top4_finishes=0, last_place=8)
@@ -205,7 +191,7 @@ class PlayoffMatchLimitsTests(unittest.IsolatedAsyncioTestCase):
         await apply_playoff_match_results(db, stage_id=1, ordered_user_ids=[2, 3, 4, 5, 6, 7, 1, 8], group_number=1)
 
         self.assertEqual(participants[0].points, 22)
-        self.assertEqual(stage.final_candidate_user_id, 1)
+        self.assertIsNone(stage.final_candidate_user_id)
         self.assertEqual(match.state, "in_progress")
 
     def test_playoff_sort_key_prioritizes_points_for_remaining_places(self) -> None:
