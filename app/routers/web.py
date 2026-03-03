@@ -961,6 +961,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
                             "user_id": participant.user_id,
                             "nickname": users_by_id.get(participant.user_id, f"#{participant.user_id}"),
                             "points": participant.points,
+                            "is_winner_eligible": (participant.points or 0) >= 22,
                             "total_points": participant.points or 0,
                             "first_places": participant.wins or 0,
                             "top2_4_finishes": max((participant.top4_finishes or 0) - (participant.wins or 0), 0),
@@ -1896,6 +1897,16 @@ async def admin_playoff_override(
     stage_config = get_admin_playoff_stage_config(stage.key)
     if not stage_config.is_final:
         return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
+
+    winner_participant = await db.scalar(
+        select(PlayoffParticipant).where(
+            PlayoffParticipant.stage_id == stage_id,
+            PlayoffParticipant.user_id == winner_user_id,
+        )
+    )
+    if not winner_participant or (winner_participant.points or 0) < 22:
+        return redirect_with_admin_msg("msg_operation_failed", details="winner_points_below_threshold")
+
     try:
         await override_playoff_match_winner(db, stage_id, group_number, winner_user_id, note=note)
         return redirect_with_admin_msg("msg_status_ok")

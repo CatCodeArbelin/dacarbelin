@@ -20,8 +20,11 @@ def test_admin_template_has_playoff_hint_without_manual_stage_controls() -> None
     assert "current_playoff_stage.key == 'stage_final'" in template
     assert "current_playoff_stage.key == 'stage_2'" in template
     assert "Подтвердить победителя этапа" in template
-    assert "Кандидат на победу" in template
+    assert 'name="winner_user_id"' in template
     assert "/admin/playoff/override" in template
+    assert "Выберите победителя из 8 участников текущего финала." in template
+    assert "Победителем можно назначить только игрока с 22+ очками." in template
+    assert "final_group.participants" in template
     assert "stage_macros.stage_finish_panel" in template
     assert "playoff_empty_active_stage_alert" in template
     assert "visual-draw-move" in template
@@ -31,6 +34,7 @@ def test_admin_template_has_playoff_hint_without_manual_stage_controls() -> None
     assert "group_stage_game_limit" in template
     assert "stage_finish_panel" in macros
     assert "stage_group_controls" in macros
+    assert "highlight_winner_eligible" in macros
     assert "/admin/playoff/start" not in template
     assert "/admin/playoff/promote" not in template
     assert "/admin/group/create" not in template
