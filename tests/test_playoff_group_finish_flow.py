@@ -160,6 +160,48 @@ class PlayoffGroupFinishFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("msg=msg_playoff_game_saved", response.headers["location"])
         apply_mock.assert_awaited_once_with(db, 71, [1, 2, 3, 4, 5, 6, 7, 8], group_number=1)
 
+    async def test_final_stage_remains_in_progress_after_22_plus_and_extra_game(self) -> None:
+        ordered_user_ids = [1, 2, 3, 4, 5, 6, 7, 8]
+        participants = [
+            PlayoffParticipant(stage_id=72, user_id=user_id, seed=user_id, points=0, wins=0, top4_finishes=0, last_place=8)
+            for user_id in ordered_user_ids
+        ]
+        participants[0].points = 21
+
+        stage_final = PlayoffStage(
+            id=72,
+            key="stage_final",
+            title="Final",
+            stage_order=3,
+            stage_size=8,
+            scoring_mode="final_22_top1",
+            final_candidate_user_id=None,
+        )
+        match = PlayoffMatch(stage_id=72, group_number=1, game_number=1, state="in_progress")
+
+        db = AsyncMock()
+        db.scalar = AsyncMock(side_effect=[stage_final, match, stage_final, match])
+        db.scalars = AsyncMock(return_value=_ScalarResult(participants))
+
+        await tournament.apply_playoff_match_results(
+            db,
+            stage_id=72,
+            ordered_user_ids=[2, 3, 4, 5, 6, 7, 1, 8],
+            group_number=1,
+        )
+        await tournament.apply_playoff_match_results(
+            db,
+            stage_id=72,
+            ordered_user_ids=ordered_user_ids,
+            group_number=1,
+        )
+
+        self.assertEqual(participants[0].points, 30)
+        self.assertEqual(match.game_number, 3)
+        self.assertEqual(match.state, "in_progress")
+        self.assertIsNone(stage_final.final_candidate_user_id)
+        self.assertIsNone(match.winner_user_id)
+
 
 if __name__ == "__main__":
     unittest.main()
