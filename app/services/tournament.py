@@ -17,11 +17,13 @@ from app.models.tournament import (
 )
 from app.models.user import Basket, User
 from app.services.tournament_stage_config import (
+    FINAL_STAGE_SCORING_MODES,
     GROUP_STAGE_GAME_LIMIT,
     TOURNAMENT_FLOW_SPEC,
     get_promote_top_n,
     get_stage_group_count,
     get_stage_group_label as get_stage_group_label_from_spec,
+    is_final_stage_key,
     is_limited_stage,
 )
 
@@ -881,7 +883,8 @@ async def finalize_limited_playoff_stage_if_ready(db: AsyncSession, stage_id: in
 
     Raises:
         ValueError: с кодом причины (``stage_groups_missing``, ``group_games_not_completed``,
-        ``next_stage_missing``, ``promoted_size_mismatch``), если автозавершение невозможно.
+        ``next_stage_missing``, ``promoted_size_mismatch``, ``next_stage_policy_invalid``),
+        если автозавершение невозможно.
 
     Повторный вызов безопасен: если стадия уже завершена и следующая запущена,
     функция завершится без ошибок и без повторного продвижения.
@@ -911,6 +914,21 @@ async def finalize_limited_playoff_stage_if_ready(db: AsyncSession, stage_id: in
     next_stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.stage_order == stage.stage_order + 1))
     if not next_stage:
         raise ValueError("next_stage_missing")
+
+    if stage.key == "stage_1_4":
+        normalized_scoring_mode = (next_stage.scoring_mode or "").strip().lower()
+        policy_violations: list[str] = []
+        if not is_final_stage_key(next_stage.key):
+            policy_violations.append(f"invalid_key:{next_stage.key}")
+        if next_stage.stage_size != 8:
+            policy_violations.append(f"invalid_size:{next_stage.stage_size}")
+        if normalized_scoring_mode not in FINAL_STAGE_SCORING_MODES:
+            allowed_modes = ",".join(sorted(FINAL_STAGE_SCORING_MODES))
+            policy_violations.append(
+                f"invalid_mode:{next_stage.scoring_mode}:allowed={allowed_modes}"
+            )
+        if policy_violations:
+            raise ValueError(f"next_stage_policy_invalid:{';'.join(policy_violations)}")
 
     promote_top_n = get_promote_top_n(stage.key)
     expected_promoted_count = len(expected_group_numbers) * promote_top_n
