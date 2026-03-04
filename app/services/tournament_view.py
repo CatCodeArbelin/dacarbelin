@@ -62,6 +62,33 @@ class BracketColumnVM(TypedDict):
     matches: list[BracketMatchVM]
 
 
+class TournamentTreeSourceVM(TypedDict):
+    stage_key: str
+    label: str
+    source_type: str
+
+
+class TournamentTreeMatchVM(TypedDict):
+    match_id: str
+    label: str
+    status: str
+    participants: list[BracketParticipantVM]
+    schedule_text: str
+    lobby_password: str
+    incoming_sources: list[TournamentTreeSourceVM]
+
+
+class TournamentTreeStageVM(TypedDict):
+    key: str
+    title: str
+    level: int
+    matches: list[TournamentTreeMatchVM]
+
+
+class TournamentTreeVM(TypedDict):
+    stages: list[TournamentTreeStageVM]
+
+
 class PlayoffStandingRow(TypedDict):
     user_id: int
     display_nickname: str
@@ -323,6 +350,93 @@ def build_bracket_columns(
         column["matches"] = matches_vm
 
     return stage_columns
+
+
+def build_tournament_tree_vm(
+    groups: Sequence[TournamentGroup],
+    playoff_stages: Sequence[PlayoffStage],
+    user_by_id: Mapping[int, User],
+    direct_invite_ids: list[int],
+    tournament_winner_user_id: int | None = None,
+) -> TournamentTreeVM:
+    stage_columns = build_bracket_columns(
+        groups=groups,
+        playoff_stages=playoff_stages,
+        user_by_id=user_by_id,
+        direct_invite_ids=direct_invite_ids,
+        tournament_winner_user_id=tournament_winner_user_id,
+    )
+    columns_by_key = {column["key"]: column for column in stage_columns}
+
+    stage_order = ["group_stage", "stage_2", "stage_1_4", "stage_final"]
+    incoming_by_stage_and_group: dict[str, dict[str, list[TournamentTreeSourceVM]]] = {
+        "stage_2": {
+            "A": [
+                {"stage_key": "group_stage", "label": "A", "source_type": "group_winner"},
+                {"stage_key": "group_stage", "label": "B", "source_type": "group_winner"},
+            ],
+            "B": [
+                {"stage_key": "group_stage", "label": "C", "source_type": "group_winner"},
+                {"stage_key": "group_stage", "label": "D", "source_type": "group_winner"},
+            ],
+            "C": [
+                {"stage_key": "group_stage", "label": "E", "source_type": "group_winner"},
+                {"stage_key": "group_stage", "label": "F", "source_type": "group_winner"},
+            ],
+            "D": [
+                {"stage_key": "group_stage", "label": "G", "source_type": "group_winner"},
+                {"stage_key": "group_stage", "label": "DI", "source_type": "direct_invite"},
+            ],
+        },
+        "stage_1_4": {
+            "A": [
+                {"stage_key": "stage_2", "label": "A", "source_type": "match_winner"},
+                {"stage_key": "stage_2", "label": "B", "source_type": "match_winner"},
+            ],
+            "B": [
+                {"stage_key": "stage_2", "label": "C", "source_type": "match_winner"},
+                {"stage_key": "stage_2", "label": "D", "source_type": "match_winner"},
+            ],
+        },
+        "stage_final": {
+            "Final": [
+                {"stage_key": "stage_1_4", "label": "A", "source_type": "match_winner"},
+                {"stage_key": "stage_1_4", "label": "B", "source_type": "match_winner"},
+            ]
+        },
+    }
+
+    stages: list[TournamentTreeStageVM] = []
+    for level, stage_key in enumerate(stage_order):
+        column = columns_by_key.get(stage_key)
+        if not column:
+            continue
+
+        matches: list[TournamentTreeMatchVM] = []
+        for idx, match in enumerate(column["matches"], start=1):
+            match_label = str(match.get("group_label") or idx)
+            matches.append(
+                {
+                    "match_id": f"{stage_key}:{idx}",
+                    "label": match_label,
+                    "status": str(match.get("state") or "pending"),
+                    "participants": list(match.get("participants") or []),
+                    "schedule_text": str(match.get("schedule_text") or "TBD"),
+                    "lobby_password": str(match.get("lobby_password") or "TBD"),
+                    "incoming_sources": incoming_by_stage_and_group.get(stage_key, {}).get(match_label, []),
+                }
+            )
+
+        stages.append(
+            {
+                "key": stage_key,
+                "title": column["title"],
+                "level": level,
+                "matches": matches,
+            }
+        )
+
+    return {"stages": stages}
 
 
 def build_playoff_standings(

@@ -73,6 +73,7 @@ from app.services.tournament import (
 )
 from app.services.tournament_view import (
     build_bracket_columns,
+    build_tournament_tree_vm,
     resolve_current_stage_label,
 )
 
@@ -234,6 +235,35 @@ def _build_archive_bracket_columns(payload: str | None) -> tuple[list[dict[str, 
     if isinstance(data, dict):
         return [], f"Сетка сохранена в альтернативном формате (полей: {len(data.keys())})."
     return [], "Сетка недоступна: формат архива не поддерживается."
+
+
+def _build_archive_tree_vm(columns: list[dict[str, object]]) -> dict[str, object]:
+    stage_keys = ["group_stage", "stage_2", "stage_1_4", "stage_final"]
+    stages: list[dict[str, object]] = []
+    for idx, column in enumerate(columns):
+        matches = column.get("matches") if isinstance(column.get("matches"), list) else []
+        stage_key = stage_keys[idx] if idx < len(stage_keys) else f"stage_{idx}"
+        stages.append(
+            {
+                "key": stage_key,
+                "title": str(column.get("title") or f"Stage {idx + 1}"),
+                "level": idx,
+                "matches": [
+                    {
+                        "match_id": f"{stage_key}:{match_idx}",
+                        "label": str(match.get("label") or match_idx),
+                        "status": str(match.get("status") or "pending"),
+                        "participants": list(match.get("participants") or []),
+                        "schedule_text": "TBD",
+                        "lobby_password": "TBD",
+                        "incoming_sources": [],
+                    }
+                    for match_idx, match in enumerate(matches, start=1)
+                    if isinstance(match, dict)
+                ],
+            }
+        )
+    return {"stages": stages}
 
 
 def build_stage_display_order(active_key: str, stage_order_keys: list[str]) -> list[str]:
@@ -1058,15 +1088,13 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
 
     lang = get_lang(request.cookies.get("lang"))
     current_stage_display = resolve_current_stage_label(lang, playoff_stages, tournament_started)
-    stage_order_keys = TOURNAMENT_STAGE_KEYS_ORDER
-    active_key = "group_stage"
-    if tournament_started:
-        active_playoff = get_active_playoff_stage(playoff_stages, PLAYOFF_STAGE_KEYS_ORDER)
-        if active_playoff:
-            active_key = active_playoff.key
-    ordered_keys = build_stage_display_order(active_key, stage_order_keys)
-    columns_by_key = {column["key"]: column for column in stage_columns}
-    ordered_stage_columns = [columns_by_key[key] for key in ordered_keys if key in columns_by_key]
+    tournament_tree = build_tournament_tree_vm(
+        groups,
+        playoff_stages,
+        user_by_id,
+        direct_invite_ids,
+        winner_user_id,
+    )
     playoff_empty_active_stage_alert = get_empty_active_stage_alert(playoff_stages)
 
     return templates.TemplateResponse(
@@ -1077,9 +1105,8 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             groups=groups,
             playoff_stages=playoff_stages,
             stage_columns=stage_columns,
-            ordered_stage_columns=ordered_stage_columns,
+            tournament_tree=tournament_tree,
             current_stage_display=current_stage_display,
-            show_groups=tournament_started,
             playoff_empty_active_stage_alert=playoff_empty_active_stage_alert,
             tournament_winner_user_id=winner_user_id,
             tournament_winner_nickname=winner_nickname,
@@ -1130,11 +1157,13 @@ async def archive_page(request: Request, db: AsyncSession = Depends(get_db)):
     for entry in tournament_archives:
         columns, summary = _build_archive_bracket_columns(entry.bracket_payload_json)
         entry.bracket_columns = columns
+        entry.bracket_tree = _build_archive_tree_vm(columns) if columns else None
         entry.bracket_summary = summary
 
     for entry in archive_entries:
         columns, summary = _build_archive_bracket_columns(entry.bracket_payload)
         entry.bracket_columns = columns
+        entry.bracket_tree = _build_archive_tree_vm(columns) if columns else None
         entry.bracket_summary = summary
 
     return templates.TemplateResponse(

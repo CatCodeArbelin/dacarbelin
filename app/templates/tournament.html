@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-{% import "includes/tournament_stage_macros.html" as stage_ui with context %}
+{% import "includes/tournament_tree.html" as tree_ui with context %}
 <h2>{{ tr('tournament_title') }}</h2>
 <div class="alert alert-contrast mt-3">
   {{ tr('tournament_current_stage') }}:
@@ -9,32 +9,14 @@
 
 {% if not groups %}
 <div class="alert alert-secondary">{{ tr('tournament_no_draw') }}</div>
-{% elif not show_groups %}
-<div class="alert alert-secondary">{{ tr('tournament_wait_start') }}</div>
 {% endif %}
 
 {% if playoff_empty_active_stage_alert %}
 <div class="alert alert-warning">{{ playoff_empty_active_stage_alert }}</div>
 {% endif %}
 
-{% if ordered_stage_columns %}
 <section class="mt-4">
-  <h3>Стадии турнира</h3>
-  <div class="row g-3">
-    {% for column in ordered_stage_columns %}
-    {% call stage_ui.stage_panel(column.title, column_class='col-12', card_extra_class='') %}
-      <div class="p-3">
-        <div class="row g-2">
-          {% for match in column.matches %}
-          <div class="col-12 col-lg-6">
-            {{ stage_ui.stage_match_card(match, tr) }}
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-    {% endcall %}
-    {% endfor %}
-  </div>
+  <h3>Сетка турнира</h3>
+  {{ tree_ui.render_tournament_tree(tournament_tree, tr, 'tournament-tree') }}
 </section>
-{% endif %}
 {% endblock %}

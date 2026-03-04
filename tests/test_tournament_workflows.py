@@ -19,7 +19,7 @@ from app.services.tournament import (
     get_public_stage_display_sequence,
     parse_manual_draw_user_ids,
 )
-from app.services.tournament_view import build_bracket_columns, resolve_current_stage_label
+from app.services.tournament_view import build_bracket_columns, build_tournament_tree_vm, resolve_current_stage_label
 
 
 class TournamentWorkflowTests(unittest.TestCase):
@@ -196,10 +196,7 @@ class _FakeTournamentPageDB:
         return _FakeScalarResult([])
 
 
-def test_tournament_page_hides_groups_before_start(monkeypatch) -> None:
-    """Проверяет негативный сценарий `test_tournament_page_hides_groups_before_start`.
-    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
-    Запуск: `pytest tests/test_tournament_workflows.py -q` и `pytest tests/test_tournament_workflows.py -k "test_tournament_page_hides_groups_before_start" -q`."""
+def test_tournament_page_shows_tree_structure_before_start(monkeypatch) -> None:
 
     fake_db = _FakeTournamentPageDB()
 
@@ -227,9 +224,9 @@ def test_tournament_page_hides_groups_before_start(monkeypatch) -> None:
         app.dependency_overrides.pop(get_db, None)
 
     assert response.status_code == 200
-    assert "Groups are prepared and will be shown after tournament start" in response.text
-    assert "tournament_group_stage_title" not in response.text
-    assert "Current playoff stage / bracket" not in response.text
+    assert "Сетка турнира" in response.text
+    assert "Group A" in response.text
+    assert "Group Final" in response.text
 
 
 
@@ -250,21 +247,24 @@ def test_tournament_page_context_contains_expected_keys_when_started(monkeypatch
     def fake_build_bracket_columns(groups, playoff_stages, user_by_id, direct_invite_ids):
         return [{"key": "group_stage"}, {"key": "stage_2"}]
 
+    def fake_build_tournament_tree_vm(groups, playoff_stages, user_by_id, direct_invite_ids, tournament_winner_user_id=None):
+        return {"stages": [{"key": "group_stage", "title": "I этап", "level": 0, "matches": []}]}
+
     def fake_template_response(request, template_name, context):
         return _CaptureResponse(context)
 
     monkeypatch.setattr(web, "get_tournament_started", fake_get_tournament_started)
     monkeypatch.setattr(web, "get_playoff_stages_with_data", fake_get_playoff_stages_with_data)
     monkeypatch.setattr(web, "build_bracket_columns", fake_build_bracket_columns)
+    monkeypatch.setattr(web, "build_tournament_tree_vm", fake_build_tournament_tree_vm)
     monkeypatch.setattr(web.templates, "TemplateResponse", fake_template_response)
 
     request = SimpleNamespace(cookies={})
     response = __import__("asyncio").run(web.tournament_page(request, fake_db))
 
-    assert response.context["show_groups"] is True
     assert response.context["playoff_stages"][0].key == "stage_2"
     assert response.context["stage_columns"] == [{"key": "group_stage"}, {"key": "stage_2"}]
-    assert response.context["ordered_stage_columns"] == [{"key": "stage_2"}, {"key": "group_stage"}]
+    assert response.context["tournament_tree"]["stages"][0]["key"] == "group_stage"
 
 def test_stage_order_constants_match_active_stage_progression_order() -> None:
     assert web.TOURNAMENT_STAGE_KEYS_ORDER == get_public_stage_display_sequence()
@@ -593,3 +593,63 @@ def test_stage_sequences_are_identical_between_service_view_and_web() -> None:
 
 def test_admin_progression_uses_service_playoff_stage_sequence() -> None:
     assert get_playoff_stage_sequence_keys() == ["stage_2", "stage_1_4", "stage_final"]
+
+def test_build_tournament_tree_vm_has_stages_before_start() -> None:
+    tree = build_tournament_tree_vm(
+        groups=[],
+        playoff_stages=[],
+        user_by_id={},
+        direct_invite_ids=[],
+    )
+
+    assert [stage["key"] for stage in tree["stages"]] == ["group_stage", "stage_2", "stage_1_4", "stage_final"]
+    assert tree["stages"][0]["matches"]
+
+
+def test_build_tournament_tree_vm_marks_final_winner() -> None:
+    stage_final = SimpleNamespace(
+        key="stage_final",
+        stage_size=8,
+        participants=[
+            SimpleNamespace(user_id=1, seed=1, points=24, wins=1, top4_finishes=1, top8_finishes=1, last_place=2),
+            SimpleNamespace(user_id=2, seed=2, points=20, wins=0, top4_finishes=1, top8_finishes=1, last_place=4),
+        ],
+        matches=[
+            SimpleNamespace(
+                group_number=1,
+                game_number=1,
+                schedule_text="today",
+                lobby_password="pw",
+                state="finished",
+                winner_user_id=1,
+                manual_winner_user_id=None,
+            )
+        ],
+    )
+    tree = build_tournament_tree_vm(
+        groups=[],
+        playoff_stages=[stage_final],
+        user_by_id={},
+        direct_invite_ids=[],
+    )
+
+    final_stage = next(stage for stage in tree["stages"] if stage["key"] == "stage_final")
+    winner_rows = [p for p in final_stage["matches"][0]["participants"] if p.get("is_tournament_winner")]
+    assert len(winner_rows) == 1
+    assert winner_rows[0]["user_id"] == 1
+
+
+def test_build_tournament_tree_vm_stage_order_is_stable() -> None:
+    tree = build_tournament_tree_vm(
+        groups=[],
+        playoff_stages=[SimpleNamespace(key="stage_2", stage_size=32, participants=[], matches=[])],
+        user_by_id={},
+        direct_invite_ids=[],
+    )
+
+    assert [(stage["level"], stage["key"]) for stage in tree["stages"]] == [
+        (0, "group_stage"),
+        (1, "stage_2"),
+        (2, "stage_1_4"),
+        (3, "stage_final"),
+    ]

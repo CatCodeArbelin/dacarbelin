@@ -1,0 +1,42 @@
+{% macro render_tournament_tree(tree, tr, block_class='tournament-tree') -%}
+{% if tree and tree.stages %}
+<div class="{{ block_class }}" role="region" aria-label="Турнирная сетка">
+  {% for stage in tree.stages %}
+  <section class="{{ block_class }}-stage {{ block_class }}-stage-{{ stage.key }}" data-stage-key="{{ stage.key }}">
+    <h5 class="{{ block_class }}-stage-title">{{ stage.title }}</h5>
+    <div class="{{ block_class }}-matches">
+      {% for match in stage.matches %}
+      <article class="{{ block_class }}-match playoff-status-{{ match.status }}">
+        <div class="{{ block_class }}-match-head">Group {{ match.label }}</div>
+        {% if match.incoming_sources %}
+        <div class="{{ block_class }}-sources">
+          {% for source in match.incoming_sources %}
+          <span class="{{ block_class }}-source">{{ source.stage_key }} · {{ source.label }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <ul class="{{ block_class }}-participants list-unstyled mb-0 mt-2">
+          {% if match.participants %}
+            {% for participant in match.participants %}
+            <li class="{% if participant.is_promoted_highlight %}playoff-participant-promoted{% endif %} {% if participant.is_tournament_winner or participant.is_winner %}tournament-winner-highlight archive-winner{% endif %}">
+              {% if participant.user_id %}#{{ participant.user_id }} · {% endif %}{{ participant.nickname }}
+              {% if participant.is_tournament_winner %}
+              <span class="badge neon-accent-badge neon-accent-badge-winner tournament-winner-badge">{{ tr(participant.winner_label_key or 'tournament_winner') }}</span>
+              {% endif %}
+              {% if participant.points != '' and participant.points is not none %}
+              — <strong>{{ participant.points }}</strong>
+              {% endif %}
+            </li>
+            {% endfor %}
+          {% else %}
+            <li class="text-contrast-muted">{{ tr('tournament_wait_start') }}</li>
+          {% endif %}
+        </ul>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+{% endif %}
+{%- endmacro %}
