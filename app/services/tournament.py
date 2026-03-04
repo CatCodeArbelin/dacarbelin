@@ -7,6 +7,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.settings import SiteSetting
 from app.models.tournament import (
     GroupGameResult,
     GroupMember,
@@ -1008,6 +1009,28 @@ async def override_playoff_match_winner(db: AsyncSession, stage_id: int, group_n
     match.manual_override_note = note.strip()
     match.state = "finished"
     await db.commit()
+
+
+async def finalize_tournament_with_winner(db: AsyncSession, winner_user_id: int) -> str:
+    winner = await db.scalar(select(User).where(User.id == winner_user_id))
+    if not winner:
+        raise ValueError("Победитель турнира не найден")
+
+    setting_values = {
+        "tournament_finished": "1",
+        "tournament_winner_user_id": str(winner.id),
+        "tournament_winner_nickname": winner.nickname,
+    }
+    for key, value in setting_values.items():
+        setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == key))
+        if not setting:
+            setting = SiteSetting(key=key, value=value)
+            db.add(setting)
+        else:
+            setting.value = value
+
+    await db.commit()
+    return winner.nickname
 
 async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int) -> None:
     stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.id == stage_id))
