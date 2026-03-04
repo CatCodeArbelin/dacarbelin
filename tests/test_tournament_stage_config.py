@@ -12,6 +12,8 @@ from app.services.tournament_stage_config import (
     get_admin_playoff_stage_config,
     get_game_limit,
     get_promote_top_n,
+    is_final_stage,
+    is_final_stage_key,
     is_limited_stage,
     normalize_stage_key,
 )
@@ -110,6 +112,16 @@ class TournamentStageConfigTests(unittest.TestCase):
         self.assertEqual(get_promote_top_n("stage_4"), 1)
         self.assertFalse(is_limited_stage("final"))
         self.assertFalse(is_limited_stage("stage_4"))
+
+
+    def test_final_stage_detection_supports_legacy_and_scoring_mode(self) -> None:
+        self.assertTrue(is_final_stage_key("stage_final"))
+        self.assertTrue(is_final_stage_key("final"))
+        self.assertTrue(is_final_stage_key(" STAGE_4 "))
+
+        self.assertTrue(is_final_stage("custom_final", scoring_mode="final_22_top1"))
+        self.assertTrue(is_final_stage("unknown", stage_size=8))
+        self.assertFalse(is_final_stage("stage_1_4", stage_size=16, scoring_mode="standard"))
 
     def test_build_playoff_standings_marks_status_by_configured_limits_and_promotion(self) -> None:
         stage = PlayoffStage(

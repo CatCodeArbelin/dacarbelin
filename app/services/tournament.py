@@ -19,6 +19,7 @@ from app.models.user import Basket, User
 from app.services.tournament_stage_config import (
     GROUP_STAGE_GAME_LIMIT,
     get_promote_top_n,
+    is_final_stage_key,
     is_limited_stage,
 )
 
@@ -512,7 +513,7 @@ def get_stage_group_number_by_seed(seed: int) -> int:
 def get_stage_group_label(stage_key: str, group_number: int) -> str:
     if stage_key in {"stage_2", "stage_1_4", "stage_semifinal_groups"}:
         return chr(ord("A") + max(group_number - 1, 0))
-    if stage_key == "stage_final":
+    if is_final_stage_key(stage_key):
         return "Final"
     return str(group_number)
 
