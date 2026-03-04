@@ -15,7 +15,9 @@ from app.services.tournament import (
 )
 from app.services.tournament_stage_config import (
     GROUP_STAGE_GAME_LIMIT,
+    TOURNAMENT_FLOW_SPEC,
     get_promote_top_n,
+    get_stage_display_label_key,
     is_limited_stage,
 )
 
@@ -169,7 +171,9 @@ def build_bracket_columns(
         }
 
     stage_by_key = {stage.key: stage for stage in playoff_stages}
-    stage_columns: list[BracketColumnVM] = [{"key": "group_stage", "title": "I этап", "matches": []}]
+    stage_columns: list[BracketColumnVM] = [
+        {"key": "group_stage", "title": str(TOURNAMENT_FLOW_SPEC["group_stage"]["column_title"]), "matches": []}
+    ]
     stage_columns.extend(
         {"key": stage_key, "title": stage_title, "matches": []}
         for stage_key, stage_title in get_playoff_stage_columns()
@@ -316,14 +320,7 @@ def build_playoff_standings(
 
 
 def resolve_current_stage_label(lang: str, playoff_stages: Sequence[PlayoffStage], show_playoff: bool) -> str:
-    stage_display_key_by_stage_key = {
-        "group_stage": "tournament_stage_group_stage_label",
-        "stage_2": "tournament_stage_1_4_label",
-        "stage_1_4": "tournament_stage_semifinal_groups_label",
-        "stage_final": "tournament_stage_final_label",
-    }
-
-    default_display = t(lang, stage_display_key_by_stage_key["group_stage"])
+    default_display = t(lang, str(get_stage_display_label_key("group_stage")))
     if not show_playoff:
         return default_display
 
@@ -332,7 +329,7 @@ def resolve_current_stage_label(lang: str, playoff_stages: Sequence[PlayoffStage
     if current_stage is None:
         return default_display
 
-    display_key = stage_display_key_by_stage_key.get(current_stage.key)
+    display_key = get_stage_display_label_key(current_stage.key)
     if display_key is not None:
         return t(lang, display_key)
 

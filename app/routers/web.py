@@ -76,9 +76,12 @@ from app.services.tournament_stage_config import (
     FINAL_STAGE_SCORING_MODES,
     GROUP_STAGE_GAME_LIMIT,
     LEGACY_STAGE_KEY_ALIASES,
+    can_submit_stage_results,
     get_admin_playoff_stage_config,
     get_game_limit,
     get_promote_top_n,
+    get_stage_group_count,
+    get_stage_group_size,
     is_final_stage,
     is_final_stage_key,
     is_limited_stage,
@@ -119,21 +122,14 @@ def get_stage_group_numbers(
     stage_size: int | None = None,
     participants_count: int | None = None,
 ) -> list[int]:
-    stage_group_count = {
-        "stage_2": 4,
-        "stage_1_4": 2,
-        "stage_final": 1,
-    }
-    normalized_stage_key = stage_key
-    if is_final_stage_key(stage_key):
-        normalized_stage_key = "stage_final"
-    groups_count = stage_group_count.get(normalized_stage_key)
+    groups_count = get_stage_group_count(stage_key)
     if is_limited_stage(stage_key):
-        size_groups = max((stage_size or 0) // 8, 0)
+        group_size = get_stage_group_size(stage_key)
+        size_groups = max((stage_size or 0) // group_size, 0)
         if size_groups:
             groups_count = size_groups
         elif participants_count is not None:
-            groups_count = max(math.ceil((participants_count or 0) / 8), 0)
+            groups_count = max(math.ceil((participants_count or 0) / group_size), 0)
     if groups_count is None:
         return []
     return list(range(1, groups_count + 1))
@@ -211,15 +207,7 @@ def is_stage_allowed_for_manual_winner(stage: PlayoffStage | None) -> bool:
 
 
 def get_playoff_stage_submit_status(stage: PlayoffStage) -> dict[str, bool | str]:
-    stage_config = get_admin_playoff_stage_config(stage.key)
-    if stage_config.game_limit is not None:
-        return {"can_submit": True, "reason": ""}
-
-    if is_final_stage(
-        stage.key,
-        stage_size=stage.stage_size,
-        scoring_mode=stage.scoring_mode,
-    ):
+    if can_submit_stage_results(stage.key, stage_size=stage.stage_size, scoring_mode=stage.scoring_mode):
         return {"can_submit": True, "reason": ""}
 
     normalized_stage_key = normalize_stage_key(stage.key)
@@ -238,6 +226,15 @@ def get_playoff_stage_submit_status(stage: PlayoffStage) -> dict[str, bool | str
         return {"can_submit": False, "reason": "stage_size_not_final"}
 
     return {"can_submit": False, "reason": "stage_not_limited_and_not_final"}
+
+
+
+
+def can_change_playoff_group_meta(stage: PlayoffStage, match: PlayoffMatch) -> bool:
+    stage_config = get_admin_playoff_stage_config(stage.key)
+    if stage_config.game_limit is None:
+        return True
+    return match.game_number <= stage_config.game_limit
 
 
 async def can_submit_playoff_stage_results_with_db(db: AsyncSession, stage: PlayoffStage) -> bool:
@@ -1654,8 +1651,7 @@ async def admin_playoff_group_password(
     if not match:
         return redirect_with_admin_msg("msg_operation_failed")
 
-    stage_config = get_admin_playoff_stage_config(stage.key)
-    if stage_config.game_limit is not None and match.game_number > stage_config.game_limit:
+    if not can_change_playoff_group_meta(stage, match):
         return redirect_with_admin_msg("msg_operation_failed", details="group_games_not_completed")
 
     normalized_password = (password or "").strip()
@@ -1686,8 +1682,7 @@ async def admin_playoff_group_schedule(
     if not match:
         return redirect_with_admin_msg("msg_operation_failed")
 
-    stage_config = get_admin_playoff_stage_config(stage.key)
-    if stage_config.game_limit is not None and match.game_number > stage_config.game_limit:
+    if not can_change_playoff_group_meta(stage, match):
         return redirect_with_admin_msg("msg_operation_failed", details="group_games_not_completed")
 
     parsed_scheduled_at = None

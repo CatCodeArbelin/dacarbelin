@@ -8,6 +8,7 @@ from app.services.tournament_stage_config import (
     ADMIN_PLAYOFF_STAGE_CONFIGS,
     GROUP_STAGE_GAME_LIMIT,
     LEGACY_STAGE_KEY_ALIASES,
+    TOURNAMENT_FLOW_SPEC,
     LIMITED_PLAYOFF_STAGE_KEYS,
     PROMOTE_TOP_N_BY_STAGE,
     get_admin_playoff_stage_config,
@@ -25,6 +26,8 @@ from app.services.tournament_view import build_playoff_standings, resolve_curren
 class TournamentStageConfigTests(unittest.TestCase):
     def test_stage_config_values_are_correct(self) -> None:
         self.assertEqual(GROUP_STAGE_GAME_LIMIT, 3)
+        self.assertEqual(TOURNAMENT_FLOW_SPEC["group_stage"]["participants"], 56)
+        self.assertEqual(TOURNAMENT_FLOW_SPEC["group_stage"]["groups_count"], 7)
         self.assertEqual(LIMITED_PLAYOFF_STAGE_KEYS, {"stage_2", "stage_1_4"})
         self.assertEqual(PROMOTE_TOP_N_BY_STAGE["stage_2"], 4)
         self.assertEqual(PROMOTE_TOP_N_BY_STAGE["stage_1_4"], 4)
@@ -116,6 +119,40 @@ class TournamentStageConfigTests(unittest.TestCase):
         self.assertFalse(is_limited_stage("final"))
         self.assertFalse(is_limited_stage("stage_4"))
 
+
+
+    def test_stage_submit_contracts_for_all_tournament_stages(self) -> None:
+        stages = [
+            ("stage_2", 32, "standard", True),
+            ("stage_1_4", 16, "standard", True),
+            ("stage_final", 8, "final_22_top1", True),
+            ("group_stage", 56, "standard", False),
+        ]
+
+        for key, stage_size, scoring_mode, expected in stages:
+            stage = PlayoffStage(
+                id=1,
+                key=key,
+                title=key,
+                stage_order=1,
+                stage_size=stage_size,
+                scoring_mode=scoring_mode,
+            )
+            status = web.get_playoff_stage_submit_status(stage)
+            self.assertEqual(status["can_submit"], expected, key)
+
+    def test_stage_submit_contract_rejects_unknown_non_final_stage(self) -> None:
+        stage = PlayoffStage(
+            id=10,
+            key="mystery_stage",
+            title="Mystery",
+            stage_order=1,
+            stage_size=16,
+            scoring_mode="standard",
+        )
+        status = web.get_playoff_stage_submit_status(stage)
+        self.assertFalse(status["can_submit"])
+        self.assertEqual(status["reason"], "stage_key_unrecognized")
 
     def test_final_stage_detection_supports_legacy_and_scoring_mode(self) -> None:
         self.assertTrue(is_final_stage_key("stage_final"))
