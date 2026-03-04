@@ -333,6 +333,13 @@ body {
   box-shadow: 0 0 10px rgba(255, 98, 204, 0.35);
 }
 
+.neon-accent-badge-winner {
+  color: #fff6dc !important;
+  border-color: #ffca69;
+  background: linear-gradient(90deg, rgba(142, 86, 10, 0.62), rgba(224, 128, 13, 0.45));
+  box-shadow: 0 0 12px rgba(255, 171, 64, 0.45);
+}
+
 .playoff-participants li.tournament-winner-highlight {
   border-left-color: #ffb347;
   color: #fff5de;
