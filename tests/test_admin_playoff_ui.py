@@ -17,7 +17,7 @@ def test_admin_template_has_playoff_hint_without_manual_stage_controls() -> None
     assert "admin_playoff_match_results" in template
     assert "current_playoff_stage_config.can_shuffle" in template
     assert "current_playoff_stage_config.can_debug_simulate" in template
-    assert "current_playoff_stage.key == 'stage_final'" in template
+    assert "current_playoff_stage_is_final" in template
     assert "current_playoff_stage.key == 'stage_2'" in template
     assert "Подтвердить победителя этапа" in template
     assert 'name="winner_user_id"' in template
@@ -64,7 +64,7 @@ def test_admin_template_disables_stage_result_submit_for_disallowed_stage() -> N
     router = Path("app/routers/web.py").read_text(encoding="utf-8")
 
     assert "current_playoff_stage_can_submit_results" in router
-    assert "current_playoff_stage_config.game_limit is not None or is_final_like_stage" in router
+    assert "can_submit_playoff_stage_results" in router
     assert "can_submit_results=current_playoff_stage_can_submit_results" in template
     assert "submit_results_disabled_reason='Запись результатов для этой стадии запрещена" in template
     assert "can_submit_results=True" in macros

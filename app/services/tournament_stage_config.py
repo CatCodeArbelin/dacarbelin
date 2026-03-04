@@ -8,6 +8,9 @@ GROUP_STAGE_GAME_LIMIT = 3
 LEGACY_STAGE_KEY_ALIASES: Mapping[str, str] = {
     "final": "stage_final",
     "stage_4": "stage_final",
+    "stage4": "stage_final",
+    "stage_4_final": "stage_final",
+    "final_stage": "stage_final",
 }
 FINAL_STAGE_SCORING_MODES = {"final_22_top1"}
 PROMOTE_TOP_N_BY_STAGE: Mapping[str, int] = {
@@ -80,6 +83,12 @@ def is_final_stage(
 ) -> bool:
     if is_final_stage_key(stage_key):
         return True
+    normalized_key = normalize_stage_key(stage_key)
+    if "final" in normalized_key:
+        return True
     if (scoring_mode or "").strip().lower() in FINAL_STAGE_SCORING_MODES:
         return True
-    return stage_size == 8
+    try:
+        return int(stage_size) == 8 if stage_size is not None else False
+    except (TypeError, ValueError):
+        return False
