@@ -2,7 +2,7 @@
 {% import "includes/tournament_stage_macros.html" as stage_macros with context %}
 {% block content %}
 <h2>{{ tr('admin_title') }}</h2>
-{% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}{% if request.query_params.get('details') %}: <span class="small">{{ request.query_params.get('details') }}</span>{% endif %}</div>{% endif %}
+{% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}{% if request.query_params.get('details') %}: <span class="small">{{ tr(request.query_params.get('details')) }}</span>{% endif %}</div>{% endif %}
 {% if playoff_empty_active_stage_alert %}<div class="alert alert-warning">{{ playoff_empty_active_stage_alert }}</div>{% endif %}
 <div class="d-flex justify-content-end align-items-center gap-2 mb-3">
   <a class="btn btn-sm btn-outline-info" href="/admin/users">Список участников</a>
@@ -143,6 +143,16 @@
 
       {% set final_group = current_stage_groups[0] if current_stage_groups else None %}
       <h5 class="mt-4">{{ tr('admin_playoff_match_results') }}</h5>
+      {% if not current_playoff_stage_can_submit_results %}
+      <div class="alert alert-warning py-2">
+        {{ tr('admin_playoff_submit_forbidden_hint') }}
+        <div class="small mt-1">
+          stage.key=<code>{{ current_playoff_stage.key }}</code>,
+          stage_size=<code>{{ current_playoff_stage.stage_size }}</code>,
+          scoring_mode=<code>{{ current_playoff_stage.scoring_mode }}</code>
+        </div>
+      </div>
+      {% endif %}
       {{ stage_macros.stage_finish_panel(
         is_ready=playoff_stage_finish_ready,
         finish_action='/admin/playoff/stage/finish',
