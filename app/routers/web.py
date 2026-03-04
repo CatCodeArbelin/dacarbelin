@@ -92,6 +92,11 @@ ALLOWED_USER_UPDATE_FIELDS = {"nickname", "basket", "direct_invite_stage"}
 ALLOWED_DIRECT_INVITE_STAGES = {None, *get_playoff_stage_sequence_keys()}
 TOURNAMENT_STAGE_KEYS_ORDER = get_public_stage_display_sequence()
 PLAYOFF_STAGE_KEYS_ORDER = TOURNAMENT_STAGE_KEYS_ORDER[1:]
+EXPECTED_32_PLAYER_STAGE_ORDER_PAIRS = [
+    (0, "stage_2"),
+    (1, "stage_1_4"),
+    (2, "stage_final"),
+]
 
 CHAT_NICK_COLORS = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff66c4", "#5ce1e6", "#f48c06", "#90be6d", "#4cc9f0"]
 FORBIDDEN_CHAT_NICKS = {"@admin"}
@@ -239,6 +244,52 @@ def get_empty_active_stage_alert(playoff_stages: list[PlayoffStage]) -> str | No
         return f"Этап {stage.title} активен, но участников 0."
 
     return None
+
+
+def get_playoff_stage_integrity_alert(playoff_stages: list[PlayoffStage]) -> str | None:
+    if not playoff_stages:
+        return None
+
+    known_stage_keys = set(get_playoff_stage_sequence_keys())
+    stage_order_key_pairs = {(stage.stage_order, normalize_stage_key(stage.key)) for stage in playoff_stages}
+    expected_pairs = set(EXPECTED_32_PLAYER_STAGE_ORDER_PAIRS)
+    issues: list[str] = []
+
+    for stage in playoff_stages:
+        normalized_key = normalize_stage_key(stage.key)
+        if normalized_key not in known_stage_keys:
+            issues.append(
+                f"Этап id={stage.id} имеет неизвестный key='{stage.key}' (alias не распознан)."
+            )
+
+    has_32_player_stage = any(int(stage.stage_size or 0) == 32 for stage in playoff_stages)
+    if has_32_player_stage and stage_order_key_pairs != expected_pairs:
+        current_pairs = ", ".join([f"({stage.stage_order}, {normalize_stage_key(stage.key)})" for stage in playoff_stages])
+        expected_pairs_text = ", ".join([f"({order}, {key})" for order, key in EXPECTED_32_PLAYER_STAGE_ORDER_PAIRS])
+        issues.append(
+            "Для 32-игрокового сценария нарушены пары (stage_order, key): "
+            f"ожидается [{expected_pairs_text}], сейчас [{current_pairs}]."
+        )
+
+    final_stage = next((stage for stage in playoff_stages if normalize_stage_key(stage.key) == "stage_final"), None)
+    if final_stage is None:
+        final_stage = next((stage for stage in playoff_stages if stage.stage_order == EXPECTED_32_PLAYER_STAGE_ORDER_PAIRS[-1][0]), None)
+    if final_stage:
+        if int(final_stage.stage_size or 0) != 8:
+            issues.append(
+                f"Финальная стадия id={final_stage.id} должна иметь stage_size=8, сейчас {final_stage.stage_size}."
+            )
+
+        scoring_mode = (final_stage.scoring_mode or "").strip().lower()
+        if scoring_mode != "final_22_top1":
+            issues.append(
+                "Для финальной стадии предпочтителен scoring_mode='final_22_top1' "
+                f"(сейчас '{final_stage.scoring_mode or '∅'}')."
+            )
+
+    if not issues:
+        return None
+    return "⚠️ Проверка целостности playoff_stages: " + " ".join(issues)
 
 
 def _normalize_direct_invite_stage(raw_value: str | None) -> str | None:
@@ -1050,6 +1101,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
         playoff_stage_finish_progress, playoff_stage_finish_ready = build_playoff_stage_finish_status(current_playoff_stage)
         playoff_stage_finish_progress_limit = GROUP_STAGE_GAME_LIMIT if is_limited_stage(current_playoff_stage.key) else "∞"
     playoff_empty_active_stage_alert = get_empty_active_stage_alert(playoff_stages)
+    playoff_stage_integrity_alert = get_playoff_stage_integrity_alert(playoff_stages)
     registration_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "registration_open"))
     registration_open = (registration_setting.value == "1") if registration_setting else True
     tournament_started_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_started"))
@@ -1113,6 +1165,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             group_stage_finish_status=group_stage_finish_status,
             group_stage_games_summary=group_stage_games_summary,
             playoff_empty_active_stage_alert=playoff_empty_active_stage_alert,
+            playoff_stage_integrity_alert=playoff_stage_integrity_alert,
         ),
     )
 

@@ -2,6 +2,7 @@
 
 import unittest
 
+from app.routers import web
 from app.models.tournament import PlayoffMatch, PlayoffParticipant, PlayoffStage
 from app.services.tournament_stage_config import (
     ADMIN_PLAYOFF_STAGE_CONFIGS,
@@ -126,6 +127,22 @@ class TournamentStageConfigTests(unittest.TestCase):
         self.assertTrue(is_final_stage("unknown", stage_size="8"))
         self.assertTrue(is_final_stage("stage_4_final", stage_size=16, scoring_mode="standard"))
         self.assertFalse(is_final_stage("stage_1_4", stage_size=16, scoring_mode="standard"))
+
+    def test_playoff_stage_integrity_alert_detects_invalid_final_stage(self) -> None:
+        stages = [
+            PlayoffStage(id=1, key="stage_2", title="Stage 2", stage_order=0, stage_size=32, scoring_mode="standard"),
+            PlayoffStage(id=2, key="stage_1_4", title="Stage 3", stage_order=1, stage_size=16, scoring_mode="standard"),
+            PlayoffStage(id=3, key="invalid_final", title="Final", stage_order=2, stage_size=16, scoring_mode="standard"),
+        ]
+
+        alert = web.get_playoff_stage_integrity_alert(stages)
+
+        self.assertIsNotNone(alert)
+        assert alert is not None
+        self.assertIn("неизвестный key='invalid_final'", alert)
+        self.assertIn("нарушены пары (stage_order, key)", alert)
+        self.assertIn("должна иметь stage_size=8", alert)
+        self.assertIn("scoring_mode='final_22_top1'", alert)
 
     def test_build_playoff_standings_marks_status_by_configured_limits_and_promotion(self) -> None:
         stage = PlayoffStage(
