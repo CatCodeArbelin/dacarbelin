@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, Form, Query, Request
 from pydantic import BaseModel
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import desc, func, select
+from sqlalchemy import delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -38,7 +38,7 @@ from app.models.settings import (
     SiteSetting,
     TournamentStage,
 )
-from app.models.tournament import GroupGameResult, GroupMember, PlayoffMatch, PlayoffParticipant, PlayoffStage, TournamentGroup
+from app.models.tournament import EmergencyOperationLog, GroupGameResult, GroupMember, PlayoffMatch, PlayoffParticipant, PlayoffStage, TournamentGroup
 from app.models.tournament_archive import TournamentArchive
 from app.models.user import Basket, User
 from app.services.basket_allocator import allocate_basket
@@ -788,6 +788,81 @@ def redirect_with_admin_users_msg(msg_key: str, details: str | None = None) -> R
     return RedirectResponse(url=f"/admin/users?{urlencode(params)}", status_code=303)
 
 
+def _parse_user_id_list(raw_user_ids: str) -> list[int]:
+    normalized = [part.strip() for part in (raw_user_ids or "").split(",") if part.strip()]
+    user_ids: list[int] = []
+    for value in normalized:
+        user_id = int(value)
+        if user_id in user_ids:
+            raise ValueError("duplicate_user")
+        user_ids.append(user_id)
+    if not user_ids:
+        raise ValueError("empty_user_ids")
+    return user_ids
+
+
+async def _is_tournament_finished(db: AsyncSession) -> bool:
+    setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_finished"))
+    return bool(isinstance(setting, SiteSetting) and setting.value == "1")
+
+
+async def _check_emergency_safety_lock(db: AsyncSession, *, confirm_final: bool) -> tuple[bool, str | None]:
+    if await _is_tournament_finished(db) and not confirm_final:
+        return False, "final_locked_require_confirmation"
+    return True, None
+
+
+async def _log_emergency_action(
+    db: AsyncSession,
+    *,
+    request: Request,
+    action_type: str,
+    dry_run: bool,
+    target_stage_id: int | None,
+    details: dict[str, object],
+) -> None:
+    admin_name = request.cookies.get(ADMIN_SESSION_COOKIE, "admin")[:120] or "admin"
+    db.add(
+        EmergencyOperationLog(
+            admin_name=admin_name,
+            action_type=action_type,
+            dry_run=dry_run,
+            target_stage_id=target_stage_id,
+            details_json=json.dumps(details, ensure_ascii=False),
+        )
+    )
+
+
+async def _render_admin_emergency_page(
+    request: Request,
+    db: AsyncSession,
+    *,
+    preview_title: str | None = None,
+    preview_payload: dict[str, object] | None = None,
+):
+    manual_draw_users = (
+        await db.scalars(
+            select(User)
+            .where(User.basket != Basket.INVITED.value)
+            .order_by(User.nickname.asc(), User.created_at.desc())
+        )
+    ).all()
+    playoff_stages = await get_playoff_stages_with_data(db)
+    emergency_logs = (
+        await db.scalars(select(EmergencyOperationLog).order_by(EmergencyOperationLog.created_at.desc(), EmergencyOperationLog.id.desc()).limit(30))
+    ).all()
+    return templates.TemplateResponse(
+        request,
+        "admin_emergency.html",
+        template_context(
+            request,
+            playoff_stages=playoff_stages,
+            manual_draw_users=manual_draw_users,
+            emergency_logs=emergency_logs,
+            preview_title=preview_title,
+            preview_payload=preview_payload,
+        ),
+    )
 
 
 async def _playoff_stage_exists(db: AsyncSession, stage_id: int) -> bool:
@@ -1963,23 +2038,7 @@ async def admin_content_page(request: Request, db: AsyncSession = Depends(get_db
 
 @router.get("/admin/emergency", response_class=HTMLResponse)
 async def admin_emergency_page(request: Request, db: AsyncSession = Depends(get_db)):
-    manual_draw_users = (
-        await db.scalars(
-            select(User)
-            .where(User.basket != Basket.INVITED.value)
-            .order_by(User.nickname.asc(), User.created_at.desc())
-        )
-    ).all()
-    playoff_stages = await get_playoff_stages_with_data(db)
-    return templates.TemplateResponse(
-        request,
-        "admin_emergency.html",
-        template_context(
-            request,
-            playoff_stages=playoff_stages,
-            manual_draw_users=manual_draw_users,
-        ),
-    )
+    return await _render_admin_emergency_page(request, db)
 
 
 @router.post("/admin/user/update")
@@ -2479,13 +2538,191 @@ async def admin_debug_simulate_three_random_playoff_games(
     except Exception:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed", details="debug_simulate_3_games_failed")
 
+@router.post("/admin/emergency/rebuild-stage")
+async def admin_emergency_rebuild_stage(
+    request: Request,
+    stage_id: int = Form(...),
+    user_ids: str = Form(...),
+    dry_run: bool = Form(default=False),
+    confirm_final: bool = Form(default=False),
+    db: AsyncSession = Depends(get_db),
+):
+    stage = await _get_playoff_stage(db, stage_id)
+    if not stage:
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
+    allowed, reason = await _check_emergency_safety_lock(db, confirm_final=confirm_final)
+    if not allowed:
+        return redirect_with_admin_msg("msg_operation_failed", details=reason)
+
+    try:
+        ordered_user_ids = _parse_user_id_list(user_ids)
+    except Exception:
+        return redirect_with_admin_msg("msg_operation_failed", details="invalid_user_list")
+
+    current = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))).all())
+    preview = {
+        "stage_id": stage_id,
+        "before_count": len(current),
+        "after_count": len(ordered_user_ids),
+        "added": [uid for uid in ordered_user_ids if uid not in {p.user_id for p in current}],
+        "removed": [p.user_id for p in current if p.user_id not in set(ordered_user_ids)],
+        "dry_run": dry_run,
+    }
+
+    if not dry_run:
+        await db.execute(delete(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))
+        for seed, user_id in enumerate(ordered_user_ids, start=1):
+            db.add(PlayoffParticipant(stage_id=stage_id, user_id=user_id, seed=seed))
+        stage.stage_size = len(ordered_user_ids)
+
+    await _log_emergency_action(
+        db,
+        request=request,
+        action_type="rebuild_stage",
+        dry_run=dry_run,
+        target_stage_id=stage_id,
+        details=preview,
+    )
+    if dry_run:
+        await db.flush()
+        return await _render_admin_emergency_page(request, db, preview_title="Dry-run: rebuild stage", preview_payload=preview)
+    await db.commit()
+    return redirect_with_admin_msg("msg_status_ok", details="stage_rebuilt")
+
+
+@router.post("/admin/emergency/stage-config")
+async def admin_emergency_stage_config(
+    request: Request,
+    stage_id: int = Form(...),
+    stage_size: int = Form(...),
+    groups_count: int = Form(...),
+    reseed: bool = Form(default=False),
+    dry_run: bool = Form(default=False),
+    confirm_final: bool = Form(default=False),
+    db: AsyncSession = Depends(get_db),
+):
+    stage = await _get_playoff_stage(db, stage_id)
+    if not stage:
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
+    allowed, reason = await _check_emergency_safety_lock(db, confirm_final=confirm_final)
+    if not allowed:
+        return redirect_with_admin_msg("msg_operation_failed", details=reason)
+
+    participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id).order_by(PlayoffParticipant.seed))).all())
+    matches = list((await db.scalars(select(PlayoffMatch).where(PlayoffMatch.stage_id == stage_id))).all())
+    required_matches = max(1, groups_count)
+    preview = {
+        "stage_id": stage_id,
+        "old_stage_size": stage.stage_size,
+        "new_stage_size": stage_size,
+        "old_matches": len(matches),
+        "new_matches": required_matches,
+        "reseed": reseed,
+        "dry_run": dry_run,
+    }
+
+    if not dry_run:
+        stage.stage_size = stage_size
+        if reseed:
+            for seed, participant in enumerate(participants, start=1):
+                participant.seed = seed
+        await db.execute(delete(PlayoffMatch).where(PlayoffMatch.stage_id == stage_id))
+        for group_number in range(1, required_matches + 1):
+            db.add(PlayoffMatch(stage_id=stage_id, match_number=group_number, group_number=group_number, game_number=1, lobby_password="0000", schedule_text="TBD"))
+
+    await _log_emergency_action(db, request=request, action_type="stage_config", dry_run=dry_run, target_stage_id=stage_id, details=preview)
+    if dry_run:
+        await db.flush()
+        return await _render_admin_emergency_page(request, db, preview_title="Dry-run: stage config", preview_payload=preview)
+    await db.commit()
+    return redirect_with_admin_msg("msg_status_ok", details="stage_config_updated")
+
+
+@router.post("/admin/emergency/bulk-move")
+async def admin_emergency_bulk_move(
+    request: Request,
+    from_stage_id: int = Form(...),
+    to_stage_id: int = Form(...),
+    user_ids: str = Form(...),
+    dry_run: bool = Form(default=False),
+    confirm_final: bool = Form(default=False),
+    db: AsyncSession = Depends(get_db),
+):
+    if not await _playoff_stage_exists(db, from_stage_id) or not await _playoff_stage_exists(db, to_stage_id):
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
+    allowed, reason = await _check_emergency_safety_lock(db, confirm_final=confirm_final)
+    if not allowed:
+        return redirect_with_admin_msg("msg_operation_failed", details=reason)
+    try:
+        ordered_user_ids = _parse_user_id_list(user_ids)
+    except Exception:
+        return redirect_with_admin_msg("msg_operation_failed", details="invalid_user_list")
+
+    moved: list[int] = []
+    skipped: list[int] = []
+    for user_id in ordered_user_ids:
+        source = await db.scalar(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == from_stage_id, PlayoffParticipant.user_id == user_id))
+        target_exists = await db.scalar(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == to_stage_id, PlayoffParticipant.user_id == user_id))
+        if not source or target_exists:
+            skipped.append(user_id)
+            continue
+        moved.append(user_id)
+        if not dry_run:
+            await db.delete(source)
+            next_seed = (await db.scalar(select(func.max(PlayoffParticipant.seed)).where(PlayoffParticipant.stage_id == to_stage_id))) or 0
+            db.add(PlayoffParticipant(stage_id=to_stage_id, user_id=user_id, seed=int(next_seed) + 1))
+
+    preview = {"from_stage_id": from_stage_id, "to_stage_id": to_stage_id, "moved": moved, "skipped": skipped, "dry_run": dry_run}
+    await _log_emergency_action(db, request=request, action_type="bulk_move", dry_run=dry_run, target_stage_id=to_stage_id, details=preview)
+    if dry_run:
+        await db.flush()
+        return await _render_admin_emergency_page(request, db, preview_title="Dry-run: bulk move", preview_payload=preview)
+    await db.commit()
+    return redirect_with_admin_msg("msg_status_ok", details=f"bulk_moved:{len(moved)}")
+
+
+@router.post("/admin/emergency/diagnostics")
+async def admin_emergency_diagnostics(
+    request: Request,
+    dry_run: bool = Form(default=True),
+    db: AsyncSession = Depends(get_db),
+):
+    stages = list((await db.scalars(select(PlayoffStage).order_by(PlayoffStage.stage_order, PlayoffStage.id))).all())
+    diagnostics: list[dict[str, object]] = []
+    for stage in stages:
+        participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage.id))).all())
+        matches = list((await db.scalars(select(PlayoffMatch).where(PlayoffMatch.stage_id == stage.id))).all())
+        duplicate_users = sorted({p.user_id for p in participants if [x.user_id for x in participants].count(p.user_id) > 1})
+        expected_groups = max(1, math.ceil(int(stage.stage_size or 0) / 8))
+        group_numbers = {m.group_number for m in matches}
+        missing_groups = [number for number in range(1, expected_groups + 1) if number not in group_numbers]
+        if len(participants) != int(stage.stage_size or 0) or duplicate_users or missing_groups:
+            diagnostics.append({
+                "stage_id": stage.id,
+                "stage_key": stage.key,
+                "stage_size": stage.stage_size,
+                "participants": len(participants),
+                "missing_groups": missing_groups,
+                "duplicate_users": duplicate_users,
+            })
+
+    payload = {"dry_run": dry_run, "issues": diagnostics}
+    await _log_emergency_action(db, request=request, action_type="diagnostics", dry_run=dry_run, target_stage_id=None, details=payload)
+    await db.flush()
+    return await _render_admin_emergency_page(request, db, preview_title="Diagnostics", preview_payload=payload)
+
+
 @router.post("/admin/playoff/move")
 async def admin_move_playoff_player(
     from_stage_id: int = Form(...),
     to_stage_id: int = Form(...),
     user_id: int = Form(...),
+    confirm_final: bool = Form(default=False),
     db: AsyncSession = Depends(get_db),
 ):
+    allowed, reason = await _check_emergency_safety_lock(db, confirm_final=confirm_final)
+    if not allowed:
+        return redirect_with_admin_msg("msg_operation_failed", details=reason)
     if not await _playoff_stage_exists(db, from_stage_id) or not await _playoff_stage_exists(db, to_stage_id):
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
@@ -2500,8 +2737,12 @@ async def admin_replace_playoff_player(
     stage_id: int = Form(...),
     from_user_id: int = Form(...),
     to_user_id: int = Form(...),
+    confirm_final: bool = Form(default=False),
     db: AsyncSession = Depends(get_db),
 ):
+    allowed, reason = await _check_emergency_safety_lock(db, confirm_final=confirm_final)
+    if not allowed:
+        return redirect_with_admin_msg("msg_operation_failed", details=reason)
     if not await _playoff_stage_exists(db, stage_id):
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
@@ -2516,8 +2757,12 @@ async def admin_adjust_playoff_points(
     stage_id: int = Form(...),
     user_id: int = Form(...),
     points_delta: int = Form(...),
+    confirm_final: bool = Form(default=False),
     db: AsyncSession = Depends(get_db),
 ):
+    allowed, reason = await _check_emergency_safety_lock(db, confirm_final=confirm_final)
+    if not allowed:
+        return redirect_with_admin_msg("msg_operation_failed", details=reason)
     if not await _playoff_stage_exists(db, stage_id):
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
@@ -2686,8 +2931,12 @@ async def admin_playoff_override(
     group_number: int = Form(default=1),
     winner_user_id: int = Form(...),
     note: str = Form(default=""),
+    confirm_final: bool = Form(default=False),
     db: AsyncSession = Depends(get_db),
 ):
+    allowed, reason = await _check_emergency_safety_lock(db, confirm_final=confirm_final)
+    if not allowed:
+        return redirect_with_admin_msg("msg_operation_failed", details=reason)
     stage = await _get_playoff_stage(db, stage_id)
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")

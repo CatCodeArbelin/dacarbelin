@@ -8,31 +8,68 @@
 </div>
 <div class="card bg-black neon-border-red"><div class="card-body">
   <div class="alert alert-warning mt-2 mb-2">{{ tr('admin_advanced_actions_warning') }}</div>
+  {% if preview_payload %}
+  <div class="alert alert-info">
+    <div><strong>{{ preview_title or 'Preview' }}</strong></div>
+    <pre class="mb-0" style="white-space: pre-wrap">{{ preview_payload | tojson(indent=2) }}</pre>
+  </div>
+  {% endif %}
   {% set has_playoff_stages = playoff_stages|length > 0 %}
+
+  <form action="/admin/emergency/rebuild-stage" method="post" class="row g-2 mb-3">
+    <div class="col-md-3"><select class="form-select" name="stage_id" required>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
+    <div class="col-md-5"><input class="form-control" type="text" name="user_ids" placeholder="user ids: 1,2,3" required></div>
+    <div class="col-md-2 form-check d-flex align-items-center"><input class="form-check-input me-2" type="checkbox" name="dry_run" value="true" checked><label class="form-check-label">dry-run</label></div>
+    <div class="col-md-2"><button class="btn btn-outline-info w-100" {% if not has_playoff_stages %}disabled{% endif %}>Rebuild stage</button></div>
+    <div class="col-12 form-check"><input class="form-check-input me-2" type="checkbox" name="confirm_final" value="true"><label class="form-check-label">Подтвердить действие после фиксации финала</label></div>
+  </form>
+
+  <form action="/admin/emergency/stage-config" method="post" class="row g-2 mb-3">
+    <div class="col-md-3"><select class="form-select" name="stage_id" required>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><input class="form-control" type="number" name="stage_size" min="1" placeholder="stage_size" required></div>
+    <div class="col-md-2"><input class="form-control" type="number" name="groups_count" min="1" placeholder="groups" required></div>
+    <div class="col-md-2 form-check d-flex align-items-center"><input class="form-check-input me-2" type="checkbox" name="reseed" value="true"><label class="form-check-label">reseed</label></div>
+    <div class="col-md-2 form-check d-flex align-items-center"><input class="form-check-input me-2" type="checkbox" name="dry_run" value="true" checked><label class="form-check-label">dry-run</label></div>
+    <div class="col-md-1"><button class="btn btn-outline-info w-100">Apply</button></div>
+    <div class="col-12 form-check"><input class="form-check-input me-2" type="checkbox" name="confirm_final" value="true"><label class="form-check-label">Подтвердить действие после фиксации финала</label></div>
+  </form>
+
+  <form action="/admin/emergency/bulk-move" method="post" class="row g-2 mb-3">
+    <div class="col-md-3"><select class="form-select" name="from_stage_id" required>{% for stage in playoff_stages %}<option value="{{ stage.id }}">from: {{ stage.title }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><select class="form-select" name="to_stage_id" required>{% for stage in playoff_stages %}<option value="{{ stage.id }}">to: {{ stage.title }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><input class="form-control" type="text" name="user_ids" placeholder="1,2,3" required></div>
+    <div class="col-md-2 form-check d-flex align-items-center"><input class="form-check-input me-2" type="checkbox" name="dry_run" value="true" checked><label class="form-check-label">dry-run</label></div>
+    <div class="col-md-1"><button class="btn btn-outline-info w-100">Move</button></div>
+    <div class="col-12 form-check"><input class="form-check-input me-2" type="checkbox" name="confirm_final" value="true"><label class="form-check-label">Подтвердить действие после фиксации финала</label></div>
+  </form>
+
+  <form action="/admin/emergency/diagnostics" method="post" class="row g-2 mb-3">
+    <div class="col-md-3 form-check d-flex align-items-center"><input class="form-check-input me-2" type="checkbox" name="dry_run" value="true" checked><label class="form-check-label">dry-run</label></div>
+    <div class="col-md-3"><button class="btn btn-outline-light w-100" {% if not has_playoff_stages %}disabled{% endif %}>Run diagnostics</button></div>
+  </form>
+
+  <hr>
+
   <form action="/admin/playoff/move" method="post" class="row g-2 mb-2">
     <div class="col-md-4"><select class="form-select" name="from_stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
     <div class="col-md-4"><select class="form-select" name="to_stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
     <div class="col-md-4"><select class="form-select" name="user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
     <div class="col-md-3"><button class="btn btn-outline-warning w-100" {% if not has_playoff_stages %}disabled{% endif %}>{{ tr('admin_manual_transfer') }}</button></div>
+    <div class="col-12 form-check"><input class="form-check-input me-2" type="checkbox" name="confirm_final" value="true"><label class="form-check-label">Подтвердить действие после фиксации финала</label></div>
   </form>
-  <form action="/admin/playoff/replace" method="post" class="row g-2 mb-2">
-    <div class="col-md-4"><select class="form-select" name="stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
-    <div class="col-md-4"><select class="form-select" name="from_user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
-    <div class="col-md-4"><select class="form-select" name="to_user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
-    <div class="col-md-3"><button class="btn btn-outline-danger w-100" {% if not has_playoff_stages %}disabled{% endif %}>{{ tr('admin_replace_participant') }}</button></div>
-  </form>
-  <form action="/admin/playoff/points" method="post" class="row g-2 mb-2">
-    <div class="col-md-4"><select class="form-select" name="stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
-    <div class="col-md-4"><select class="form-select" name="user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
-    <div class="col-md-3"><input class="form-control" type="number" name="points_delta" placeholder="{{ tr('admin_points_delta') }}" required></div>
-    <div class="col-md-3"><button class="btn btn-outline-secondary w-100" {% if not has_playoff_stages %}disabled{% endif %}>{{ tr('admin_adjust_points') }}</button></div>
-  </form>
-  <form action="/admin/playoff/override" method="post" class="row g-2 mb-3">
-    <div class="col-md-4"><select class="form-select" name="stage_id" required {% if not has_playoff_stages %}disabled{% endif %}><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
-    <div class="col-md-2"><input class="form-control" type="number" name="group_number" value="1" required></div>
-    <div class="col-md-4"><select class="form-select" name="winner_user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
-    <div class="col-md-3"><input class="form-control" name="note" placeholder="{{ tr('admin_override_note') }}"></div>
-    <div class="col-md-2"><button class="btn btn-outline-light w-100" {% if not has_playoff_stages %}disabled{% endif %}>{{ tr('admin_set_winner') }}</button></div>
-  </form>
+
+  <h5 class="mt-4">Emergency log</h5>
+  <div class="table-responsive"><table class="table table-dark table-sm align-middle">
+    <thead><tr><th>#</th><th>When</th><th>Admin</th><th>Action</th><th>Dry-run</th><th>Details</th></tr></thead>
+    <tbody>
+      {% for row in emergency_logs %}
+      <tr>
+        <td>{{ row.id }}</td><td>{{ row.created_at }}</td><td>{{ row.admin_name }}</td><td>{{ row.action_type }}</td><td>{{ 'yes' if row.dry_run else 'no' }}</td><td><code>{{ row.details_json }}</code></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-muted">No emergency operations yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
 </div></div>
 {% endblock %}
