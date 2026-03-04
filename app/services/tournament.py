@@ -18,8 +18,10 @@ from app.models.tournament import (
 from app.models.user import Basket, User
 from app.services.tournament_stage_config import (
     GROUP_STAGE_GAME_LIMIT,
+    TOURNAMENT_FLOW_SPEC,
     get_promote_top_n,
-    is_final_stage_key,
+    get_stage_group_count,
+    get_stage_group_label as get_stage_group_label_from_spec,
     is_limited_stage,
 )
 
@@ -428,16 +430,21 @@ async def apply_game_results(db: AsyncSession, group_id: int, ordered_user_ids: 
 
 
 PLAYOFF_STAGE_SEQUENCE = [
-    ("stage_2", "Stage 2", 32, "standard"),
-    ("stage_1_4", "Stage 3", 16, "standard"),
-    ("stage_final", "Final", 8, "final_22_top1"),
+    (
+        stage_key,
+        str(stage_spec["admin_title"]),
+        int(stage_spec["participants"]),
+        str(stage_spec["scoring_mode"]),
+    )
+    for stage_key, stage_spec in TOURNAMENT_FLOW_SPEC.items()
+    if stage_key != "group_stage"
 ]
 PLAYOFF_STAGE_COLUMNS = [
-    ("stage_2", "II этап (32)"),
-    ("stage_1_4", "III этап — полуфинальные группы (16)"),
-    ("stage_final", "Финал (8)"),
+    (stage_key, str(stage_spec["column_title"]))
+    for stage_key, stage_spec in TOURNAMENT_FLOW_SPEC.items()
+    if stage_key != "group_stage"
 ]
-FINAL_SCORING_MODE = "final_22_top1"
+FINAL_SCORING_MODE = str(TOURNAMENT_FLOW_SPEC["stage_final"]["scoring_mode"])
 DIRECT_INVITE_STAGE_2 = "stage_2"
 STAGE_2_DIRECT_INVITES_LIMIT = 11
 
@@ -493,7 +500,11 @@ def apply_points_to_playoff_participant(participant: PlayoffParticipant, place: 
     participant.last_place = place
 
 
-def get_group_count_for_stage(stage_size: int) -> int:
+def get_group_count_for_stage(stage_size: int, stage_key: str | None = None) -> int:
+    if stage_key:
+        configured_groups_count = get_stage_group_count(stage_key)
+        if configured_groups_count is not None:
+            return configured_groups_count
     return max(1, stage_size // 8)
 
 
@@ -502,7 +513,7 @@ def get_promoted_count_for_stage(stage: PlayoffStage) -> int:
     if not promote_top_n:
         return 0
 
-    groups_count = get_group_count_for_stage(stage.stage_size)
+    groups_count = get_group_count_for_stage(stage.stage_size, stage.key)
     return groups_count * promote_top_n
 
 
@@ -511,11 +522,7 @@ def get_stage_group_number_by_seed(seed: int) -> int:
 
 
 def get_stage_group_label(stage_key: str, group_number: int) -> str:
-    if stage_key in {"stage_2", "stage_1_4", "stage_semifinal_groups"}:
-        return chr(ord("A") + max(group_number - 1, 0))
-    if is_final_stage_key(stage_key):
-        return "Final"
-    return str(group_number)
+    return get_stage_group_label_from_spec(stage_key, group_number)
 
 
 def build_stage_2_player_ids(stage_1_promoted_ids: list[int], direct_invite_ids: list[int]) -> list[int]:
@@ -636,7 +643,7 @@ async def rebuild_playoff_stages(db: AsyncSession, player_ids: list[int]) -> lis
         if index == 0:
             groups_count = get_group_count_for_stage(len(seeded))
         else:
-            groups_count = get_group_count_for_stage(stage.stage_size)
+            groups_count = get_group_count_for_stage(stage.stage_size, stage.key)
 
         for group_number in range(1, groups_count + 1):
             db.add(
