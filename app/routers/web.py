@@ -1,5 +1,6 @@
 """Содержит веб-маршруты для страниц турнира, админки и пользовательских действий."""
 
+import asyncio
 import json
 import math
 import uuid
@@ -11,7 +12,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Form, Query, Request
 from pydantic import BaseModel
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -120,6 +121,28 @@ HOME_STAGE_KEY_TO_NUMBER = {
 CHAT_NICK_COLORS = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff66c4", "#5ce1e6", "#f48c06", "#90be6d", "#4cc9f0"]
 FORBIDDEN_CHAT_NICKS = {"@admin"}
 CHAT_SENDER_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+class ChatEventBroker:
+    """Публикует события чата и позволяет подписчикам ждать появления новых сообщений."""
+
+    def __init__(self) -> None:
+        self._version = 0
+        self._condition = asyncio.Condition()
+
+    async def publish(self) -> None:
+        async with self._condition:
+            self._version += 1
+            self._condition.notify_all()
+
+    async def wait_for_update(self, last_seen_version: int) -> int:
+        async with self._condition:
+            while self._version <= last_seen_version:
+                await self._condition.wait()
+            return self._version
+
+
+chat_event_broker = ChatEventBroker()
 
 
 ALLOWED_CONTENT_HTML_TAGS = {
@@ -1185,6 +1208,7 @@ async def send_chat(
 
     db.add(ChatMessage(temp_nick=safe_nick, nick_color=safe_color, message=message, ip_address=ip, sender_token=chat_sender))
     await db.commit()
+    await chat_event_broker.publish()
     redirect = RedirectResponse(url="/#chat", status_code=303)
     if should_set_chat_sender_cookie:
         redirect.set_cookie("chat_sender", chat_sender, max_age=60 * 60 * 24 * 365, samesite="lax")
@@ -1196,6 +1220,27 @@ async def chat_messages_api(db: AsyncSession = Depends(get_db)):
     chat_messages = (await db.scalars(select(ChatMessage).order_by(desc(ChatMessage.id)).limit(20))).all()
     payload = _build_chat_messages_payload(list(reversed(chat_messages)))
     return {"messages": payload}
+
+
+@router.get("/chat/stream")
+async def chat_stream(request: Request):
+    async def event_stream():
+        last_seen_version = -1
+        while True:
+            if await request.is_disconnected():
+                break
+
+            try:
+                last_seen_version = await asyncio.wait_for(chat_event_broker.wait_for_update(last_seen_version), timeout=25)
+                yield "event: chat_update\ndata: {}\n\n"
+            except asyncio.TimeoutError:
+                yield "event: ping\ndata: {}\n\n"
+
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+    }
+    return StreamingResponse(event_stream(), media_type="text/event-stream", headers=headers)
 
 
 @router.get("/participants", response_class=HTMLResponse)
@@ -2816,6 +2861,7 @@ async def admin_send_chat_message(
 
     db.add(ChatMessage(temp_nick="@Admin", nick_color="#ff0000", message=message, ip_address="admin", sender_token="admin"))
     await db.commit()
+    await chat_event_broker.publish()
     return redirect_with_admin_msg("msg_admin_chat_message_saved")
 
 
