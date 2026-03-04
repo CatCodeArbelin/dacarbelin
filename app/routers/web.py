@@ -73,6 +73,7 @@ from app.services.tournament_view import (
 )
 
 from app.services.tournament_stage_config import (
+    FINAL_STAGE_SCORING_MODES,
     GROUP_STAGE_GAME_LIMIT,
     get_admin_playoff_stage_config,
     get_game_limit,
@@ -80,6 +81,7 @@ from app.services.tournament_stage_config import (
     is_final_stage,
     is_final_stage_key,
     is_limited_stage,
+    normalize_stage_key,
 )
 
 router = APIRouter()
@@ -189,12 +191,37 @@ def build_playoff_stage_finish_status(
     return progress_items, False
 
 def can_submit_playoff_stage_results(stage: PlayoffStage) -> bool:
+    return get_playoff_stage_submit_status(stage)["can_submit"]
+
+
+def get_playoff_stage_submit_status(stage: PlayoffStage) -> dict[str, bool | str]:
     stage_config = get_admin_playoff_stage_config(stage.key)
-    return stage_config.game_limit is not None or is_final_stage(
+    if stage_config.game_limit is not None:
+        return {"can_submit": True, "reason": ""}
+
+    if is_final_stage(
         stage.key,
         stage_size=stage.stage_size,
         scoring_mode=stage.scoring_mode,
-    )
+    ):
+        return {"can_submit": True, "reason": ""}
+
+    normalized_stage_key = normalize_stage_key(stage.key)
+    if normalized_stage_key not in set(get_playoff_stage_sequence_keys()):
+        return {"can_submit": False, "reason": "stage_key_unrecognized"}
+
+    scoring_mode = (stage.scoring_mode or "").strip().lower()
+    if scoring_mode not in FINAL_STAGE_SCORING_MODES:
+        return {"can_submit": False, "reason": "stage_scoring_mode_not_final"}
+
+    try:
+        stage_size = int(stage.stage_size) if stage.stage_size is not None else None
+    except (TypeError, ValueError):
+        stage_size = None
+    if stage_size != 8:
+        return {"can_submit": False, "reason": "stage_size_not_final"}
+
+    return {"can_submit": False, "reason": "stage_not_limited_and_not_final"}
 
 
 def get_empty_active_stage_alert(playoff_stages: list[PlayoffStage]) -> str | None:
@@ -999,9 +1026,12 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     current_playoff_stage_config = (
         get_admin_playoff_stage_config(current_playoff_stage.key) if current_playoff_stage else None
     )
-    current_playoff_stage_can_submit_results = (
-        can_submit_playoff_stage_results(current_playoff_stage) if current_playoff_stage else False
+    current_playoff_stage_submit_status = (
+        get_playoff_stage_submit_status(current_playoff_stage)
+        if current_playoff_stage
+        else {"can_submit": False, "reason": "stage_key_unrecognized"}
     )
+    current_playoff_stage_can_submit_results = current_playoff_stage_submit_status["can_submit"]
     current_playoff_stage_is_final = (
         is_final_stage(
             current_playoff_stage.key,
@@ -1069,6 +1099,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             active_stage_key=active_stage_key,
             current_playoff_stage=current_playoff_stage,
             current_playoff_stage_config=current_playoff_stage_config,
+            current_playoff_stage_submit_status=current_playoff_stage_submit_status,
             current_playoff_stage_can_submit_results=current_playoff_stage_can_submit_results,
             current_playoff_stage_is_final=current_playoff_stage_is_final,
             current_stage_groups=current_stage_groups,
@@ -1768,8 +1799,9 @@ async def admin_playoff_score(
     stage = await _get_playoff_stage(db, stage_id)
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
-    if not can_submit_playoff_stage_results(stage):
-        return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
+    submit_status = get_playoff_stage_submit_status(stage)
+    if not submit_status["can_submit"]:
+        return redirect_with_admin_msg("msg_operation_failed", details=str(submit_status["reason"]))
     try:
         if placements_list:
             ordered_user_ids = [int(part) for part in placements_list]
@@ -1790,8 +1822,9 @@ async def admin_finish_playoff_group(
     stage = await _get_playoff_stage(db, stage_id)
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
-    if not can_submit_playoff_stage_results(stage):
-        return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
+    submit_status = get_playoff_stage_submit_status(stage)
+    if not submit_status["can_submit"]:
+        return redirect_with_admin_msg("msg_operation_failed", details=str(submit_status["reason"]))
 
     participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))).all())
     group_participants = [p for p in participants if get_stage_group_number_by_seed(p.seed) == group_number]
@@ -1872,8 +1905,9 @@ async def admin_playoff_results_batch(
     stage = await _get_playoff_stage(db, stage_id)
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
-    if not can_submit_playoff_stage_results(stage):
-        return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
+    submit_status = get_playoff_stage_submit_status(stage)
+    if not submit_status["can_submit"]:
+        return redirect_with_admin_msg("msg_operation_failed", details=str(submit_status["reason"]))
     try:
         if len(user_ids) != len(places):
             raise ValueError("Некорректное количество полей")
