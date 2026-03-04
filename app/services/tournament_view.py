@@ -82,6 +82,7 @@ class TournamentTreeStageVM(TypedDict):
     key: str
     title: str
     level: int
+    is_active: bool
     matches: list[TournamentTreeMatchVM]
 
 
@@ -358,6 +359,7 @@ def build_tournament_tree_vm(
     user_by_id: Mapping[int, User],
     direct_invite_ids: list[int],
     tournament_winner_user_id: int | None = None,
+    active_stage_key: str = "group_stage",
 ) -> TournamentTreeVM:
     stage_columns = build_bracket_columns(
         groups=groups,
@@ -432,6 +434,7 @@ def build_tournament_tree_vm(
                 "key": stage_key,
                 "title": column["title"],
                 "level": level,
+                "is_active": stage_key == active_stage_key,
                 "matches": matches,
             }
         )
