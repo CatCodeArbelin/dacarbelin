@@ -324,3 +324,21 @@ body {
   background: rgba(110, 18, 84, 0.48);
   box-shadow: 0 0 10px rgba(255, 98, 204, 0.35);
 }
+
+.playoff-participants li.tournament-winner-highlight {
+  border-left-color: #ffb347;
+  color: #fff5de;
+  background: linear-gradient(90deg, rgba(255, 170, 64, 0.32), rgba(255, 123, 0, 0.18));
+  border: 1px solid rgba(255, 191, 90, 0.55);
+  border-radius: 8px;
+  box-shadow: 0 0 12px rgba(255, 153, 0, 0.35);
+  padding: 4px 8px;
+}
+
+.tournament-winner-badge {
+  background: linear-gradient(180deg, #ffd36f, #ff9d2e);
+  color: #2d1200;
+  border: 1px solid #ffe7a6;
+  box-shadow: 0 0 8px rgba(255, 179, 66, 0.45);
+  font-weight: 700;
+}
