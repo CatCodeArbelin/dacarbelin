@@ -258,5 +258,42 @@ class PlayoffGroupFinishFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(match.winner_user_id)
 
 
+    async def test_last_stage_with_legacy_key_still_allows_score_submission(self) -> None:
+        stage_final_legacy = PlayoffStage(id=76, key="stage_legacy_final", title="Final", stage_order=2, stage_size=8)
+        db = AsyncMock()
+        db.scalar = AsyncMock(side_effect=[stage_final_legacy, None])
+
+        with patch.object(web, "apply_playoff_match_results", new=AsyncMock()) as apply_mock:
+            response = await web.admin_playoff_score(
+                stage_id=76,
+                group_number=1,
+                placements_list=[str(user_id) for user_id in range(1, 9)],
+                placements="",
+                db=db,
+            )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertIn("msg=msg_playoff_game_saved", response.headers["location"])
+        apply_mock.assert_awaited_once_with(db, 76, [1, 2, 3, 4, 5, 6, 7, 8], group_number=1)
+
+    async def test_last_stage_with_legacy_key_still_allows_batch_submission(self) -> None:
+        stage_final_legacy = PlayoffStage(id=77, key="stage_legacy_final", title="Final", stage_order=2, stage_size=8)
+        db = AsyncMock()
+        db.scalar = AsyncMock(side_effect=[stage_final_legacy, None])
+
+        with patch.object(web, "apply_playoff_match_results", new=AsyncMock()) as apply_mock:
+            response = await web.admin_playoff_results_batch(
+                stage_id=77,
+                group_number=1,
+                user_ids=[str(user_id) for user_id in range(1, 9)],
+                places=[str(place) for place in range(1, 9)],
+                db=db,
+            )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertIn("msg=msg_playoff_game_saved", response.headers["location"])
+        apply_mock.assert_awaited_once_with(db, 77, [1, 2, 3, 4, 5, 6, 7, 8], group_number=1)
+
+
 if __name__ == "__main__":
     unittest.main()

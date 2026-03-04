@@ -229,6 +229,20 @@ def get_playoff_stage_submit_status(stage: PlayoffStage) -> dict[str, bool | str
     return {"can_submit": False, "reason": "stage_not_limited_and_not_final"}
 
 
+async def can_submit_playoff_stage_results_with_db(db: AsyncSession, stage: PlayoffStage) -> bool:
+    """Разрешает запись результатов для лимитированных/финальных стадий и для фактического последнего этапа.
+
+    Последний этап определяется по отсутствию следующей стадии с ``stage_order + 1``.
+    Это защищает админку от исторически неконсистентных ключей стадии (например,
+    когда в БД финал имеет нестандартный ``key``, но это реально последняя стадия).
+    """
+    if can_submit_playoff_stage_results(stage):
+        return True
+
+    next_stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.stage_order == stage.stage_order + 1))
+    return next_stage is None
+
+
 def get_empty_active_stage_alert(playoff_stages: list[PlayoffStage]) -> str | None:
     stage_by_order = {stage.stage_order: stage for stage in playoff_stages}
     for stage in playoff_stages:
@@ -1853,7 +1867,7 @@ async def admin_playoff_score(
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     submit_status = get_playoff_stage_submit_status(stage)
-    if not submit_status["can_submit"]:
+    if not submit_status["can_submit"] and not await can_submit_playoff_stage_results_with_db(db, stage):
         return redirect_with_admin_msg("msg_operation_failed", details=str(submit_status["reason"]))
     try:
         if placements_list:
@@ -1876,7 +1890,7 @@ async def admin_finish_playoff_group(
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     submit_status = get_playoff_stage_submit_status(stage)
-    if not submit_status["can_submit"]:
+    if not submit_status["can_submit"] and not await can_submit_playoff_stage_results_with_db(db, stage):
         return redirect_with_admin_msg("msg_operation_failed", details=str(submit_status["reason"]))
 
     participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))).all())
@@ -1959,7 +1973,7 @@ async def admin_playoff_results_batch(
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     submit_status = get_playoff_stage_submit_status(stage)
-    if not submit_status["can_submit"]:
+    if not submit_status["can_submit"] and not await can_submit_playoff_stage_results_with_db(db, stage):
         return redirect_with_admin_msg("msg_operation_failed", details=str(submit_status["reason"]))
     try:
         if len(user_ids) != len(places):
