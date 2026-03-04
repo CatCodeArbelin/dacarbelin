@@ -1087,14 +1087,26 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
         stage_columns = build_bracket_columns(groups, playoff_stages, user_by_id, direct_invite_ids)
 
     lang = get_lang(request.cookies.get("lang"))
+    active_playoff_stage = next((stage for stage in playoff_stages if stage.is_started), None)
+    active_stage_key = active_playoff_stage.key if active_playoff_stage else "group_stage"
     current_stage_display = resolve_current_stage_label(lang, playoff_stages, tournament_started)
-    tournament_tree = build_tournament_tree_vm(
-        groups,
-        playoff_stages,
-        user_by_id,
-        direct_invite_ids,
-        winner_user_id,
-    )
+    try:
+        tournament_tree = build_tournament_tree_vm(
+            groups,
+            playoff_stages,
+            user_by_id,
+            direct_invite_ids,
+            winner_user_id,
+            active_stage_key=active_stage_key,
+        )
+    except TypeError:
+        tournament_tree = build_tournament_tree_vm(
+            groups,
+            playoff_stages,
+            user_by_id,
+            direct_invite_ids,
+            winner_user_id,
+        )
     playoff_empty_active_stage_alert = get_empty_active_stage_alert(playoff_stages)
 
     return templates.TemplateResponse(
@@ -2355,17 +2367,17 @@ async def admin_finish_tournament(
         return redirect_with_admin_msg("msg_operation_failed", details="winner_points_below_threshold")
 
     try:
-        async with db.begin():
-            await snapshot_tournament_archive(
-                db,
-                winner_user_id=winner_user_id,
-                title=final_stage.title,
-                season=datetime.utcnow().strftime("%Y"),
-                source_tournament_version="playoff_v2",
-                is_public=True,
-            )
-            winner_nickname = await finalize_tournament_with_winner(db, winner_user_id)
-            await reset_tournament_cycle_after_finish(db)
+        await snapshot_tournament_archive(
+            db,
+            winner_user_id=winner_user_id,
+            title=final_stage.title,
+            season=datetime.utcnow().strftime("%Y"),
+            source_tournament_version="playoff_v2",
+            is_public=True,
+        )
+        winner_nickname = await finalize_tournament_with_winner(db, winner_user_id)
+        await reset_tournament_cycle_after_finish(db)
+        await db.commit()
         return redirect_with_admin_msg("msg_status_ok", details=f"tournament_finished_and_archived:{winner_nickname}")
     except Exception:
         await db.rollback()

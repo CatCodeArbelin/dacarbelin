@@ -2,19 +2,16 @@
 {% if tree and tree.stages %}
 <div class="{{ block_class }}" role="region" aria-label="Турнирная сетка">
   {% for stage in tree.stages %}
-  <section class="{{ block_class }}-stage {{ block_class }}-stage-{{ stage.key }}" data-stage-key="{{ stage.key }}">
+  <section class="{{ block_class }}-stage {{ block_class }}-stage-{{ stage.key }} {% if stage.is_active %}{{ block_class }}-stage-active{% endif %}" data-stage-key="{{ stage.key }}">
     <h5 class="{{ block_class }}-stage-title">{{ stage.title }}</h5>
     <div class="{{ block_class }}-matches">
       {% for match in stage.matches %}
-      <article class="{{ block_class }}-match playoff-status-{{ match.status }}">
+      <article class="{{ block_class }}-match playoff-status-{{ match.status }} {% if stage.is_active %}{{ block_class }}-match-active{% endif %}">
         <div class="{{ block_class }}-match-head">Group {{ match.label }}</div>
-        {% if match.incoming_sources %}
-        <div class="{{ block_class }}-sources">
-          {% for source in match.incoming_sources %}
-          <span class="{{ block_class }}-source">{{ source.stage_key }} · {{ source.label }}</span>
-          {% endfor %}
+        <div class="{{ block_class }}-meta mb-2">
+          <span class="{{ block_class }}-badge">{{ tr('tournament_schedule') }}: {{ match.schedule_text or tr('tournament_tbd') }}</span>
+          <span class="{{ block_class }}-badge">{{ tr('tournament_lobby_pw') }}: {{ match.lobby_password or tr('tournament_tbd') }}</span>
         </div>
-        {% endif %}
         <ul class="{{ block_class }}-participants list-unstyled mb-0 mt-2">
           {% if match.participants %}
             {% for participant in match.participants %}
