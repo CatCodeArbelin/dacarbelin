@@ -40,6 +40,19 @@
         </form>
       </div>
     </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card bg-black neon-border-blue">
+      <div class="card-body">
+        <h3>{{ tr('index_stages') }}</h3>
+        <div class="mb-2{% if current_stage_number == 1 %} text-contrast-neon{% endif %}">{{ tr('index_stage_1') }} ({{ stage_percentages.get(1, 0) }}%)</div>
+        <div class="mb-2{% if current_stage_number == 2 %} text-contrast-neon{% endif %}">{{ tr('index_stage_2') }} ({{ stage_percentages.get(2, 0) }}%)</div>
+        <div class="mb-2{% if current_stage_number == 3 %} text-contrast-neon{% endif %}">{{ tr('index_stage_3') }} ({{ stage_percentages.get(3, 0) }}%)</div>
+        <div>
+          <a href="https://www.twitch.tv/loyrensss" target="_blank" rel="noopener noreferrer">{{ tr('index_stage_final_live') }}</a>
+        </div>
+      </div>
+    </div>
 
     <div id="chat" class="card bg-black neon-border-blue mt-4">
       <div class="card-body">
@@ -68,18 +81,6 @@
             </div>
           {% endfor %}
         </div>
-      </div>
-    </div>
-  </div>
-  <div class="col-lg-4">
-    <div class="card bg-black neon-border-blue">
-      <div class="card-body">
-        <h3>{{ tr('index_stages') }}</h3>
-        {% for stage in stages %}
-          <div class="mb-2">{{ stage.title_en if lang == 'en' else stage.title_ru }} — {{ stage.date_text }} — {% if stage.is_active %}{{ tr('index_active') }}{% else %}{{ tr('index_done') }}{% endif %}</div>
-        {% else %}
-          <div>{{ tr('index_tbd') }}</div>
-        {% endfor %}
       </div>
     </div>
   </div>

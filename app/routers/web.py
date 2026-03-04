@@ -110,6 +110,13 @@ EXPECTED_32_PLAYER_STAGE_ORDER_PAIRS = [
     (2, "stage_final"),
 ]
 
+HOME_STAGE_KEY_TO_NUMBER = {
+    "group_stage": 1,
+    "stage_2": 2,
+    "stage_1_4": 3,
+    "stage_final": 3,
+}
+
 CHAT_NICK_COLORS = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff66c4", "#5ce1e6", "#f48c06", "#90be6d", "#4cc9f0"]
 FORBIDDEN_CHAT_NICKS = {"@admin"}
 CHAT_SENDER_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
@@ -838,6 +845,68 @@ async def get_chat_settings(db: AsyncSession) -> ChatSetting:
     return ChatSetting(id=1, cooldown_seconds=10, max_length=1000, is_enabled=True)
 
 
+async def get_home_stage_progress(db: AsyncSession) -> tuple[int | None, dict[int, int]]:
+    total_participants = int(await db.scalar(select(func.count(User.id))) or 0)
+
+    stage_1_count = int(
+        await db.scalar(
+            select(func.count(func.distinct(GroupMember.user_id)))
+            .select_from(GroupMember)
+            .join(TournamentGroup, TournamentGroup.id == GroupMember.group_id)
+            .where(TournamentGroup.stage == "group_stage")
+        )
+        or 0
+    )
+
+    stage_2_count = int(
+        await db.scalar(
+            select(func.count(func.distinct(PlayoffParticipant.user_id)))
+            .select_from(PlayoffParticipant)
+            .join(PlayoffStage, PlayoffStage.id == PlayoffParticipant.stage_id)
+            .where(PlayoffStage.key == "stage_2")
+        )
+        or 0
+    )
+
+    stage_3_count = int(
+        await db.scalar(
+            select(func.count(func.distinct(PlayoffParticipant.user_id)))
+            .select_from(PlayoffParticipant)
+            .join(PlayoffStage, PlayoffStage.id == PlayoffParticipant.stage_id)
+            .where(PlayoffStage.key == "stage_1_4")
+        )
+        or 0
+    )
+
+    def _percent(count: int) -> int:
+        if total_participants <= 0:
+            return 0
+        return round((count / total_participants) * 100)
+
+    stage_percentages = {
+        1: _percent(stage_1_count),
+        2: _percent(stage_2_count),
+        3: _percent(stage_3_count),
+    }
+
+    active_playoff_key = await db.scalar(
+        select(PlayoffStage.key)
+        .where(PlayoffStage.is_started.is_(True))
+        .order_by(desc(PlayoffStage.stage_order))
+        .limit(1)
+    )
+    current_stage_number = HOME_STAGE_KEY_TO_NUMBER.get(str(active_playoff_key), None)
+    if current_stage_number is None:
+        if stage_3_count > 0:
+            current_stage_number = 3
+        elif stage_2_count > 0:
+            current_stage_number = 2
+        elif stage_1_count > 0:
+            current_stage_number = 1
+
+    return current_stage_number, stage_percentages
+
+
 async def get_or_create_chat_settings(db: AsyncSession) -> ChatSetting:
     row = await db.scalar(select(ChatSetting).where(ChatSetting.id == 1))
     if row:
@@ -960,23 +1029,24 @@ async def set_lang(lang: str):
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request, db: AsyncSession = Depends(get_db)):
     # Рендерим главную страницу с формой и чатом.
-    stages = (await db.scalars(select(TournamentStage).order_by(TournamentStage.id))).all()
     chat_messages = (await db.scalars(select(ChatMessage).order_by(desc(ChatMessage.id)).limit(20))).all()
     registration_open = await get_registration_open(db)
     tournament_started = await get_tournament_started(db)
     chat_settings = await get_chat_settings(db)
+    current_stage_number, stage_percentages = await get_home_stage_progress(db)
     return templates.TemplateResponse(
         request,
         "index.html",
         template_context(
             request,
-            stages=stages,
             chat_messages=list(reversed(chat_messages)),
             chat_messages_payload=_build_chat_messages_payload(list(reversed(chat_messages))),
             chat_nick_colors=CHAT_NICK_COLORS,
             registration_open=registration_open,
             tournament_started=tournament_started,
             chat_settings=chat_settings,
+            current_stage_number=current_stage_number,
+            stage_percentages=stage_percentages,
         ),
     )
 
