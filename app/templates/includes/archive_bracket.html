@@ -1,0 +1,25 @@
+<div class="archive-bracket" role="region" aria-label="Архивная турнирная сетка">
+  {% for column in columns %}
+    <section class="archive-bracket-column">
+      <h5 class="archive-bracket-column-title">{{ column.title }}</h5>
+      <div class="archive-bracket-matches">
+        {% for match in column.matches %}
+          <article class="archive-bracket-match-card archive-match-status-{{ match.status }}">
+            <div class="archive-bracket-match-label">{{ match.label }}</div>
+            <ul class="archive-bracket-participants list-unstyled mb-0">
+              {% for participant in match.participants %}
+                <li class="{% if participant.is_winner %}archive-winner{% endif %}">
+                  <span>{{ participant.nickname }}</span>
+                  {% if participant.points != '' %}<strong>{{ participant.points }}</strong>{% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+            {% if match.winner_name %}
+              <div class="archive-bracket-winner">Победитель: {{ match.winner_name }}</div>
+            {% endif %}
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+  {% endfor %}
+</div>
