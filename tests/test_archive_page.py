@@ -64,8 +64,8 @@ def test_archive_page_renders_bracket_grid_without_raw_json_dump():
         app.dependency_overrides.pop(get_db, None)
 
     assert response.status_code == 200
-    assert "archive-bracket" in response.text
-    assert "archive-bracket-column" in response.text
+    assert "archive-tree" in response.text
+    assert "archive-tree-stage" in response.text
     assert "<pre" not in response.text
     assert "winner_user_id" not in response.text
     assert "Сетка недоступна" in response.text
