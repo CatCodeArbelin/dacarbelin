@@ -69,3 +69,6 @@ def test_archive_page_renders_bracket_grid_without_raw_json_dump():
     assert "<pre" not in response.text
     assert "winner_user_id" not in response.text
     assert "Сетка недоступна" in response.text
+    assert "Чемпион:" in response.text
+    assert "★ Alpha" in response.text
+    assert "archive-tree-badge-schedule" in response.text

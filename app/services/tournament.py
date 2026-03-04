@@ -1177,6 +1177,7 @@ async def reset_tournament_cycle_after_finish(db: AsyncSession) -> None:
     await db.execute(delete(PlayoffMatch))
     await db.execute(delete(PlayoffParticipant))
     await db.execute(delete(PlayoffStage))
+    await db.execute(delete(User))
 
     settings_to_reset = {
         "tournament_started": "0",

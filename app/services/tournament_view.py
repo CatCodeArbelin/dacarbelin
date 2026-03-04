@@ -174,6 +174,13 @@ def _apply_stage_highlight_rules(stage_key: str, participants: list[BracketParti
             participant["highlight_color"] = "final-qualified" if has_22_plus else "normal"
         return participants
 
+    if normalized_stage_key == "group_stage":
+        for idx, participant in enumerate(participants, start=1):
+            is_promoted = idx <= 3
+            participant["is_promoted_highlight"] = is_promoted
+            participant["highlight_color"] = "promoted" if is_promoted else "eliminated"
+        return participants
+
     stage_spec = get_stage_spec(normalized_stage_key)
     promote_top_n = int(stage_spec.get("promote_top_n", get_promote_top_n(normalized_stage_key)) or 0)
     for idx, participant in enumerate(participants, start=1):
@@ -338,6 +345,7 @@ def build_bracket_columns(
                         {
                             **participant,
                             "is_tournament_winner": is_winner,
+                            "highlight_color": "promoted" if is_winner else participant.get("highlight_color", "normal"),
                             "winner_label_key": "tournament_winner" if is_winner else None,
                         }
                     )
