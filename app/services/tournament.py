@@ -12,6 +12,7 @@ from app.models.settings import SiteSetting
 from app.models.tournament_archive import TournamentArchive
 from app.models.tournament import (
     GroupGameResult,
+    GroupManualTieBreak,
     GroupMember,
     PlayoffMatch,
     PlayoffParticipant,
@@ -1164,8 +1165,34 @@ async def finalize_tournament_with_winner(db: AsyncSession, winner_user_id: int)
         else:
             setting.value = value
 
-    await db.commit()
     return winner.nickname
+
+
+async def reset_tournament_cycle_after_finish(db: AsyncSession) -> None:
+    """Полностью очищает данные текущего турнирного цикла и возвращает стартовые настройки."""
+    await db.execute(delete(GroupGameResult))
+    await db.execute(delete(GroupManualTieBreak))
+    await db.execute(delete(GroupMember))
+    await db.execute(delete(TournamentGroup))
+    await db.execute(delete(PlayoffMatch))
+    await db.execute(delete(PlayoffParticipant))
+    await db.execute(delete(PlayoffStage))
+
+    settings_to_reset = {
+        "tournament_started": "0",
+        "draw_applied": "0",
+        "tournament_finished": "0",
+        "tournament_winner_user_id": "",
+        "tournament_winner_nickname": "",
+        "registration_open": "1",
+    }
+    for key, value in settings_to_reset.items():
+        setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == key))
+        if not setting:
+            setting = SiteSetting(key=key, value=value)
+            db.add(setting)
+        else:
+            setting.value = value
 
 async def promote_top_between_stages(db: AsyncSession, stage_id: int, top_n: int) -> None:
     stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.id == stage_id))
