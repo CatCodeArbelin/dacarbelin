@@ -10,6 +10,7 @@ from urllib.parse import urlencode
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Form, Query, Request
+from pydantic import BaseModel
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, func, select
@@ -893,11 +894,56 @@ def _build_chat_messages_payload(chat_messages: list[ChatMessage]) -> list[dict[
     ]
 
 
+class ContentLocalePayload(BaseModel):
+    rules_body: str
+    donation_links_items: str
+    donation_methods_items: str
+    prize_pool_items: str
+    donors_items: str
+
+
+def localized_attr(entity: object, base_name: str, lang: str) -> str:
+    value = getattr(entity, f"{base_name}_{lang}", "") or ""
+    if value:
+        return str(value)
+    return str(getattr(entity, f"{base_name}_ru", "") or "")
+
+
+def dump_admin_content_for_lang(
+    lang: str,
+    rules_content: RulesContent,
+    donation_links: list[DonationLink],
+    donation_methods: list[DonationMethod],
+    prize_pool_entries: list[PrizePoolEntry],
+    donors: list[Donor],
+) -> ContentLocalePayload:
+    donation_links_items = "\n".join(
+        f"{localized_attr(row, 'title', lang)}|{row.url}|{1 if row.is_active else 0}" for row in donation_links
+    )
+    donation_methods_items = "\n".join(
+        f"{row.method_type}|{localized_attr(row, 'label', lang)}|{localized_attr(row, 'details', lang)}|{1 if row.is_active else 0}"
+        for row in donation_methods
+    )
+    prize_pool_items = "\n".join(
+        f"{localized_attr(row, 'place_label', lang)}|{localized_attr(row, 'reward', lang)}" for row in prize_pool_entries
+    )
+    donors_items = "\n".join(
+        f"{row.name}|{row.amount}|{localized_attr(row, 'message', lang)}" for row in donors
+    )
+    return ContentLocalePayload(
+        rules_body=localized_attr(rules_content, 'body', lang),
+        donation_links_items=donation_links_items,
+        donation_methods_items=donation_methods_items,
+        prize_pool_items=prize_pool_items,
+        donors_items=donors_items,
+    )
+
+
 async def get_or_create_rules_content(db: AsyncSession) -> RulesContent:
     row = await db.scalar(select(RulesContent).where(RulesContent.id == 1))
     if row:
         return row
-    row = RulesContent(id=1, body="")
+    row = RulesContent(id=1, body_ru="", body_en="")
     db.add(row)
     await db.flush()
     return row
@@ -1275,7 +1321,7 @@ async def rules_page(request: Request, db: AsyncSession = Depends(get_db)):
         template_context(
             request,
             rules_content=rules_content,
-            rules_content_html=sanitize_content_html(rules_content.body),
+            rules_content_html=sanitize_content_html(localized_attr(rules_content, "body", get_lang(request.cookies.get("lang")))),
         ),
     )
 
@@ -1727,16 +1773,18 @@ async def admin_content_page(request: Request, db: AsyncSession = Depends(get_db
     donation_methods = (await db.scalars(select(DonationMethod).order_by(DonationMethod.sort_order, DonationMethod.id))).all()
     prize_pool_entries = (await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all()
     donors = (await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all()
+    selected_lang = get_lang(request.query_params.get("content_lang") or request.cookies.get("lang"))
+    content_by_lang = {
+        "ru": dump_admin_content_for_lang("ru", rules_content, donation_links, donation_methods, prize_pool_entries, donors).model_dump(),
+        "en": dump_admin_content_for_lang("en", rules_content, donation_links, donation_methods, prize_pool_entries, donors).model_dump(),
+    }
     return templates.TemplateResponse(
         request,
         "admin_content.html",
         template_context(
             request,
-            rules_content=rules_content,
-            donation_links=donation_links,
-            donation_methods=donation_methods,
-            prize_pool_entries=prize_pool_entries,
-            donors=donors,
+            selected_content_lang=selected_lang,
+            content_by_lang=content_by_lang,
         ),
     )
 
@@ -2511,75 +2559,126 @@ async def admin_finish_tournament(
 @router.post("/admin/donation-links")
 async def admin_save_donation_links(
     items: str = Form(default=""),
+    content_lang: str = Form(default="ru"),
     db: AsyncSession = Depends(get_db),
 ):
-    await db.execute(DonationLink.__table__.delete())
-    for idx, line in enumerate([item.strip() for item in items.splitlines() if item.strip()]):
+    lang = get_lang(content_lang)
+    existing_rows = list((await db.scalars(select(DonationLink).order_by(DonationLink.sort_order, DonationLink.id))).all())
+    lines = [item.strip() for item in items.splitlines() if item.strip()]
+    for idx, line in enumerate(lines):
         parts = [part.strip() for part in line.split("|")]
         if len(parts) < 2:
             continue
-        db.add(DonationLink(title=parts[0], url=parts[1], is_active=(parts[2] != "0") if len(parts) > 2 else True, sort_order=idx))
+        row = existing_rows[idx] if idx < len(existing_rows) else DonationLink()
+        row.sort_order = idx
+        row.url = parts[1]
+        row.is_active = (parts[2] != "0") if len(parts) > 2 else True
+        setattr(row, f"title_{lang}", parts[0])
+        if idx >= len(existing_rows):
+            db.add(row)
+
+    for row in existing_rows[len(lines):]:
+        await db.delete(row)
+
     await db.commit()
-    return redirect_with_admin_msg("msg_donation_links_saved")
+    return RedirectResponse(url=f"/admin/content?msg=msg_donation_links_saved&content_lang={lang}", status_code=303)
 
 
 @router.post("/admin/donation-methods")
 async def admin_save_donation_methods(
     items: str = Form(default=""),
+    content_lang: str = Form(default="ru"),
     db: AsyncSession = Depends(get_db),
 ):
-    await db.execute(DonationMethod.__table__.delete())
-    for idx, line in enumerate([item.strip() for item in items.splitlines() if item.strip()]):
+    lang = get_lang(content_lang)
+    existing_rows = list((await db.scalars(select(DonationMethod).order_by(DonationMethod.sort_order, DonationMethod.id))).all())
+    lines = [item.strip() for item in items.splitlines() if item.strip()]
+    for idx, line in enumerate(lines):
         parts = [part.strip() for part in line.split("|")]
         if len(parts) < 3:
             continue
-        db.add(DonationMethod(method_type=parts[0], label=parts[1], details=parts[2], is_active=(parts[3] != "0") if len(parts) > 3 else True, sort_order=idx))
+        row = existing_rows[idx] if idx < len(existing_rows) else DonationMethod()
+        row.sort_order = idx
+        row.method_type = parts[0]
+        row.is_active = (parts[3] != "0") if len(parts) > 3 else True
+        setattr(row, f"label_{lang}", parts[1])
+        setattr(row, f"details_{lang}", parts[2])
+        if idx >= len(existing_rows):
+            db.add(row)
+
+    for row in existing_rows[len(lines):]:
+        await db.delete(row)
+
     await db.commit()
-    return redirect_with_admin_msg("msg_donation_methods_saved")
+    return RedirectResponse(url=f"/admin/content?msg=msg_donation_methods_saved&content_lang={lang}", status_code=303)
 
 
 @router.post("/admin/prize-pool")
 async def admin_save_prize_pool(
     items: str = Form(default=""),
+    content_lang: str = Form(default="ru"),
     db: AsyncSession = Depends(get_db),
 ):
-    await db.execute(PrizePoolEntry.__table__.delete())
-    for idx, line in enumerate([item.strip() for item in items.splitlines() if item.strip()]):
+    lang = get_lang(content_lang)
+    existing_rows = list((await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all())
+    lines = [item.strip() for item in items.splitlines() if item.strip()]
+    for idx, line in enumerate(lines):
         parts = [part.strip() for part in line.split("|")]
         if len(parts) < 2:
             continue
-        db.add(PrizePoolEntry(place_label=parts[0], reward=parts[1], sort_order=idx))
+        row = existing_rows[idx] if idx < len(existing_rows) else PrizePoolEntry()
+        row.sort_order = idx
+        setattr(row, f"place_label_{lang}", parts[0])
+        setattr(row, f"reward_{lang}", parts[1])
+        if idx >= len(existing_rows):
+            db.add(row)
+
+    for row in existing_rows[len(lines):]:
+        await db.delete(row)
+
     await db.commit()
-    return redirect_with_admin_msg("msg_prize_pool_saved")
+    return RedirectResponse(url=f"/admin/content?msg=msg_prize_pool_saved&content_lang={lang}", status_code=303)
 
 
 @router.post("/admin/donors")
 async def admin_save_donors(
     items: str = Form(default=""),
+    content_lang: str = Form(default="ru"),
     db: AsyncSession = Depends(get_db),
 ):
-    await db.execute(Donor.__table__.delete())
-    for idx, line in enumerate([item.strip() for item in items.splitlines() if item.strip()]):
+    lang = get_lang(content_lang)
+    existing_rows = list((await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all())
+    lines = [item.strip() for item in items.splitlines() if item.strip()]
+    for idx, line in enumerate(lines):
         parts = [part.strip() for part in line.split("|")]
         if not parts:
             continue
-        name = parts[0]
-        amount = parts[1] if len(parts) > 1 else ""
-        message = parts[2] if len(parts) > 2 else ""
-        db.add(Donor(name=name, amount=amount, message=message, sort_order=idx))
+        row = existing_rows[idx] if idx < len(existing_rows) else Donor()
+        row.sort_order = idx
+        row.name = parts[0]
+        row.amount = parts[1] if len(parts) > 1 else ""
+        setattr(row, f"message_{lang}", parts[2] if len(parts) > 2 else "")
+        if idx >= len(existing_rows):
+            db.add(row)
+
+    for row in existing_rows[len(lines):]:
+        await db.delete(row)
+
     await db.commit()
-    return redirect_with_admin_msg("msg_donors_saved")
+    return RedirectResponse(url=f"/admin/content?msg=msg_donors_saved&content_lang={lang}", status_code=303)
 
 
 @router.post("/admin/rules")
 async def admin_save_rules(
     body: str = Form(default=""),
+    content_lang: str = Form(default="ru"),
     db: AsyncSession = Depends(get_db),
 ):
+    lang = get_lang(content_lang)
     row = await get_or_create_rules_content(db)
-    row.body = body
+    setattr(row, f"body_{lang}", body)
     await db.commit()
-    return redirect_with_admin_msg("msg_rules_saved")
+    return RedirectResponse(url=f"/admin/content?msg=msg_rules_saved&content_lang={lang}", status_code=303)
 
 
 @router.post("/admin/judge-link/regenerate")

@@ -7,35 +7,68 @@
   <a class="btn btn-sm btn-outline-light" href="/admin/logout">{{ tr('admin_logout') }}</a>
 </div>
 <div class="card bg-black neon-border-blue mt-4"><div class="card-body">
-  <h4>{{ tr('admin_content_blocks') }}</h4>
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h4 class="mb-0">{{ tr('admin_content_blocks') }}</h4>
+    <div class="d-flex align-items-center gap-2">
+      <label class="small text-contrast-muted mb-0" for="content-lang-selector">Язык</label>
+      <select id="content-lang-selector" class="form-select form-select-sm" style="width: 120px;">
+        <option value="ru" {% if selected_content_lang == 'ru' %}selected{% endif %}>RU</option>
+        <option value="en" {% if selected_content_lang == 'en' %}selected{% endif %}>EN</option>
+      </select>
+    </div>
+  </div>
+
   <h5>{{ tr('admin_rules_content') }}</h5>
   <p class="small text-contrast-muted mb-2">{{ tr('admin_rules_html_hint') }}</p>
   <form action="/admin/rules" method="post" class="mb-3" id="rules-content-form">
-    <textarea class="form-control mb-2 d-none" id="rules-body" name="body" rows="8" placeholder="{{ tr('admin_rules_text') }}">{{ rules_content.body }}</textarea>
+    <input type="hidden" id="rules-content-lang" name="content_lang" value="{{ selected_content_lang }}">
+    <textarea class="form-control mb-2 d-none" id="rules-body" name="body" rows="8" placeholder="{{ tr('admin_rules_text') }}"></textarea>
     <div id="rules-editor" class="form-control mb-2" style="min-height: 260px;"></div>
     <button class="btn btn-primary">{{ tr('admin_save_rules') }}</button>
   </form>
+
   <p class="small text-contrast-muted mb-2">{{ tr('donate_links') }}: <code>title|url|active(1/0)</code></p>
-  <form action="/admin/donation-links" method="post" class="mb-3"><textarea class="form-control" name="items" rows="4">{% for row in donation_links %}{{ row.title }}|{{ row.url }}|{{ 1 if row.is_active else 0 }}{% if not loop.last %}
-{% endif %}{% endfor %}</textarea><button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_links') }}</button></form>
+  <form action="/admin/donation-links" method="post" class="mb-3">
+    <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
+    <textarea class="form-control localized-items" data-key="donation_links_items" name="items" rows="4"></textarea>
+    <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_links') }}</button>
+  </form>
+
   <p class="small text-contrast-muted mb-2">{{ tr('admin_save_donation_methods') }}: <code>card/crypto|label|details|active(1/0)</code></p>
-  <form action="/admin/donation-methods" method="post" class="mb-3"><textarea class="form-control" name="items" rows="4">{% for row in donation_methods %}{{ row.method_type }}|{{ row.label }}|{{ row.details }}|{{ 1 if row.is_active else 0 }}{% if not loop.last %}
-{% endif %}{% endfor %}</textarea><button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_methods') }}</button></form>
+  <form action="/admin/donation-methods" method="post" class="mb-3">
+    <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
+    <textarea class="form-control localized-items" data-key="donation_methods_items" name="items" rows="4"></textarea>
+    <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_methods') }}</button>
+  </form>
+
   <p class="small text-contrast-muted mb-2">{{ tr('donate_prize_pool') }}: <code>place|reward</code></p>
-  <form action="/admin/prize-pool" method="post" class="mb-3"><textarea class="form-control" name="items" rows="4">{% for row in prize_pool_entries %}{{ row.place_label }}|{{ row.reward }}{% if not loop.last %}
-{% endif %}{% endfor %}</textarea><button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_prize_pool') }}</button></form>
+  <form action="/admin/prize-pool" method="post" class="mb-3">
+    <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
+    <textarea class="form-control localized-items" data-key="prize_pool_items" name="items" rows="4"></textarea>
+    <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_prize_pool') }}</button>
+  </form>
+
   <p class="small text-contrast-muted mb-2">{{ tr('donate_donors') }}: <code>name|amount|message</code></p>
-  <form action="/admin/donors" method="post" class="mb-3"><textarea class="form-control" name="items" rows="4">{% for row in donors %}{{ row.name }}|{{ row.amount }}|{{ row.message }}{% if not loop.last %}
-{% endif %}{% endfor %}</textarea><button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donors') }}</button></form>
+  <form action="/admin/donors" method="post" class="mb-3">
+    <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
+    <textarea class="form-control localized-items" data-key="donors_items" name="items" rows="4"></textarea>
+    <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donors') }}</button>
+  </form>
 </div></div>
 <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
 <script>
   (function () {
+    const langSelector = document.getElementById('content-lang-selector');
+    const langInputs = Array.from(document.querySelectorAll('.content-lang-input'));
+    const rulesLangInput = document.getElementById('rules-content-lang');
+    const localizedTextareas = Array.from(document.querySelectorAll('.localized-items'));
     const source = document.getElementById('rules-body');
     const editorRoot = document.getElementById('rules-editor');
     const form = document.getElementById('rules-content-form');
-    if (!source || !editorRoot || !form || !window.Quill) {
+    const contentByLang = {{ content_by_lang|tojson }};
+
+    if (!langSelector || !source || !editorRoot || !form || !window.Quill) {
       return;
     }
 
@@ -52,7 +85,30 @@
       }
     });
 
-    quill.root.innerHTML = source.value || '<p>{{ tr("admin_wysiwyg_placeholder") }}</p>';
+    function applyLang(lang) {
+      const payload = contentByLang[lang] || contentByLang.ru || {};
+      source.value = payload.rules_body || '';
+      quill.root.innerHTML = source.value || '<p>{{ tr("admin_wysiwyg_placeholder") }}</p>';
+      localizedTextareas.forEach((el) => {
+        el.value = payload[el.dataset.key] || '';
+      });
+      langInputs.forEach((input) => {
+        input.value = lang;
+      });
+      if (rulesLangInput) {
+        rulesLangInput.value = lang;
+      }
+    }
+
+    applyLang(langSelector.value || 'ru');
+
+    langSelector.addEventListener('change', function () {
+      const currentLang = langSelector.value || 'ru';
+      const params = new URLSearchParams(window.location.search);
+      params.set('content_lang', currentLang);
+      window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+      applyLang(currentLang);
+    });
 
     form.addEventListener('submit', function () {
       source.value = quill.root.innerHTML;
