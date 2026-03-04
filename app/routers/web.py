@@ -2145,12 +2145,17 @@ async def admin_playoff_override(
 async def admin_finish_tournament(
     db: AsyncSession = Depends(get_db),
 ):
-    final_stage = await db.scalar(
-        select(PlayoffStage)
-        .where(PlayoffStage.is_started.is_(True))
-        .order_by(PlayoffStage.stage_order.desc(), PlayoffStage.id.desc())
+    started_stages = list(
+        (
+            await db.scalars(
+                select(PlayoffStage)
+                .where(PlayoffStage.is_started.is_(True))
+                .order_by(PlayoffStage.stage_order.desc(), PlayoffStage.id.desc())
+            )
+        ).all()
     )
-    if not final_stage or not is_stage_allowed_for_manual_winner(final_stage):
+    final_stage = next((stage for stage in started_stages if is_stage_allowed_for_manual_winner(stage)), None)
+    if not final_stage:
         return redirect_with_admin_msg("msg_operation_failed", details="stage_not_final_by_policy")
 
     final_match = await db.scalar(
