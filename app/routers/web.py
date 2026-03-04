@@ -111,6 +111,131 @@ FORBIDDEN_CHAT_NICKS = {"@admin"}
 CHAT_SENDER_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
 
 
+def _safe_json_loads(payload: str | None) -> dict | list | None:
+    if not payload:
+        return None
+    try:
+        data = json.loads(payload)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, (dict, list)) else None
+
+
+def _build_archive_bracket_columns(payload: str | None) -> tuple[list[dict[str, object]], str | None]:
+    data = _safe_json_loads(payload)
+    if data is None:
+        return [], "Сетка недоступна: архив сохранен в устаревшем или текстовом формате."
+
+    if isinstance(data, list) and data and all(isinstance(stage, dict) and "participants" in stage for stage in data):
+        columns: list[dict[str, object]] = []
+        for stage in data:
+            participants = stage.get("participants") if isinstance(stage.get("participants"), list) else []
+            matches = stage.get("matches") if isinstance(stage.get("matches"), list) else []
+            participants_by_group: dict[int, list[dict[str, object]]] = {}
+            participant_name_by_user_id: dict[int, str] = {}
+            for participant in participants:
+                if not isinstance(participant, dict):
+                    continue
+                user_id = participant.get("user_id")
+                seed = participant.get("seed")
+                if not isinstance(seed, int):
+                    continue
+                group_number = get_stage_group_number_by_seed(seed)
+                participants_by_group.setdefault(group_number, []).append(participant)
+                if isinstance(user_id, int):
+                    participant_name_by_user_id[user_id] = str(participant.get("nickname") or f"#{user_id}")
+
+            stage_matches: list[dict[str, object]] = []
+            if matches:
+                sorted_matches = sorted(
+                    [item for item in matches if isinstance(item, dict)],
+                    key=lambda item: (item.get("group_number") or 0, item.get("match_number") or 0),
+                )
+                for match in sorted_matches:
+                    group_number = match.get("group_number")
+                    if not isinstance(group_number, int):
+                        continue
+                    group_participants = sorted(
+                        participants_by_group.get(group_number, []),
+                        key=lambda item: item.get("seed") or 0,
+                    )
+                    winner_user_id = match.get("winner_user_id")
+                    stage_matches.append(
+                        {
+                            "label": get_stage_group_label(str(stage.get("key") or "stage_2"), group_number),
+                            "status": str(match.get("state") or "pending"),
+                            "participants": [
+                                {
+                                    "nickname": str(item.get("nickname") or f"#{item.get('user_id') or '?'}"),
+                                    "points": item.get("points") or 0,
+                                    "is_winner": isinstance(winner_user_id, int) and item.get("user_id") == winner_user_id,
+                                }
+                                for item in group_participants
+                            ],
+                            "winner_name": participant_name_by_user_id.get(winner_user_id, "") if isinstance(winner_user_id, int) else "",
+                        }
+                    )
+            else:
+                for group_number in sorted(participants_by_group.keys()):
+                    stage_matches.append(
+                        {
+                            "label": get_stage_group_label(str(stage.get("key") or "stage_2"), group_number),
+                            "status": "pending",
+                            "participants": [
+                                {
+                                    "nickname": str(item.get("nickname") or f"#{item.get('user_id') or '?'}"),
+                                    "points": item.get("points") or 0,
+                                    "is_winner": False,
+                                }
+                                for item in sorted(participants_by_group[group_number], key=lambda item: item.get("seed") or 0)
+                            ],
+                            "winner_name": "",
+                        }
+                    )
+
+            columns.append(
+                {
+                    "title": str(stage.get("title") or stage.get("key") or "Этап"),
+                    "matches": stage_matches,
+                }
+            )
+
+        if columns:
+            return columns, None
+
+    if isinstance(data, dict) and isinstance(data.get("rounds"), list):
+        columns = []
+        for round_item in data["rounds"]:
+            if not isinstance(round_item, dict):
+                continue
+            round_matches = []
+            for match in round_item.get("matches", []):
+                if not isinstance(match, dict):
+                    continue
+                players = [str(player) for player in match.get("players", []) if str(player).strip()]
+                winner = str(match.get("winner") or "")
+                round_matches.append(
+                    {
+                        "label": str(match.get("label") or "Матч"),
+                        "status": str(match.get("status") or "finished"),
+                        "participants": [
+                            {"nickname": player, "points": "", "is_winner": bool(winner and player == winner)}
+                            for player in players
+                        ],
+                        "winner_name": winner,
+                    }
+                )
+            columns.append({"title": str(round_item.get("title") or "Раунд"), "matches": round_matches})
+        if columns:
+            return columns, None
+
+    if isinstance(data, list):
+        return [], f"Сетка сохранена в альтернативном формате (элементов: {len(data)})."
+    if isinstance(data, dict):
+        return [], f"Сетка сохранена в альтернативном формате (полей: {len(data.keys())})."
+    return [], "Сетка недоступна: формат архива не поддерживается."
+
+
 def build_stage_display_order(active_key: str, stage_order_keys: list[str]) -> list[str]:
     if active_key not in stage_order_keys:
         return stage_order_keys
@@ -1001,6 +1126,17 @@ async def archive_page(request: Request, db: AsyncSession = Depends(get_db)):
             .order_by(TournamentArchive.created_at.desc(), TournamentArchive.id.desc())
         )
     ).all()
+
+    for entry in tournament_archives:
+        columns, summary = _build_archive_bracket_columns(entry.bracket_payload_json)
+        entry.bracket_columns = columns
+        entry.bracket_summary = summary
+
+    for entry in archive_entries:
+        columns, summary = _build_archive_bracket_columns(entry.bracket_payload)
+        entry.bracket_columns = columns
+        entry.bracket_summary = summary
+
     return templates.TemplateResponse(
         request,
         "archive.html",

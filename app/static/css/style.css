@@ -357,3 +357,73 @@ body {
   box-shadow: 0 0 8px rgba(255, 179, 66, 0.45);
   font-weight: 700;
 }
+
+.archive-bracket {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(240px, 300px);
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.archive-bracket-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.archive-bracket-column-title {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--bs-info);
+}
+
+.archive-bracket-matches {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.archive-bracket-match-card {
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-radius: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.archive-bracket-match-label {
+  font-size: 0.85rem;
+  color: var(--bs-secondary-color);
+  margin-bottom: 0.5rem;
+}
+
+.archive-bracket-participants li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.1rem 0;
+}
+
+.archive-bracket-participants li.archive-winner {
+  color: #8dff91;
+  font-weight: 700;
+}
+
+.archive-bracket-winner {
+  margin-top: 0.45rem;
+  font-size: 0.8rem;
+  color: #8dff91;
+}
+
+.archive-match-status-finished {
+  border-color: rgba(141, 255, 145, 0.4);
+}
+
+.archive-match-status-in_progress {
+  border-color: rgba(255, 209, 102, 0.55);
+}
+
+.archive-bracket-summary {
+  color: var(--bs-secondary-color);
+}
