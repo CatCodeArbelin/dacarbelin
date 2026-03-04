@@ -1742,7 +1742,8 @@ async def admin_playoff_score(
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     stage_config = get_admin_playoff_stage_config(stage.key)
-    if stage_config.game_limit is None and not stage_config.is_final:
+    is_final_like_stage = stage_config.is_final or stage.stage_size == 8
+    if stage_config.game_limit is None and not is_final_like_stage:
         return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
     try:
         if placements_list:
@@ -1765,7 +1766,8 @@ async def admin_finish_playoff_group(
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     stage_config = get_admin_playoff_stage_config(stage.key)
-    if stage_config.game_limit is None and not stage_config.is_final:
+    is_final_like_stage = stage_config.is_final or stage.stage_size == 8
+    if stage_config.game_limit is None and not is_final_like_stage:
         return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
 
     participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))).all())
@@ -1848,7 +1850,8 @@ async def admin_playoff_results_batch(
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     stage_config = get_admin_playoff_stage_config(stage.key)
-    if stage_config.game_limit is None and not stage_config.is_final:
+    is_final_like_stage = stage_config.is_final or stage.stage_size == 8
+    if stage_config.game_limit is None and not is_final_like_stage:
         return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
     try:
         if len(user_ids) != len(places):
