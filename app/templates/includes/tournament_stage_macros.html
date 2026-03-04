@@ -85,7 +85,7 @@
 </div>
 {%- endmacro %}
 
-{% macro stage_group_controls(group_title, members, score_action, score_hidden_fields=None, group_locked=False, group_hint=None, submit_label=None, place_input='select', place_max=8, progress_text=None, finish_action=None, finish_hidden_fields=None, finish_label=None, finish_disabled=False, highlight_user_id=None, highlight_winner_eligible=False, wrapper_class='border rounded p-3 w-100 h-100') -%}
+{% macro stage_group_controls(group_title, members, score_action, score_hidden_fields=None, group_locked=False, group_hint=None, submit_label=None, place_input='select', place_max=8, progress_text=None, finish_action=None, finish_hidden_fields=None, finish_label=None, finish_disabled=False, highlight_user_id=None, highlight_winner_eligible=False, can_submit_results=True, submit_results_disabled_reason=None, wrapper_class='border rounded p-3 w-100 h-100') -%}
 <div class="{{ wrapper_class }}">
   {% if group_title %}<div class="fw-bold mb-2">{{ group_title }}</div>{% endif %}
   {% if progress_text %}
@@ -140,7 +140,12 @@
         </tbody>
       </table>
     </div>
-    <button class="btn btn-sm btn-success" {% if group_locked %}disabled{% endif %}>{{ submit_label or tr('admin_save_game_result') }}</button>
+    <button class="btn btn-sm btn-success" {% if group_locked or not can_submit_results %}disabled{% endif %}>{{ submit_label or tr('admin_save_game_result') }}</button>
+    {% if not can_submit_results %}
+    <div class="alert alert-warning py-2 mt-2 mb-0">
+      {{ submit_results_disabled_reason or 'Запись результатов для этой стадии запрещена: этап не является финальным и для него не настроен лимит игр.' }}
+    </div>
+    {% endif %}
   </form>
 
   {% if finish_action and finish_label %}

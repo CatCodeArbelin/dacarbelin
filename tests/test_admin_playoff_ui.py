@@ -56,3 +56,17 @@ def test_tournament_template_has_empty_active_stage_alert() -> None:
     template = Path("app/templates/tournament.html").read_text(encoding="utf-8")
 
     assert "playoff_empty_active_stage_alert" in template
+
+
+def test_admin_template_disables_stage_result_submit_for_disallowed_stage() -> None:
+    template = Path("app/templates/admin.html").read_text(encoding="utf-8")
+    macros = Path("app/templates/includes/tournament_stage_macros.html").read_text(encoding="utf-8")
+    router = Path("app/routers/web.py").read_text(encoding="utf-8")
+
+    assert "current_playoff_stage_can_submit_results" in router
+    assert "current_playoff_stage_config.game_limit is not None or is_final_like_stage" in router
+    assert "can_submit_results=current_playoff_stage_can_submit_results" in template
+    assert "submit_results_disabled_reason='Запись результатов для этой стадии запрещена" in template
+    assert "can_submit_results=True" in macros
+    assert "group_locked or not can_submit_results" in macros
+    assert "Запись результатов для этой стадии запрещена" in macros

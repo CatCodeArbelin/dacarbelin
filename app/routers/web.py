@@ -986,6 +986,12 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     current_playoff_stage_config = (
         get_admin_playoff_stage_config(current_playoff_stage.key) if current_playoff_stage else None
     )
+    current_playoff_stage_can_submit_results = False
+    if current_playoff_stage and current_playoff_stage_config:
+        is_final_like_stage = current_playoff_stage_config.is_final or current_playoff_stage.stage_size == 8
+        current_playoff_stage_can_submit_results = (
+            current_playoff_stage_config.game_limit is not None or is_final_like_stage
+        )
     current_stage_groups = playoff_stage_groups.get(current_playoff_stage.id, []) if current_playoff_stage else []
     current_stage_participants = playoff_stage_participants.get(current_playoff_stage.id, []) if current_playoff_stage else []
     playoff_stage_finish_progress: list[dict[str, int | str]] = []
@@ -1044,6 +1050,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             active_stage_key=active_stage_key,
             current_playoff_stage=current_playoff_stage,
             current_playoff_stage_config=current_playoff_stage_config,
+            current_playoff_stage_can_submit_results=current_playoff_stage_can_submit_results,
             current_stage_groups=current_stage_groups,
             current_stage_participants=current_stage_participants,
             playoff_stage_finish_progress=playoff_stage_finish_progress,
