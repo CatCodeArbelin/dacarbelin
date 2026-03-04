@@ -144,6 +144,49 @@ class TournamentStageConfigTests(unittest.TestCase):
         self.assertIn("должна иметь stage_size=8", alert)
         self.assertIn("scoring_mode='final_22_top1'", alert)
 
+    def test_playoff_integrity_treats_legacy_keys_as_known_not_unknown(self) -> None:
+        stages = [
+            PlayoffStage(id=1, key="stage_2", title="Stage 2", stage_order=0, stage_size=32, scoring_mode="standard"),
+            PlayoffStage(id=2, key="stage_1_4", title="Stage 3", stage_order=1, stage_size=16, scoring_mode="standard"),
+            PlayoffStage(id=3, key="final", title="Final", stage_order=2, stage_size=8, scoring_mode="final_22_top1"),
+        ]
+
+        alert = web.get_playoff_stage_integrity_alert(stages)
+
+        self.assertIsNotNone(alert)
+        assert alert is not None
+        self.assertNotIn("неизвестный key='final'", alert)
+        self.assertIn("legacy alias key='final'", alert)
+
+    def test_playoff_integrity_reports_extra_stage_without_masking_missing_required_pair(self) -> None:
+        stages = [
+            PlayoffStage(id=1, key="stage_2", title="Stage 2", stage_order=0, stage_size=32, scoring_mode="standard"),
+            PlayoffStage(id=2, key="stage_1_4", title="Stage 3", stage_order=1, stage_size=16, scoring_mode="standard"),
+            PlayoffStage(id=3, key="stage_final", title="Final", stage_order=5, stage_size=8, scoring_mode="final_22_top1"),
+            PlayoffStage(id=4, key="stage_2", title="Unexpected Stage", stage_order=3, stage_size=8, scoring_mode="standard"),
+        ]
+
+        alert = web.get_playoff_stage_integrity_alert(stages)
+
+        self.assertIsNotNone(alert)
+        assert alert is not None
+        self.assertIn("отсутствуют обязательные пары", alert)
+        self.assertIn("лишние playoff-стадии", alert)
+        self.assertIn("(5, stage_final)", alert)
+
+    def test_playoff_integrity_reports_unknown_key_explicitly(self) -> None:
+        stages = [
+            PlayoffStage(id=1, key="stage_2", title="Stage 2", stage_order=0, stage_size=32, scoring_mode="standard"),
+            PlayoffStage(id=2, key="mystery_stage", title="Mystery", stage_order=1, stage_size=16, scoring_mode="standard"),
+            PlayoffStage(id=3, key="stage_final", title="Final", stage_order=2, stage_size=8, scoring_mode="final_22_top1"),
+        ]
+
+        alert = web.get_playoff_stage_integrity_alert(stages)
+
+        self.assertIsNotNone(alert)
+        assert alert is not None
+        self.assertIn("неизвестный key='mystery_stage'", alert)
+
     def test_build_playoff_standings_marks_status_by_configured_limits_and_promotion(self) -> None:
         stage = PlayoffStage(
             id=1,

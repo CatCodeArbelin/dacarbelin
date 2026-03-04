@@ -75,6 +75,7 @@ from app.services.tournament_view import (
 from app.services.tournament_stage_config import (
     FINAL_STAGE_SCORING_MODES,
     GROUP_STAGE_GAME_LIMIT,
+    LEGACY_STAGE_KEY_ALIASES,
     get_admin_playoff_stage_config,
     get_game_limit,
     get_promote_top_n,
@@ -277,22 +278,62 @@ def get_playoff_stage_integrity_alert(playoff_stages: list[PlayoffStage]) -> str
     known_stage_keys = set(get_playoff_stage_sequence_keys())
     stage_order_key_pairs = {(stage.stage_order, normalize_stage_key(stage.key)) for stage in playoff_stages}
     expected_pairs = set(EXPECTED_32_PLAYER_STAGE_ORDER_PAIRS)
-    issues: list[str] = []
+    issues: list[dict[str, str]] = []
+    legacy_stage_aliases = set(LEGACY_STAGE_KEY_ALIASES)
 
     for stage in playoff_stages:
+        raw_key = (stage.key or "").strip().lower()
         normalized_key = normalize_stage_key(stage.key)
-        if normalized_key not in known_stage_keys:
-            issues.append(
-                f"Этап id={stage.id} имеет неизвестный key='{stage.key}' (alias не распознан)."
-            )
+        if normalized_key in known_stage_keys:
+            if raw_key in legacy_stage_aliases and raw_key != normalized_key:
+                issues.append(
+                    {
+                        "kind": "legacy_alias",
+                        "message": f"Этап id={stage.id} использует legacy alias key='{stage.key}'.",
+                    }
+                )
+            continue
+
+        issues.append(
+            {
+                "kind": "unknown_key",
+                "message": f"Этап id={stage.id} имеет неизвестный key='{stage.key}' (alias не распознан).",
+            }
+        )
 
     has_32_player_stage = any(int(stage.stage_size or 0) == 32 for stage in playoff_stages)
+    if has_32_player_stage:
+        missing_pairs = expected_pairs - stage_order_key_pairs
+        if missing_pairs:
+            missing_pairs_text = ", ".join([f"({order}, {key})" for order, key in sorted(missing_pairs)])
+            issues.append(
+                {
+                    "kind": "missing_required_pairs",
+                    "message": "Для 32-игрокового сценария отсутствуют обязательные пары (stage_order, key): "
+                    f"[{missing_pairs_text}]",
+                }
+            )
+
+        extra_pairs = stage_order_key_pairs - expected_pairs
+        if extra_pairs:
+            extra_pairs_text = ", ".join([f"({order}, {key})" for order, key in sorted(extra_pairs)])
+            issues.append(
+                {
+                    "kind": "extra_pairs",
+                    "message": "Для 32-игрокового сценария найдены лишние playoff-стадии (stage_order, key): "
+                    f"[{extra_pairs_text}]",
+                }
+            )
+
     if has_32_player_stage and stage_order_key_pairs != expected_pairs:
         current_pairs = ", ".join([f"({stage.stage_order}, {normalize_stage_key(stage.key)})" for stage in playoff_stages])
         expected_pairs_text = ", ".join([f"({order}, {key})" for order, key in EXPECTED_32_PLAYER_STAGE_ORDER_PAIRS])
         issues.append(
-            "Для 32-игрокового сценария нарушены пары (stage_order, key): "
-            f"ожидается [{expected_pairs_text}], сейчас [{current_pairs}]."
+            {
+                "kind": "pairs_mismatch_summary",
+                "message": "Для 32-игрокового сценария нарушены пары (stage_order, key): "
+                f"ожидается [{expected_pairs_text}], сейчас [{current_pairs}].",
+            }
         )
 
     final_stage = next((stage for stage in playoff_stages if normalize_stage_key(stage.key) == "stage_final"), None)
@@ -301,19 +342,26 @@ def get_playoff_stage_integrity_alert(playoff_stages: list[PlayoffStage]) -> str
     if final_stage:
         if int(final_stage.stage_size or 0) != 8:
             issues.append(
-                f"Финальная стадия id={final_stage.id} должна иметь stage_size=8, сейчас {final_stage.stage_size}."
+                {
+                    "kind": "invalid_final_size",
+                    "message": f"Финальная стадия id={final_stage.id} должна иметь stage_size=8, сейчас {final_stage.stage_size}.",
+                }
             )
 
         scoring_mode = (final_stage.scoring_mode or "").strip().lower()
         if scoring_mode != "final_22_top1":
             issues.append(
-                "Для финальной стадии предпочтителен scoring_mode='final_22_top1' "
-                f"(сейчас '{final_stage.scoring_mode or '∅'}')."
+                {
+                    "kind": "invalid_final_scoring",
+                    "message": "Для финальной стадии предпочтителен scoring_mode='final_22_top1' "
+                    f"(сейчас '{final_stage.scoring_mode or '∅'}').",
+                }
             )
 
     if not issues:
         return None
-    return "⚠️ Проверка целостности playoff_stages: " + " ".join(issues)
+    issue_messages = [issue["message"] for issue in issues]
+    return "⚠️ Проверка целостности playoff_stages: " + " ".join(issue_messages)
 
 
 def _normalize_direct_invite_stage(raw_value: str | None) -> str | None:
