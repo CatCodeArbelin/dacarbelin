@@ -5,6 +5,9 @@ from collections.abc import Mapping
 
 LIMITED_PLAYOFF_STAGE_KEYS = {"stage_2", "stage_1_4"}
 GROUP_STAGE_GAME_LIMIT = 3
+LEGACY_STAGE_KEY_ALIASES: Mapping[str, str] = {
+    "final": "stage_final",
+}
 PROMOTE_TOP_N_BY_STAGE: Mapping[str, int] = {
     "stage_2": 4,
     "stage_1_4": 4,
@@ -43,7 +46,7 @@ DEFAULT_ADMIN_PLAYOFF_STAGE_CONFIG = AdminPlayoffStageConfig()
 
 
 def is_limited_stage(stage_key: str) -> bool:
-    return stage_key in LIMITED_PLAYOFF_STAGE_KEYS
+    return normalize_stage_key(stage_key) in LIMITED_PLAYOFF_STAGE_KEYS
 
 
 def get_game_limit(stage_key: str) -> int | None:
@@ -55,4 +58,8 @@ def get_promote_top_n(stage_key: str) -> int:
 
 
 def get_admin_playoff_stage_config(stage_key: str) -> AdminPlayoffStageConfig:
-    return ADMIN_PLAYOFF_STAGE_CONFIGS.get(stage_key, DEFAULT_ADMIN_PLAYOFF_STAGE_CONFIG)
+    return ADMIN_PLAYOFF_STAGE_CONFIGS.get(normalize_stage_key(stage_key), DEFAULT_ADMIN_PLAYOFF_STAGE_CONFIG)
+
+
+def normalize_stage_key(stage_key: str) -> str:
+    return LEGACY_STAGE_KEY_ALIASES.get(stage_key, stage_key)
