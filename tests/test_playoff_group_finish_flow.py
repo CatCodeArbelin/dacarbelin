@@ -160,8 +160,8 @@ class PlayoffGroupFinishFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("msg=msg_playoff_game_saved", response.headers["location"])
         apply_mock.assert_awaited_once_with(db, 71, [1, 2, 3, 4, 5, 6, 7, 8], group_number=1)
 
-    async def test_legacy_final_like_stage_allows_batch_score_submission_by_size(self) -> None:
-        legacy_final_stage = PlayoffStage(id=73, key="stage_4", title="Final", stage_order=4, stage_size=8)
+    async def test_legacy_final_stage_alias_allows_batch_score_submission(self) -> None:
+        legacy_final_stage = PlayoffStage(id=73, key="stage_4", title="Final", stage_order=4, stage_size=16)
         db = AsyncMock()
         db.scalar = AsyncMock(side_effect=[legacy_final_stage])
 
@@ -177,6 +177,24 @@ class PlayoffGroupFinishFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 303)
         self.assertIn("msg=msg_playoff_game_saved", response.headers["location"])
         apply_mock.assert_awaited_once_with(db, 73, [1, 2, 3, 4, 5, 6, 7, 8], group_number=1)
+
+    async def test_legacy_final_text_key_allows_score_submission(self) -> None:
+        legacy_final_stage = PlayoffStage(id=74, key="final", title="Final", stage_order=4, stage_size=16)
+        db = AsyncMock()
+        db.scalar = AsyncMock(side_effect=[legacy_final_stage])
+
+        with patch.object(web, "apply_playoff_match_results", new=AsyncMock()) as apply_mock:
+            response = await web.admin_playoff_score(
+                stage_id=74,
+                group_number=1,
+                placements_list=[str(user_id) for user_id in range(1, 9)],
+                placements="",
+                db=db,
+            )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertIn("msg=msg_playoff_game_saved", response.headers["location"])
+        apply_mock.assert_awaited_once_with(db, 74, [1, 2, 3, 4, 5, 6, 7, 8], group_number=1)
 
     async def test_final_stage_remains_in_progress_after_22_plus_and_extra_game(self) -> None:
         ordered_user_ids = [1, 2, 3, 4, 5, 6, 7, 8]

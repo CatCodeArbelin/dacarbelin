@@ -93,16 +93,23 @@ class TournamentStageConfigTests(unittest.TestCase):
 
     def test_legacy_stage_key_aliases_map_to_current_final_stage(self) -> None:
         self.assertEqual(LEGACY_STAGE_KEY_ALIASES["final"], "stage_final")
+        self.assertEqual(LEGACY_STAGE_KEY_ALIASES["stage_4"], "stage_final")
         self.assertEqual(normalize_stage_key("final"), "stage_final")
+        self.assertEqual(normalize_stage_key("stage_4"), "stage_final")
 
         legacy_final_config = get_admin_playoff_stage_config("final")
+        legacy_stage_4_config = get_admin_playoff_stage_config("stage_4")
         canonical_final_config = get_admin_playoff_stage_config("stage_final")
 
         self.assertEqual(legacy_final_config, canonical_final_config)
+        self.assertEqual(legacy_stage_4_config, canonical_final_config)
         self.assertTrue(legacy_final_config.is_final)
         self.assertIsNone(get_game_limit("final"))
+        self.assertIsNone(get_game_limit("stage_4"))
         self.assertEqual(get_promote_top_n("final"), 1)
+        self.assertEqual(get_promote_top_n("stage_4"), 1)
         self.assertFalse(is_limited_stage("final"))
+        self.assertFalse(is_limited_stage("stage_4"))
 
     def test_build_playoff_standings_marks_status_by_configured_limits_and_promotion(self) -> None:
         stage = PlayoffStage(
