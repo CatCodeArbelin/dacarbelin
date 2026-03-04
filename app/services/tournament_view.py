@@ -39,6 +39,7 @@ class BracketParticipantVM(TypedDict, total=False):
     nickname: str
     points: int
     is_direct_invite_preview: bool
+    is_promoted_highlight: bool
     is_tournament_winner: bool
     winner_label_key: str | None
 
@@ -117,7 +118,7 @@ def build_group_stage_standings(groups: Sequence[TournamentGroup]) -> dict[int, 
 
 
 def _participants_for_group_members(members: Sequence[GroupMember]) -> list[BracketParticipantVM]:
-    return [
+    participants = [
         {
             "user_id": member.user_id,
             "nickname": _display_nickname(member.user, str(member.user_id)),
@@ -126,6 +127,30 @@ def _participants_for_group_members(members: Sequence[GroupMember]) -> list[Brac
         }
         for member in sort_members_for_table(list(members))
     ]
+    for participant in participants[:3]:
+        participant["is_promoted_highlight"] = True
+    return participants
+
+
+def _apply_stage_highlight_rules(stage_key: str, participants: list[BracketParticipantVM]) -> list[BracketParticipantVM]:
+    if not participants:
+        return participants
+
+    promote_top_n_by_stage = {
+        "stage_2": 4,
+        "stage_1_4": 4,
+    }
+    promote_top_n = promote_top_n_by_stage.get(stage_key)
+    if promote_top_n is not None:
+        for participant in participants[:promote_top_n]:
+            participant["is_promoted_highlight"] = True
+        return participants
+
+    if stage_key == "stage_final":
+        for participant in participants:
+            participant["is_promoted_highlight"] = int(participant.get("points", 0) or 0) >= 22
+
+    return participants
 
 
 def _participants_for_playoff_members(
@@ -269,6 +294,7 @@ def build_bracket_columns(
                 continue
 
             participant_rows = participants_by_group.get(match.group_number, [])
+            participant_rows = _apply_stage_highlight_rules(stage.key, participant_rows)
             is_final_match = stage.key == "stage_final"
             winner_applied = False
             if is_final_match and final_match_winner_user_id:

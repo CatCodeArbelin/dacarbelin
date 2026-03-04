@@ -243,6 +243,14 @@ body {
   margin-bottom: 2px;
 }
 
+
+.playoff-participants li.playoff-participant-promoted {
+  border-left-color: #4adf8b;
+  background: rgba(26, 111, 63, 0.45);
+  border-radius: 8px;
+  color: #eafff2;
+}
+
 .playoff-next-link {
   margin-top: 8px;
   color: #9ed9ff !important;
