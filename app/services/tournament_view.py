@@ -42,6 +42,7 @@ class BracketParticipantVM(TypedDict, total=False):
     points: int
     is_direct_invite_preview: bool
     is_promoted_highlight: bool
+    highlight_color: str
     is_tournament_winner: bool
     winner_label_key: str | None
 
@@ -168,14 +169,17 @@ def _apply_stage_highlight_rules(stage_key: str, participants: list[BracketParti
 
     if normalized_stage_key == "stage_final":
         for participant in participants:
-            participant["is_promoted_highlight"] = int(participant.get("points", 0) or 0) >= 22
+            has_22_plus = int(participant.get("points", 0) or 0) >= 22
+            participant["is_promoted_highlight"] = has_22_plus
+            participant["highlight_color"] = "final-qualified" if has_22_plus else "normal"
         return participants
 
     stage_spec = get_stage_spec(normalized_stage_key)
     promote_top_n = int(stage_spec.get("promote_top_n", get_promote_top_n(normalized_stage_key)) or 0)
-    if promote_top_n > 0:
-        for participant in participants[:promote_top_n]:
-            participant["is_promoted_highlight"] = True
+    for idx, participant in enumerate(participants, start=1):
+        is_promoted = promote_top_n > 0 and idx <= promote_top_n
+        participant["is_promoted_highlight"] = is_promoted
+        participant["highlight_color"] = "promoted" if is_promoted else "eliminated"
 
     return participants
 
