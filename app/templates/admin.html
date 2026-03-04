@@ -189,6 +189,8 @@
                 progress_text=(tr('admin_group') ~ ' ' ~ group.group_label ~ ': ' ~ group.games_played ~ '/' ~ (group.game_limit if group.game_limit != 'special' else '∞')),
                 highlight_user_id=(none if current_playoff_stage.key == 'stage_final' else current_playoff_stage.final_candidate_user_id),
                 highlight_winner_eligible=(current_playoff_stage.key == 'stage_final'),
+                can_submit_results=current_playoff_stage_can_submit_results,
+                submit_results_disabled_reason='Запись результатов для этой стадии запрещена: этап не является финальным и для него не настроен лимит игр.',
                 wrapper_class='w-100 h-100'
               ) }}
             </div>
