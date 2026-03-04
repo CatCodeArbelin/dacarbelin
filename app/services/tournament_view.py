@@ -17,6 +17,7 @@ from app.services.tournament_stage_config import (
     GROUP_STAGE_GAME_LIMIT,
     TOURNAMENT_FLOW_SPEC,
     get_promote_top_n,
+    get_stage_spec,
     get_stage_display_label_key,
     is_limited_stage,
     normalize_stage_key,
@@ -128,9 +129,7 @@ def _participants_for_group_members(members: Sequence[GroupMember]) -> list[Brac
         }
         for member in sort_members_for_table(list(members))
     ]
-    for participant in participants[:3]:
-        participant["is_promoted_highlight"] = True
-    return participants
+    return _apply_stage_highlight_rules("group_stage", participants)
 
 
 def _apply_stage_highlight_rules(stage_key: str, participants: list[BracketParticipantVM]) -> list[BracketParticipantVM]:
@@ -144,7 +143,8 @@ def _apply_stage_highlight_rules(stage_key: str, participants: list[BracketParti
             participant["is_promoted_highlight"] = int(participant.get("points", 0) or 0) >= 22
         return participants
 
-    promote_top_n = get_promote_top_n(normalized_stage_key)
+    stage_spec = get_stage_spec(normalized_stage_key)
+    promote_top_n = int(stage_spec.get("promote_top_n", get_promote_top_n(normalized_stage_key)) or 0)
     if promote_top_n > 0:
         for participant in participants[:promote_top_n]:
             participant["is_promoted_highlight"] = True
