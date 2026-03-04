@@ -56,7 +56,10 @@
 
     <div id="chat" class="card bg-black neon-border-blue mt-4">
       <div class="card-body">
-        <h3 class="text-contrast-neon neon-text-outline">{{ tr('index_chat') }}</h3>
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+          <h3 class="text-contrast-neon neon-text-outline mb-0">{{ tr('index_chat') }}</h3>
+          <button type="button" class="btn btn-outline-light btn-sm" id="chat-refresh-btn">Refresh</button>
+        </div>
         <form action="/chat/send" method="post" class="mb-3" id="chat-form">
           {% if not chat_settings.is_enabled %}<div class="alert alert-warning">{{ tr('msg_chat_disabled_admin') }}</div>{% endif %}
           <input class="form-control mb-2" name="temp_nick" placeholder="{{ tr('index_temp_nick') }}" required>
@@ -168,6 +171,10 @@
   const chatBox = document.getElementById("chat-box");
   if (!chatBox) return;
 
+  const refreshButton = document.getElementById("chat-refresh-btn");
+  let eventSource = null;
+  let reconnectTimer = null;
+
   const render = (messages) => {
     chatBox.innerHTML = messages.map((msg) => `
       <div><strong class="chat-nick${msg.is_admin ? " chat-nick-admin" : ""}" style="--nick-color: ${msg.nick_color || "#00d4ff"};">${msg.temp_nick}</strong>: ${msg.message}</div>
@@ -181,11 +188,43 @@
       const data = await response.json();
       if (Array.isArray(data.messages)) render(data.messages);
     } catch (e) {
-      // ignore polling errors
+      // ignore refresh errors
     }
   };
 
-  setInterval(refresh, 3000);
+  const scheduleReconnect = () => {
+    if (reconnectTimer) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connectToStream();
+    }, 3000);
+  };
+
+  const connectToStream = () => {
+    if (eventSource) {
+      eventSource.close();
+    }
+
+    eventSource = new EventSource("/chat/stream");
+    eventSource.addEventListener("chat_update", () => {
+      refresh();
+    });
+    eventSource.onerror = () => {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      scheduleReconnect();
+    };
+  };
+
+  if (refreshButton) {
+    refreshButton.addEventListener("click", () => {
+      refresh();
+    });
+  }
+
+  connectToStream();
 })();
 
 </script>
