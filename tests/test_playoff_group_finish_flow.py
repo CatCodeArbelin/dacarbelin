@@ -47,6 +47,31 @@ class PlayoffGroupFinishFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("invalid_size", str(context.exception))
         self.assertIn("invalid_mode", str(context.exception))
 
+    async def test_admin_active_stage_prefers_final_when_started_stages_are_finished(self) -> None:
+        stage_3 = PlayoffStage(id=90, key="stage_1_4", title="Stage 3", stage_order=1, is_started=True)
+        stage_final = PlayoffStage(id=91, key="stage_final", title="Final", stage_order=2, stage_size=8, is_started=True)
+
+        stage_3.participants = [
+            PlayoffParticipant(stage_id=90, user_id=user_id, seed=seed, points=0, wins=0, top4_finishes=0, last_place=8)
+            for seed, user_id in enumerate(range(2001, 2009), start=1)
+        ]
+        stage_3.matches = [PlayoffMatch(stage_id=90, group_number=1, game_number=4, state="finished")]
+
+        stage_final.participants = [
+            PlayoffParticipant(stage_id=91, user_id=user_id, seed=seed, points=0, wins=0, top4_finishes=0, last_place=8)
+            for seed, user_id in enumerate(range(3001, 3009), start=1)
+        ]
+        stage_final.matches = [
+            PlayoffMatch(stage_id=91, group_number=1, game_number=1, state="finished", winner_user_id=3001)
+        ]
+
+        active_stage_key = web.get_admin_active_playoff_stage_key(
+            [stage_3, stage_final],
+            ["stage_2", "stage_1_4", "stage_final"],
+        )
+
+        self.assertEqual(active_stage_key, "stage_final")
+
     async def test_stage_is_finished_by_active_groups_only(self) -> None:
         stage = PlayoffStage(id=10, key="stage_2", title="Stage 2", stage_order=0)
         participants = [

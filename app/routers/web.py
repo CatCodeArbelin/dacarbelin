@@ -195,6 +195,49 @@ def build_playoff_stage_finish_status(
 
     return progress_items, False
 
+
+def is_playoff_stage_finished(stage: PlayoffStage) -> bool:
+    participants_group_numbers = {
+        get_stage_group_number_by_seed(participant.seed)
+        for participant in stage.participants
+    }
+    if not participants_group_numbers:
+        return False
+
+    for group_number in participants_group_numbers:
+        group_matches = [match for match in stage.matches if match.group_number == group_number]
+        if not group_matches:
+            return False
+        if not any(match.state == "finished" for match in group_matches):
+            return False
+    return True
+
+
+def get_admin_active_playoff_stage_key(playoff_stages: list[PlayoffStage], stage_progression_keys: list[str]) -> str | None:
+    if not playoff_stages:
+        return None
+
+    playoff_stage_by_key = {stage.key: stage for stage in playoff_stages}
+
+    for stage_key in stage_progression_keys:
+        stage = playoff_stage_by_key.get(stage_key)
+        if stage and stage.is_started and not is_playoff_stage_finished(stage):
+            return stage_key
+
+    started_stages_in_progression = [
+        playoff_stage_by_key[stage_key]
+        for stage_key in stage_progression_keys
+        if stage_key in playoff_stage_by_key and playoff_stage_by_key[stage_key].is_started
+    ]
+    for stage in started_stages_in_progression:
+        if is_stage_allowed_for_manual_winner(stage):
+            return stage.key
+
+    if started_stages_in_progression:
+        return max(started_stages_in_progression, key=lambda item: item.stage_order if item.stage_order is not None else -1).key
+
+    return get_default_playoff_stage_key(playoff_stages, stage_progression_keys)
+
 def can_submit_playoff_stage_results(stage: PlayoffStage) -> bool:
     return get_playoff_stage_submit_status(stage)["can_submit"]
 
@@ -1019,22 +1062,6 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     playoff_stages = await get_playoff_stages_with_data(db)
     active_playoff_stage = get_active_playoff_stage(playoff_stages)
 
-    def _is_stage_finished(stage: PlayoffStage) -> bool:
-        participants_group_numbers = {
-            get_stage_group_number_by_seed(participant.seed)
-            for participant in stage.participants
-        }
-        if not participants_group_numbers:
-            return False
-
-        for group_number in participants_group_numbers:
-            group_matches = [match for match in stage.matches if match.group_number == group_number]
-            if not group_matches:
-                return False
-            if not any(match.state == "finished" for match in group_matches):
-                return False
-        return True
-
     playoff_stage_by_key = {stage.key: stage for stage in playoff_stages}
     stage_progression_keys = PLAYOFF_STAGE_KEYS_ORDER
     tournament_started = await get_tournament_started(db)
@@ -1061,26 +1088,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     elif not group_stage_finished:
         active_stage_key = "group_stage"
     else:
-        for stage_key in stage_progression_keys:
-            stage = playoff_stage_by_key.get(stage_key)
-            if not stage:
-                continue
-            if stage.is_started and not _is_stage_finished(stage):
-                active_stage_key = stage_key
-                break
-
-        if active_stage_key is None:
-            # Не перескакиваем на следующую стадию до явного запуска через Stage Finish.
-            # Показываем первую незавершённую стадию только среди уже стартовавших.
-            for stage_key in stage_progression_keys:
-                stage = playoff_stage_by_key.get(stage_key)
-                if stage and stage.is_started and not _is_stage_finished(stage):
-                    active_stage_key = stage_key
-                    break
-
-        if active_stage_key is None and playoff_stages:
-            started_stage = get_active_playoff_stage(playoff_stages, stage_progression_keys)
-            active_stage_key = started_stage.key if started_stage else get_default_playoff_stage_key(playoff_stages, stage_progression_keys)
+        active_stage_key = get_admin_active_playoff_stage_key(playoff_stages, stage_progression_keys)
 
     show_group_stage_controls = active_stage_key == "group_stage"
     groups = group_stage_groups if show_group_stage_controls else []
