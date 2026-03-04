@@ -144,7 +144,7 @@ class AdminPlayoffOverrideTests(unittest.IsolatedAsyncioTestCase):
 
         await reset_tournament_cycle_after_finish(db)
 
-        self.assertEqual(db.execute.await_count, 7)
+        self.assertEqual(db.execute.await_count, 8)
         self.assertEqual(existing_settings["tournament_started"].value, "0")
         self.assertEqual(existing_settings["draw_applied"].value, "0")
         self.assertEqual(existing_settings["tournament_finished"].value, "0")

@@ -237,6 +237,29 @@ def _build_archive_bracket_columns(payload: str | None) -> tuple[list[dict[str, 
     return [], "Сетка недоступна: формат архива не поддерживается."
 
 
+
+
+def _apply_archive_stage_highlight(stage_key: str, participants: list[dict[str, object]]) -> list[dict[str, object]]:
+    if not participants:
+        return participants
+
+    if stage_key == "stage_final":
+        winner_marked = False
+        for participant in participants:
+            is_winner = bool(participant.get("is_winner")) and not winner_marked
+            if is_winner:
+                winner_marked = True
+                participant["highlight_color"] = "promoted"
+                participant["is_tournament_winner"] = True
+            else:
+                participant["highlight_color"] = "final-qualified" if int(participant.get("points") or 0) >= 22 else "normal"
+        return participants
+
+    promote_top_n = 3 if stage_key == "group_stage" else 4 if stage_key in {"stage_2", "stage_1_4"} else 0
+    for idx, participant in enumerate(participants, start=1):
+        participant["highlight_color"] = "promoted" if promote_top_n and idx <= promote_top_n else "eliminated"
+    return participants
+
 def _build_archive_tree_vm(columns: list[dict[str, object]]) -> dict[str, object]:
     stage_keys = ["group_stage", "stage_2", "stage_1_4", "stage_final"]
     stages: list[dict[str, object]] = []
@@ -253,7 +276,9 @@ def _build_archive_tree_vm(columns: list[dict[str, object]]) -> dict[str, object
                         "match_id": f"{stage_key}:{match_idx}",
                         "label": str(match.get("label") or match_idx),
                         "status": str(match.get("status") or "pending"),
-                        "participants": list(match.get("participants") or []),
+                        "participants": _apply_archive_stage_highlight(
+                            stage_key, list(match.get("participants") or [])
+                        ),
                         "schedule_text": "TBD",
                         "lobby_password": "TBD",
                         "incoming_sources": [],
