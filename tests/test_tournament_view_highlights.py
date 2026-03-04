@@ -16,6 +16,12 @@ def test_stage_2_highlights_top_4() -> None:
     assert highlighted == [True, True, True, True, False, False, False, False]
 
 
+def test_stage_1_highlights_top_3() -> None:
+    rows = _apply_stage_highlight_rules("group_stage", _participants([24, 18, 15, 12, 9, 6, 3, 0]))
+    highlighted = [row.get("is_promoted_highlight", False) for row in rows]
+    assert highlighted == [True, True, True, False, False, False, False, False]
+
+
 def test_stage_3_highlights_top_4() -> None:
     rows = _apply_stage_highlight_rules("stage_1_4", _participants([24, 18, 15, 12, 9, 6, 3, 0]))
     highlighted = [row.get("is_promoted_highlight", False) for row in rows]
