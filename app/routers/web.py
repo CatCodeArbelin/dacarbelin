@@ -734,6 +734,13 @@ def template_context(request: Request, **extra):
     return context
 
 
+def _get_twitch_embed_parents(request: Request) -> list[str]:
+    host = (request.url.hostname or "").strip().lower()
+    if not host:
+        return ["localhost"]
+    return [host.split(":", 1)[0]]
+
+
 def redirect_with_msg(url: str, msg_key: str, status_code: int = 303) -> RedirectResponse:
     separator = "&" if "?" in url else "?"
     return RedirectResponse(url=f"{url}{separator}msg={msg_key}", status_code=status_code)
@@ -1714,6 +1721,19 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             playoff_stage_integrity_alert=playoff_stage_integrity_alert,
             tournament_finished=tournament_finished,
             tournament_winner_nickname=tournament_winner_nickname,
+        ),
+    )
+
+
+@router.get("/watch", response_class=HTMLResponse)
+async def watch_page(request: Request):
+    return templates.TemplateResponse(
+        request,
+        "watch.html",
+        template_context(
+            request,
+            twitch_channel="loyrensss",
+            twitch_embed_parents=_get_twitch_embed_parents(request),
         ),
     )
 
