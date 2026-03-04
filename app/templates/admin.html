@@ -214,8 +214,8 @@
         {% if current_playoff_stage_is_final and final_group %}
         <div class="mt-3 border rounded p-3">
           <div class="fw-bold mb-2">Назначение победителя финала</div>
-          <div class="small text-contrast-muted mb-2">Выберите победителя из 8 участников текущего финала. Победителем можно назначить только игрока с 22+ очками.</div>
-          <form action="/admin/playoff/override" method="post" class="row g-2">
+          <div class="small text-contrast-muted mb-2">Выберите победителя из 8 участников текущего финала. Победителем можно назначить только игрока с 22+ очками. После выбора завершите турнир и сохраните архивный snapshot.</div>
+          <form action="/admin/playoff/override" method="post" class="row g-2 mb-2">
             <input type="hidden" name="stage_id" value="{{ current_playoff_stage.id }}">
             <input type="hidden" name="group_number" value="1">
             <div class="col-md-8">
@@ -228,6 +228,9 @@
             <div class="col-md-4">
               <button class="btn btn-outline-success w-100">Подтвердить победителя этапа</button>
             </div>
+          </form>
+          <form action="/admin/tournament/finish" method="post">
+            <button class="btn btn-success">Завершить турнир</button>
           </form>
         </div>
         {% endif %}

@@ -13,6 +13,7 @@ from app.models.settings import (
     TournamentStage,
 )
 from app.models.tournament import GroupGameResult, GroupManualTieBreak, GroupMember, TournamentGroup
+from app.models.tournament_archive import TournamentArchive
 from app.models.user import User
 
 __all__ = [
@@ -31,4 +32,5 @@ __all__ = [
     "GroupMember",
     "GroupGameResult",
     "GroupManualTieBreak",
+    "TournamentArchive",
 ]
