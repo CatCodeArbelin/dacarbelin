@@ -7,6 +7,7 @@ LIMITED_PLAYOFF_STAGE_KEYS = {"stage_2", "stage_1_4"}
 GROUP_STAGE_GAME_LIMIT = 3
 LEGACY_STAGE_KEY_ALIASES: Mapping[str, str] = {
     "final": "stage_final",
+    "stage_4": "stage_final",
 }
 PROMOTE_TOP_N_BY_STAGE: Mapping[str, int] = {
     "stage_2": 4,
