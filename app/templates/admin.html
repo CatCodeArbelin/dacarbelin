@@ -124,7 +124,7 @@
         {% endif %}
         {% if current_playoff_stage_config.can_debug_simulate %}
         <form action="/admin/playoff/debug/simulate-3-games" method="post" class="mt-2" onsubmit="return confirm('Симулировать 3 случайные игры для этапа «{{ current_playoff_stage.title }}»?');">
-          <input type="hidden" name="stage_id" value="{{ current_playoff_stage.id }}">
+          <input type="hidden" name="stage_id" value="{{ manual_winner_stage.id }}">
           <button class="btn btn-sm btn-outline-danger">Симулировать 3 случайные игры ({{ current_playoff_stage.title }})</button>
         </form>
         {% endif %}
@@ -143,8 +143,7 @@
         {% endif %}
       </div>
 
-      {% set final_group = current_stage_groups[0] if current_stage_groups else None %}
-      <h5 class="mt-4">{{ tr('admin_playoff_match_results') }}</h5>
+            <h5 class="mt-4">{{ tr('admin_playoff_match_results') }}</h5>
       {% if not current_playoff_stage_can_submit_results %}
       <div class="alert alert-warning py-2">
         {{ tr('admin_playoff_submit_forbidden_hint') }}
@@ -211,16 +210,16 @@
         </div>
         {% endif %}
 
-        {% if current_playoff_stage_is_final and final_group %}
+        {% if manual_winner_stage and manual_winner_final_group %}
         <div class="mt-3 border rounded p-3">
           <div class="fw-bold mb-2">Назначение победителя финала</div>
           <div class="small text-contrast-muted mb-2">Выберите победителя из 8 участников текущего финала. Победителем можно назначить только игрока с 22+ очками. После выбора завершите турнир и сохраните архивный snapshot.</div>
           <form action="/admin/playoff/override" method="post" class="row g-2 mb-2">
-            <input type="hidden" name="stage_id" value="{{ current_playoff_stage.id }}">
+            <input type="hidden" name="stage_id" value="{{ manual_winner_stage.id }}">
             <input type="hidden" name="group_number" value="1">
             <div class="col-md-8">
               <select class="form-select" name="winner_user_id" required>
-                {% for participant in final_group.participants %}
+                {% for participant in manual_winner_final_group.participants %}
                 <option value="{{ participant.user_id }}">{{ participant.nickname }} ({{ participant.points }} pts)</option>
                 {% endfor %}
               </select>

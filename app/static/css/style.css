@@ -245,10 +245,13 @@ body {
 
 
 .playoff-participants li.playoff-participant-promoted {
-  border-left-color: #4adf8b;
-  background: rgba(26, 111, 63, 0.45);
+  border-left-color: #54ff9b;
+  border-left-width: 4px;
+  background: linear-gradient(90deg, rgba(24, 132, 73, 0.78), rgba(11, 70, 38, 0.55));
+  border: 1px solid rgba(122, 255, 181, 0.55);
   border-radius: 8px;
-  color: #eafff2;
+  color: #f2fff7 !important;
+  box-shadow: 0 0 12px rgba(77, 255, 153, 0.32);
 }
 
 .playoff-next-link {
@@ -331,6 +334,13 @@ body {
   border-color: #ff62cc;
   background: rgba(110, 18, 84, 0.48);
   box-shadow: 0 0 10px rgba(255, 98, 204, 0.35);
+}
+
+.neon-accent-badge-winner {
+  color: #fff6dc !important;
+  border-color: #ffca69;
+  background: linear-gradient(90deg, rgba(142, 86, 10, 0.62), rgba(224, 128, 13, 0.45));
+  box-shadow: 0 0 12px rgba(255, 171, 64, 0.45);
 }
 
 .playoff-participants li.tournament-winner-highlight {

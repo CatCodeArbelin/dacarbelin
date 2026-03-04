@@ -19,6 +19,7 @@ from app.services.tournament_stage_config import (
     get_promote_top_n,
     get_stage_display_label_key,
     is_limited_stage,
+    normalize_stage_key,
 )
 
 
@@ -136,19 +137,17 @@ def _apply_stage_highlight_rules(stage_key: str, participants: list[BracketParti
     if not participants:
         return participants
 
-    promote_top_n_by_stage = {
-        "stage_2": 4,
-        "stage_1_4": 4,
-    }
-    promote_top_n = promote_top_n_by_stage.get(stage_key)
-    if promote_top_n is not None:
-        for participant in participants[:promote_top_n]:
-            participant["is_promoted_highlight"] = True
-        return participants
+    normalized_stage_key = normalize_stage_key(stage_key)
 
-    if stage_key == "stage_final":
+    if normalized_stage_key == "stage_final":
         for participant in participants:
             participant["is_promoted_highlight"] = int(participant.get("points", 0) or 0) >= 22
+        return participants
+
+    promote_top_n = get_promote_top_n(normalized_stage_key)
+    if promote_top_n > 0:
+        for participant in participants[:promote_top_n]:
+            participant["is_promoted_highlight"] = True
 
     return participants
 
@@ -299,7 +298,7 @@ def build_bracket_columns(
             winner_applied = False
             if is_final_match and final_match_winner_user_id:
                 participant_rows = []
-                for participant in participants_by_group.get(match.group_number, []):
+                for participant in _apply_stage_highlight_rules(stage.key, participants_by_group.get(match.group_number, [])):
                     is_winner = participant["user_id"] == final_match_winner_user_id and not winner_applied
                     if is_winner:
                         winner_applied = True

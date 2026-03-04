@@ -158,6 +158,15 @@ def get_default_playoff_stage_key(playoff_stages: list[PlayoffStage], stage_orde
     return next((stage_key for stage_key in stage_order_keys if stage_key in stage_by_key), playoff_stages[0].key)
 
 
+def get_latest_manual_winner_stage(playoff_stages: list[PlayoffStage]) -> PlayoffStage | None:
+    final_like_stages = [stage for stage in playoff_stages if is_stage_allowed_for_manual_winner(stage)]
+    if not final_like_stages:
+        return None
+
+    final_like_stages.sort(key=lambda stage: (stage.stage_order, stage.id), reverse=True)
+    return final_like_stages[0]
+
+
 def build_playoff_stage_finish_status(
     stage: PlayoffStage,
     participants: list[PlayoffParticipant] | None = None,
@@ -1082,6 +1091,16 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             started_stage = get_active_playoff_stage(playoff_stages, stage_progression_keys)
             active_stage_key = started_stage.key if started_stage else get_default_playoff_stage_key(playoff_stages, stage_progression_keys)
 
+    manual_winner_stage = get_latest_manual_winner_stage(playoff_stages)
+    if manual_winner_stage is not None:
+        has_stage_winner = any(
+            (match.manual_winner_user_id or match.winner_user_id)
+            for match in manual_winner_stage.matches
+            if match.group_number == 1
+        )
+        if has_stage_winner:
+            active_stage_key = manual_winner_stage.key
+
     show_group_stage_controls = active_stage_key == "group_stage"
     groups = group_stage_groups if show_group_stage_controls else []
     draw_groups = group_stage_groups
@@ -1212,6 +1231,9 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     current_playoff_stage_is_final = is_stage_allowed_for_manual_winner(current_playoff_stage)
     current_stage_groups = playoff_stage_groups.get(current_playoff_stage.id, []) if current_playoff_stage else []
     current_stage_participants = playoff_stage_participants.get(current_playoff_stage.id, []) if current_playoff_stage else []
+    manual_winner_stage = get_latest_manual_winner_stage(playoff_stages)
+    manual_winner_stage_groups = playoff_stage_groups.get(manual_winner_stage.id, []) if manual_winner_stage else []
+    manual_winner_final_group = manual_winner_stage_groups[0] if manual_winner_stage_groups else None
     playoff_stage_finish_progress: list[dict[str, int | str]] = []
     playoff_stage_finish_ready = False
     playoff_stage_finish_progress_limit: int | str = GROUP_STAGE_GAME_LIMIT
@@ -1274,6 +1296,8 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             current_playoff_stage_is_final=current_playoff_stage_is_final,
             current_stage_groups=current_stage_groups,
             current_stage_participants=current_stage_participants,
+            manual_winner_stage=manual_winner_stage,
+            manual_winner_final_group=manual_winner_final_group,
             playoff_stage_finish_progress=playoff_stage_finish_progress,
             playoff_stage_finish_ready=playoff_stage_finish_ready,
             playoff_stage_finish_progress_limit=playoff_stage_finish_progress_limit,
@@ -2145,12 +2169,16 @@ async def admin_playoff_override(
 async def admin_finish_tournament(
     db: AsyncSession = Depends(get_db),
 ):
-    final_stage = await db.scalar(
-        select(PlayoffStage)
-        .where(PlayoffStage.is_started.is_(True))
-        .order_by(PlayoffStage.stage_order.desc(), PlayoffStage.id.desc())
+    playoff_stages = list(
+        (
+            await db.scalars(
+                select(PlayoffStage)
+                .order_by(PlayoffStage.stage_order.desc(), PlayoffStage.id.desc())
+            )
+        ).all()
     )
-    if not final_stage or not is_stage_allowed_for_manual_winner(final_stage):
+    final_stage = get_latest_manual_winner_stage(playoff_stages)
+    if not final_stage:
         return redirect_with_admin_msg("msg_operation_failed", details="stage_not_final_by_policy")
 
     final_match = await db.scalar(
