@@ -4,6 +4,8 @@ import json
 import math
 import uuid
 import re
+from html import escape
+from html.parser import HTMLParser
 from urllib.parse import urlencode
 from datetime import datetime, timedelta
 
@@ -110,6 +112,97 @@ EXPECTED_32_PLAYER_STAGE_ORDER_PAIRS = [
 CHAT_NICK_COLORS = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff66c4", "#5ce1e6", "#f48c06", "#90be6d", "#4cc9f0"]
 FORBIDDEN_CHAT_NICKS = {"@admin"}
 CHAT_SENDER_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+ALLOWED_CONTENT_HTML_TAGS = {
+    "p",
+    "br",
+    "strong",
+    "b",
+    "em",
+    "i",
+    "u",
+    "s",
+    "blockquote",
+    "ul",
+    "ol",
+    "li",
+    "a",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "code",
+    "pre",
+}
+ALLOWED_CONTENT_HTML_ATTRS = {
+    "a": {"href", "title", "target", "rel"},
+}
+ALLOWED_LINK_SCHEMES = ("http://", "https://", "mailto:", "#", "/")
+
+
+class _ContentHtmlSanitizer(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._chunks: list[str] = []
+
+    def _sanitize_attrs(self, tag: str, attrs: list[tuple[str, str | None]]) -> str:
+        allowed_attrs = ALLOWED_CONTENT_HTML_ATTRS.get(tag, set())
+        if not allowed_attrs:
+            return ""
+
+        rendered_attrs: list[str] = []
+        for key, raw_value in attrs:
+            if key not in allowed_attrs:
+                continue
+            value = (raw_value or "").strip()
+            if not value:
+                continue
+            if key == "href":
+                if not value.startswith(ALLOWED_LINK_SCHEMES):
+                    continue
+            if key == "target":
+                if value not in {"_blank", "_self"}:
+                    continue
+            if key == "rel":
+                value = " ".join(item for item in value.split() if item in {"noopener", "noreferrer", "nofollow"})
+                if not value:
+                    continue
+
+            rendered_attrs.append(f' {key}="{escape(value, quote=True)}"')
+        return "".join(rendered_attrs)
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag not in ALLOWED_CONTENT_HTML_TAGS:
+            return
+        self._chunks.append(f"<{tag}{self._sanitize_attrs(tag, attrs)}>")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in ALLOWED_CONTENT_HTML_TAGS:
+            self._chunks.append(f"</{tag}>")
+
+    def handle_data(self, data: str) -> None:
+        self._chunks.append(escape(data))
+
+    def handle_entityref(self, name: str) -> None:
+        self._chunks.append(f"&{name};")
+
+    def handle_charref(self, name: str) -> None:
+        self._chunks.append(f"&#{name};")
+
+    def get_html(self) -> str:
+        return "".join(self._chunks)
+
+
+def sanitize_content_html(raw_html: str | None) -> str:
+    if not raw_html:
+        return ""
+    sanitizer = _ContentHtmlSanitizer()
+    sanitizer.feed(raw_html)
+    sanitizer.close()
+    return sanitizer.get_html()
 
 
 def _safe_json_loads(payload: str | None) -> dict | list | None:
@@ -1176,7 +1269,15 @@ async def rules_page(request: Request, db: AsyncSession = Depends(get_db)):
     # Отдаем страницу правил.
     rules_content = await get_or_create_rules_content(db)
     await db.commit()
-    return templates.TemplateResponse(request, "rules.html", template_context(request, rules_content=rules_content))
+    return templates.TemplateResponse(
+        request,
+        "rules.html",
+        template_context(
+            request,
+            rules_content=rules_content,
+            rules_content_html=sanitize_content_html(rules_content.body),
+        ),
+    )
 
 
 @router.get("/archive", response_class=HTMLResponse)
@@ -1626,7 +1727,6 @@ async def admin_content_page(request: Request, db: AsyncSession = Depends(get_db
     donation_methods = (await db.scalars(select(DonationMethod).order_by(DonationMethod.sort_order, DonationMethod.id))).all()
     prize_pool_entries = (await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all()
     donors = (await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all()
-    archive_entries = (await db.scalars(select(ArchiveEntry).order_by(ArchiveEntry.sort_order, ArchiveEntry.id))).all()
     return templates.TemplateResponse(
         request,
         "admin_content.html",
@@ -1637,7 +1737,6 @@ async def admin_content_page(request: Request, db: AsyncSession = Depends(get_db
             donation_methods=donation_methods,
             prize_pool_entries=prize_pool_entries,
             donors=donors,
-            archive_entries=archive_entries,
         ),
     )
 
@@ -2481,39 +2580,6 @@ async def admin_save_rules(
     row.body = body
     await db.commit()
     return redirect_with_admin_msg("msg_rules_saved")
-
-
-@router.post("/admin/archive")
-async def admin_save_archive(
-    items: str = Form(default=""),
-    db: AsyncSession = Depends(get_db),
-):
-    await db.execute(ArchiveEntry.__table__.delete())
-    for idx, line in enumerate([item.strip() for item in items.splitlines() if item.strip()]):
-        parts = [part.strip() for part in line.split("|")]
-        if not parts:
-            continue
-        title = parts[0]
-        season = parts[1] if len(parts) > 1 else ""
-        summary = parts[2] if len(parts) > 2 else ""
-        link_url = parts[3] if len(parts) > 3 else ""
-        champion_name = parts[4] if len(parts) > 4 else ""
-        bracket_payload = parts[5] if len(parts) > 5 else ""
-        is_published = parts[6] != "0" if len(parts) > 6 else True
-        db.add(
-            ArchiveEntry(
-                title=title,
-                season=season,
-                summary=summary,
-                link_url=link_url,
-                champion_name=champion_name,
-                bracket_payload=bracket_payload,
-                is_published=is_published,
-                sort_order=idx,
-            )
-        )
-    await db.commit()
-    return redirect_with_admin_msg("msg_archive_saved")
 
 
 @router.post("/admin/judge-link/regenerate")
