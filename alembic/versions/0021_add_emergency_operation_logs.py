@@ -16,6 +16,14 @@ depends_on = None
 
 
 def upgrade() -> None:
+    op.alter_column(
+        "alembic_version",
+        "version_num",
+        existing_type=sa.String(length=32),
+        type_=sa.String(length=64),
+        existing_nullable=False,
+    )
+
     op.create_table(
         "emergency_operation_logs",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -36,3 +44,11 @@ def downgrade() -> None:
     op.drop_index("ix_emergency_operation_logs_target_stage_id", table_name="emergency_operation_logs")
     op.drop_index("ix_emergency_operation_logs_action_type", table_name="emergency_operation_logs")
     op.drop_table("emergency_operation_logs")
+
+    op.alter_column(
+        "alembic_version",
+        "version_num",
+        existing_type=sa.String(length=64),
+        type_=sa.String(length=32),
+        existing_nullable=False,
+    )
