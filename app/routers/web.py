@@ -255,18 +255,23 @@ async def can_submit_playoff_stage_results_with_db(db: AsyncSession, stage: Play
 
 
 def get_empty_active_stage_alert(playoff_stages: list[PlayoffStage]) -> str | None:
-    stage_by_order = {stage.stage_order: stage for stage in playoff_stages}
+    stage_by_order = {
+        stage_order: stage
+        for stage in playoff_stages
+        if (stage_order := getattr(stage, "stage_order", None)) is not None
+    }
     for stage in playoff_stages:
-        if not stage.is_started or stage.participants:
+        if not getattr(stage, "is_started", False) or getattr(stage, "participants", None):
             continue
 
-        previous_stage = stage_by_order.get(stage.stage_order - 1)
-        if previous_stage and is_limited_stage(previous_stage.key):
+        stage_order = getattr(stage, "stage_order", None)
+        previous_stage = stage_by_order.get(stage_order - 1) if stage_order is not None else None
+        if previous_stage and is_limited_stage(getattr(previous_stage, "key", "")):
             return (
-                f"Этап {stage.title} активен, но участников 0: "
-                f"завершите {previous_stage.title} через Stage Finish (/admin/playoff/stage/finish)."
+                f"Этап {getattr(stage, 'title', '-')} активен, но участников 0: "
+                f"завершите {getattr(previous_stage, 'title', '-')} через Stage Finish (/admin/playoff/stage/finish)."
             )
-        return f"Этап {stage.title} активен, но участников 0."
+        return f"Этап {getattr(stage, 'title', '-')} активен, но участников 0."
 
     return None
 
@@ -848,7 +853,39 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
 
     users = list((await db.scalars(select(User))).all())
     user_by_id = {user.id: user for user in users}
-    stage_columns = build_bracket_columns(groups, playoff_stages, user_by_id, direct_invite_ids)
+
+    winner_settings = list(
+        (
+            await db.scalars(
+                select(SiteSetting).where(SiteSetting.key.in_(("tournament_winner_user_id", "tournament_winner_nickname")))
+            )
+        ).all()
+    )
+    winner_setting_by_key = {setting.key: setting for setting in winner_settings}
+
+    winner_user_id_setting = winner_setting_by_key.get("tournament_winner_user_id")
+    winner_user_id: int | None = None
+    if winner_user_id_setting and winner_user_id_setting.value:
+        try:
+            winner_user_id = int(winner_user_id_setting.value)
+        except ValueError:
+            winner_user_id = None
+
+    winner_nickname_setting = winner_setting_by_key.get("tournament_winner_nickname")
+    winner_nickname = (winner_nickname_setting.value or "").strip() if winner_nickname_setting else ""
+    if winner_user_id and not winner_nickname:
+        winner_nickname = user_by_id.get(winner_user_id).nickname if user_by_id.get(winner_user_id) else ""
+
+    try:
+        stage_columns = build_bracket_columns(
+            groups,
+            playoff_stages,
+            user_by_id,
+            direct_invite_ids,
+            winner_user_id,
+        )
+    except TypeError:
+        stage_columns = build_bracket_columns(groups, playoff_stages, user_by_id, direct_invite_ids)
 
     lang = get_lang(request.cookies.get("lang"))
     current_stage_display = resolve_current_stage_label(lang, playoff_stages, tournament_started)
@@ -875,6 +912,8 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             current_stage_display=current_stage_display,
             show_groups=tournament_started,
             playoff_empty_active_stage_alert=playoff_empty_active_stage_alert,
+            tournament_winner_user_id=winner_user_id,
+            tournament_winner_nickname=winner_nickname,
         ),
     )
 

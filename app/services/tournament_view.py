@@ -34,11 +34,13 @@ class GroupStageStandingRow(TypedDict):
     status: str
 
 
-class BracketParticipantVM(TypedDict):
+class BracketParticipantVM(TypedDict, total=False):
     user_id: int
     nickname: str
     points: int
     is_direct_invite_preview: bool
+    is_tournament_winner: bool
+    winner_label_key: str | None
 
 
 class BracketMatchVM(TypedDict, total=False):
@@ -159,6 +161,7 @@ def build_bracket_columns(
     playoff_stages: Sequence[PlayoffStage],
     user_by_id: Mapping[int, User],
     direct_invite_ids: list[int],
+    tournament_winner_user_id: int | None = None,
 ) -> list[BracketColumnVM]:
     def _empty_match(stage_key: str, group_number: int) -> BracketMatchVM:
         return {
@@ -216,7 +219,6 @@ def build_bracket_columns(
                         {
                             "user_id": invited["user_id"],
                             "nickname": _display_nickname(user, str(invited["user_id"])),
-                            "points": 0,
                             "is_direct_invite_preview": True,
                         }
                     )
@@ -238,6 +240,11 @@ def build_bracket_columns(
 
         participants_by_group = _participants_for_playoff_members(stage.participants, user_by_id)
         matches_by_group = {match.group_number: match for match in sorted(stage.matches, key=lambda item: item.group_number)}
+        final_match_winner_user_id = tournament_winner_user_id
+        if stage.key == "stage_final":
+            final_match = next(iter(sorted(stage.matches, key=lambda item: item.group_number)), None)
+            if final_match is not None:
+                final_match_winner_user_id = final_match.manual_winner_user_id or final_match.winner_user_id or final_match_winner_user_id
 
         stage_group_numbers = sorted({*participants_by_group.keys(), *matches_by_group.keys()})
         if is_limited_stage(stage.key):
@@ -261,13 +268,30 @@ def build_bracket_columns(
                 )
                 continue
 
+            participant_rows = participants_by_group.get(match.group_number, [])
+            is_final_match = stage.key == "stage_final"
+            winner_applied = False
+            if is_final_match and final_match_winner_user_id:
+                participant_rows = []
+                for participant in participants_by_group.get(match.group_number, []):
+                    is_winner = participant["user_id"] == final_match_winner_user_id and not winner_applied
+                    if is_winner:
+                        winner_applied = True
+                    participant_rows.append(
+                        {
+                            **participant,
+                            "is_tournament_winner": is_winner,
+                            "winner_label_key": "tournament_winner" if is_winner else None,
+                        }
+                    )
+
             matches_vm.append(
                 {
                     "group_label": get_stage_group_label(stage.key, match.group_number),
                     "game_number": match.game_number,
                     "schedule_text": _normalize_schedule(match.schedule_text),
                     "lobby_password": match.lobby_password,
-                    "participants": participants_by_group.get(match.group_number, []),
+                    "participants": participant_rows,
                     "state": match.state,
                 }
             )
