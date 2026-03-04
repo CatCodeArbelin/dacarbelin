@@ -5,6 +5,7 @@
 {% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}{% if request.query_params.get('details') %}: <span class="small">{{ tr(request.query_params.get('details')) }}</span>{% endif %}</div>{% endif %}
 {% if playoff_empty_active_stage_alert %}<div class="alert alert-warning">{{ playoff_empty_active_stage_alert }}</div>{% endif %}
 {% if playoff_stage_integrity_alert %}<div class="alert alert-warning">{{ playoff_stage_integrity_alert }}</div>{% endif %}
+{% if tournament_finished %}<div class="alert alert-success">{{ tr('msg_tournament_finished') }}. {{ tr('msg_tournament_winner_selected').replace('{nickname}', tournament_winner_nickname or '-') }}</div>{% endif %}
 <div class="d-flex justify-content-end align-items-center gap-2 mb-3">
   <a class="btn btn-sm btn-outline-info" href="/admin/users">Список участников</a>
   <a class="btn btn-sm btn-outline-info" href="/admin/chat">Чат</a>

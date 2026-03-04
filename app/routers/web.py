@@ -49,6 +49,7 @@ from app.services.tournament import (
     ManualDrawValidationError,
     generate_playoff_from_groups,
     finalize_limited_playoff_stage_if_ready,
+    finalize_tournament_with_winner,
     get_playoff_stages_with_data,
     override_playoff_match_winner,
     parse_manual_draw_user_ids,
@@ -944,6 +945,10 @@ async def admin_logout():
 @router.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     judge_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "judge_login_token"))
+    tournament_finished_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_finished"))
+    tournament_winner_nickname_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_winner_nickname"))
+    tournament_finished = (tournament_finished_setting.value == "1") if tournament_finished_setting else False
+    tournament_winner_nickname = tournament_winner_nickname_setting.value if tournament_winner_nickname_setting else ""
     judge_login_token = (judge_setting.value if judge_setting else "")
     judge_login_url = ""
     if judge_login_token:
@@ -1227,6 +1232,8 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             group_stage_games_summary=group_stage_games_summary,
             playoff_empty_active_stage_alert=playoff_empty_active_stage_alert,
             playoff_stage_integrity_alert=playoff_stage_integrity_alert,
+            tournament_finished=tournament_finished,
+            tournament_winner_nickname=tournament_winner_nickname,
         ),
     )
 
@@ -2078,7 +2085,8 @@ async def admin_playoff_override(
 
     try:
         await override_playoff_match_winner(db, stage_id, group_number, winner_user_id, note=note)
-        return redirect_with_admin_msg("msg_status_ok")
+        winner_nickname = await finalize_tournament_with_winner(db, winner_user_id)
+        return redirect_with_admin_msg("msg_tournament_finished_with_winner", details=winner_nickname)
     except Exception:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
 
