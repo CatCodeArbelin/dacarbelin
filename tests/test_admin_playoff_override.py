@@ -29,7 +29,7 @@ class AdminPlayoffOverrideTests(unittest.IsolatedAsyncioTestCase):
         participant = PlayoffParticipant(stage_id=101, user_id=5001, seed=1, points=21)
 
         db = AsyncMock()
-        db.scalar = AsyncMock(side_effect=[stage_final, participant])
+        db.scalar = AsyncMock(side_effect=[SiteSetting(key="tournament_finished", value="0"), stage_final, participant])
 
         with patch.object(web, "override_playoff_match_winner", new=AsyncMock()) as override_mock:
             response = await web.admin_playoff_override(
@@ -50,7 +50,7 @@ class AdminPlayoffOverrideTests(unittest.IsolatedAsyncioTestCase):
         participant = PlayoffParticipant(stage_id=102, user_id=5002, seed=1, points=22)
 
         db = AsyncMock()
-        db.scalar = AsyncMock(side_effect=[stage_final, participant])
+        db.scalar = AsyncMock(side_effect=[SiteSetting(key="tournament_finished", value="0"), stage_final, participant])
 
         with patch.object(web, "override_playoff_match_winner", new=AsyncMock()) as override_mock:
             response = await web.admin_playoff_override(

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.user import User
@@ -136,3 +136,15 @@ class PlayoffMatch(Base):
     manual_override_note: Mapped[str] = mapped_column(String(255), default="")
 
     stage: Mapped[PlayoffStage] = relationship("PlayoffStage", back_populates="matches")
+
+
+class EmergencyOperationLog(Base):
+    __tablename__ = "emergency_operation_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    admin_name: Mapped[str] = mapped_column(String(120), default="admin")
+    action_type: Mapped[str] = mapped_column(String(100), index=True)
+    dry_run: Mapped[bool] = mapped_column(Boolean, default=False)
+    target_stage_id: Mapped[int | None] = mapped_column(ForeignKey("playoff_stages.id", ondelete="SET NULL"), nullable=True, index=True)
+    details_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
