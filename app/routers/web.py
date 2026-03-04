@@ -35,6 +35,7 @@ from app.models.settings import (
     TournamentStage,
 )
 from app.models.tournament import GroupGameResult, GroupMember, PlayoffMatch, PlayoffParticipant, PlayoffStage, TournamentGroup
+from app.models.tournament_archive import TournamentArchive
 from app.models.user import Basket, User
 from app.services.basket_allocator import allocate_basket
 from app.services.i18n import get_lang, t
@@ -67,6 +68,7 @@ from app.services.tournament import (
     get_stage_group_label,
     shuffle_stage_2_participants,
     simulate_three_random_games_for_stage,
+    snapshot_tournament_archive,
 )
 from app.services.tournament_view import (
     build_bracket_columns,
@@ -909,7 +911,18 @@ async def rules_page(request: Request, db: AsyncSession = Depends(get_db)):
 async def archive_page(request: Request, db: AsyncSession = Depends(get_db)):
     # Отдаем страницу архива.
     archive_entries = (await db.scalars(select(ArchiveEntry).where(ArchiveEntry.is_published.is_(True)).order_by(ArchiveEntry.sort_order, ArchiveEntry.id))).all()
-    return templates.TemplateResponse(request, "archive.html", template_context(request, archive_entries=archive_entries))
+    tournament_archives = (
+        await db.scalars(
+            select(TournamentArchive)
+            .where(TournamentArchive.is_public.is_(True))
+            .order_by(TournamentArchive.created_at.desc(), TournamentArchive.id.desc())
+        )
+    ).all()
+    return templates.TemplateResponse(
+        request,
+        "archive.html",
+        template_context(request, archive_entries=archive_entries, tournament_archives=tournament_archives),
+    )
 
 
 @router.get("/admin/login", response_class=HTMLResponse)
@@ -2085,10 +2098,59 @@ async def admin_playoff_override(
 
     try:
         await override_playoff_match_winner(db, stage_id, group_number, winner_user_id, note=note)
-        winner_nickname = await finalize_tournament_with_winner(db, winner_user_id)
-        return redirect_with_admin_msg("msg_tournament_finished_with_winner", details=winner_nickname)
+        return redirect_with_admin_msg("msg_status_ok", details="winner_selected")
     except Exception:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
+
+@router.post("/admin/tournament/finish")
+async def admin_finish_tournament(
+    db: AsyncSession = Depends(get_db),
+):
+    final_stage = await db.scalar(
+        select(PlayoffStage)
+        .where(PlayoffStage.is_started.is_(True))
+        .order_by(PlayoffStage.stage_order.desc(), PlayoffStage.id.desc())
+    )
+    if not final_stage or not is_stage_allowed_for_manual_winner(final_stage):
+        return redirect_with_admin_msg("msg_operation_failed", details="stage_not_final_by_policy")
+
+    final_match = await db.scalar(
+        select(PlayoffMatch).where(
+            PlayoffMatch.stage_id == final_stage.id,
+            PlayoffMatch.group_number == 1,
+        )
+    )
+    if not final_match or final_match.state != "finished":
+        return redirect_with_admin_msg("msg_operation_failed", details="final_not_finished")
+
+    winner_user_id = final_match.manual_winner_user_id or final_match.winner_user_id
+    if not winner_user_id:
+        return redirect_with_admin_msg("msg_operation_failed", details="winner_not_selected")
+
+    winner_participant = await db.scalar(
+        select(PlayoffParticipant).where(
+            PlayoffParticipant.stage_id == final_stage.id,
+            PlayoffParticipant.user_id == winner_user_id,
+        )
+    )
+    if not winner_participant or (winner_participant.points or 0) < 22:
+        return redirect_with_admin_msg("msg_operation_failed", details="winner_points_below_threshold")
+
+    try:
+        await snapshot_tournament_archive(
+            db,
+            winner_user_id=winner_user_id,
+            title=final_stage.title,
+            season=datetime.utcnow().strftime("%Y"),
+            source_tournament_version="playoff_v2",
+            is_public=True,
+        )
+        winner_nickname = await finalize_tournament_with_winner(db, winner_user_id)
+        return redirect_with_admin_msg("msg_status_ok", details=f"tournament_finished_and_archived:{winner_nickname}")
+    except Exception:
+        await db.rollback()
+        return redirect_with_admin_msg("msg_operation_failed")
+
 
 @router.post("/admin/donation-links")
 async def admin_save_donation_links(

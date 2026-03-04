@@ -1,6 +1,33 @@
 {% extends "base.html" %}
 {% block content %}
 <h2>{{ tr('archive_title') }}</h2>
+
+{% if tournament_archives %}
+  <h4 class="mt-4">Архив турниров</h4>
+  {% for entry in tournament_archives %}
+    <div class="card bg-black neon-border-blue mb-3">
+      <div class="card-body">
+        <h4>{{ entry.title or 'Турнир' }}</h4>
+        {% if entry.season %}<div class="text-contrast-muted mb-2">Сезон: {{ entry.season }}</div>{% endif %}
+        {% if entry.winner_nickname %}<p><strong>Champion:</strong> {{ entry.winner_nickname }}</p>{% endif %}
+        {% if entry.created_at %}<div class="small text-contrast-muted mb-2">{{ entry.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</div>{% endif %}
+        {% if entry.group_payload_json %}
+          <details class="mb-2">
+            <summary>Group snapshot JSON</summary>
+            <pre class="small">{{ entry.group_payload_json }}</pre>
+          </details>
+        {% endif %}
+        {% if entry.bracket_payload_json %}
+          <details>
+            <summary>Bracket snapshot JSON</summary>
+            <pre class="small">{{ entry.bracket_payload_json }}</pre>
+          </details>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+{% endif %}
+
 {% for entry in archive_entries %}
   <div class="card bg-black neon-border-blue mb-3">
     <div class="card-body">
@@ -13,6 +40,8 @@
     </div>
   </div>
 {% else %}
-  <p>{{ tr('archive_empty') }}</p>
+  {% if not tournament_archives %}
+    <p>{{ tr('archive_empty') }}</p>
+  {% endif %}
 {% endfor %}
 {% endblock %}

@@ -1,6 +1,7 @@
 """Реализует основную бизнес-логику управления турниром и сеткой матчей."""
 
 from collections import defaultdict
+import json
 import random
 
 from sqlalchemy import delete, func, select
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.settings import SiteSetting
+from app.models.tournament_archive import TournamentArchive
 from app.models.tournament import (
     GroupGameResult,
     GroupMember,
@@ -993,6 +995,139 @@ async def simulate_three_random_games_for_stage(db: AsyncSession, stage_id: int)
             )
 
 
+
+def _serialize_datetime(value: object) -> str | None:
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
+async def snapshot_tournament_archive(
+    db: AsyncSession,
+    *,
+    winner_user_id: int,
+    title: str = "Турнир",
+    season: str = "",
+    source_tournament_version: str = "v2",
+    is_public: bool = True,
+) -> TournamentArchive:
+    winner = await db.scalar(select(User).where(User.id == winner_user_id))
+    if not winner:
+        raise ValueError("Победитель турнира не найден")
+
+    groups = list(
+        (
+            await db.scalars(
+                select(TournamentGroup)
+                .options(selectinload(TournamentGroup.members).selectinload(GroupMember.user))
+                .order_by(TournamentGroup.stage, TournamentGroup.name)
+            )
+        ).all()
+    )
+
+    playoff_stages = list(
+        (
+            await db.scalars(
+                select(PlayoffStage)
+                .options(
+                    selectinload(PlayoffStage.participants).selectinload(PlayoffParticipant.user),
+                    selectinload(PlayoffStage.matches),
+                )
+                .order_by(PlayoffStage.stage_order, PlayoffStage.id)
+            )
+        ).all()
+    )
+
+    group_payload = [
+        {
+            "id": group.id,
+            "stage": group.stage,
+            "name": group.name,
+            "lobby_password": group.lobby_password,
+            "schedule_text": group.schedule_text,
+            "scheduled_at": _serialize_datetime(group.scheduled_at),
+            "current_game": group.current_game,
+            "is_started": group.is_started,
+            "draw_mode": group.draw_mode,
+            "members": [
+                {
+                    "user_id": member.user_id,
+                    "nickname": member.user.nickname if member.user else f"#{member.user_id}",
+                    "seat": member.seat,
+                    "total_points": member.total_points,
+                    "first_places": member.first_places,
+                    "top4_finishes": member.top4_finishes,
+                    "top8_finishes": member.top8_finishes,
+                    "eighth_places": member.eighth_places,
+                    "last_game_place": member.last_game_place,
+                }
+                for member in sorted(group.members, key=lambda item: (item.seat, item.id))
+            ],
+        }
+        for group in groups
+    ]
+
+    bracket_payload = [
+        {
+            "id": stage.id,
+            "key": stage.key,
+            "title": stage.title,
+            "stage_size": stage.stage_size,
+            "stage_order": stage.stage_order,
+            "scoring_mode": stage.scoring_mode,
+            "stage_code": stage.stage_code,
+            "is_started": stage.is_started,
+            "final_candidate_user_id": stage.final_candidate_user_id,
+            "participants": [
+                {
+                    "user_id": participant.user_id,
+                    "nickname": participant.user.nickname if participant.user else f"#{participant.user_id}",
+                    "seed": participant.seed,
+                    "points": participant.points,
+                    "wins": participant.wins,
+                    "top4_finishes": participant.top4_finishes,
+                    "top8_finishes": participant.top8_finishes,
+                    "eighth_places": participant.eighth_places,
+                    "last_place": participant.last_place,
+                    "is_eliminated": participant.is_eliminated,
+                }
+                for participant in sorted(stage.participants, key=lambda item: item.seed)
+            ],
+            "matches": [
+                {
+                    "id": match.id,
+                    "match_number": match.match_number,
+                    "group_number": match.group_number,
+                    "game_number": match.game_number,
+                    "lobby_password": match.lobby_password,
+                    "schedule_text": match.schedule_text,
+                    "scheduled_at": _serialize_datetime(match.scheduled_at),
+                    "state": match.state,
+                    "winner_user_id": match.winner_user_id,
+                    "manual_winner_user_id": match.manual_winner_user_id,
+                    "manual_override_note": match.manual_override_note,
+                }
+                for match in sorted(stage.matches, key=lambda item: (item.group_number, item.match_number))
+            ],
+        }
+        for stage in playoff_stages
+    ]
+
+    archive = TournamentArchive(
+        title=title.strip() or "Турнир",
+        season=season.strip(),
+        winner_user_id=winner.id,
+        winner_nickname=winner.nickname,
+        bracket_payload_json=json.dumps(bracket_payload, ensure_ascii=False),
+        group_payload_json=json.dumps(group_payload, ensure_ascii=False),
+        source_tournament_version=source_tournament_version.strip() or "v2",
+        is_public=is_public,
+    )
+    db.add(archive)
+    await db.flush()
+    return archive
 
 
 async def override_playoff_match_winner(db: AsyncSession, stage_id: int, group_number: int, winner_user_id: int, note: str = "") -> None:
