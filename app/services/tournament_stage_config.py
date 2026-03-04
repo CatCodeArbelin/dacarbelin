@@ -9,6 +9,7 @@ LEGACY_STAGE_KEY_ALIASES: Mapping[str, str] = {
     "final": "stage_final",
     "stage_4": "stage_final",
 }
+FINAL_STAGE_SCORING_MODES = {"final_22_top1"}
 PROMOTE_TOP_N_BY_STAGE: Mapping[str, int] = {
     "stage_2": 4,
     "stage_1_4": 4,
@@ -63,4 +64,22 @@ def get_admin_playoff_stage_config(stage_key: str) -> AdminPlayoffStageConfig:
 
 
 def normalize_stage_key(stage_key: str) -> str:
-    return LEGACY_STAGE_KEY_ALIASES.get(stage_key, stage_key)
+    normalized_key = (stage_key or "").strip().lower()
+    return LEGACY_STAGE_KEY_ALIASES.get(normalized_key, normalized_key)
+
+
+def is_final_stage_key(stage_key: str) -> bool:
+    return normalize_stage_key(stage_key) == "stage_final"
+
+
+def is_final_stage(
+    stage_key: str,
+    *,
+    stage_size: int | None = None,
+    scoring_mode: str | None = None,
+) -> bool:
+    if is_final_stage_key(stage_key):
+        return True
+    if (scoring_mode or "").strip().lower() in FINAL_STAGE_SCORING_MODES:
+        return True
+    return stage_size == 8
