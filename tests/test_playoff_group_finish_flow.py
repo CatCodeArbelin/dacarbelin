@@ -17,6 +17,36 @@ class _ScalarResult:
 
 
 class PlayoffGroupFinishFlowTests(unittest.IsolatedAsyncioTestCase):
+    async def test_stage_3_policy_blocks_auto_transition_with_invalid_next_stage(self) -> None:
+        stage_3 = PlayoffStage(id=81, key="stage_1_4", title="Stage 3", stage_order=3, stage_size=16)
+        invalid_next_stage = PlayoffStage(
+            id=82,
+            key="stage_2",
+            title="Not Final",
+            stage_order=4,
+            stage_size=16,
+            scoring_mode="standard",
+        )
+        participants = [
+            PlayoffParticipant(stage_id=81, user_id=user_id, seed=seed, points=0, wins=0, top4_finishes=0, last_place=8)
+            for seed, user_id in enumerate(range(1001, 1017), start=1)
+        ]
+        matches = [
+            PlayoffMatch(stage_id=81, group_number=1, game_number=4, state="finished"),
+            PlayoffMatch(stage_id=81, group_number=2, game_number=4, state="finished"),
+        ]
+
+        db = AsyncMock()
+        db.scalar = AsyncMock(side_effect=[stage_3, invalid_next_stage])
+        db.scalars = AsyncMock(side_effect=[_ScalarResult(participants), _ScalarResult(matches)])
+
+        with self.assertRaisesRegex(ValueError, "next_stage_policy_invalid") as context:
+            await tournament.finalize_limited_playoff_stage_if_ready(db, stage_id=81)
+
+        self.assertIn("invalid_key", str(context.exception))
+        self.assertIn("invalid_size", str(context.exception))
+        self.assertIn("invalid_mode", str(context.exception))
+
     async def test_stage_is_finished_by_active_groups_only(self) -> None:
         stage = PlayoffStage(id=10, key="stage_2", title="Stage 2", stage_order=0)
         participants = [
