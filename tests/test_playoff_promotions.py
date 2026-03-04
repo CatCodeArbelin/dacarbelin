@@ -74,6 +74,33 @@ class PlayoffPromotionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(db.executed, 1)
         self.assertEqual(db.commits, 1)
 
+
+    async def test_stage_2_to_stage_3_promotes_top4_from_all_four_groups_for_48_profile_stage2(self) -> None:
+        stage = PlayoffStage(id=90, key="stage_2", title="Stage 2", stage_order=1, stage_size=32)
+        next_stage = PlayoffStage(id=91, key="stage_1_4", title="Stage 3", stage_order=2, stage_size=16)
+
+        participants = [
+            PlayoffParticipant(
+                stage_id=90,
+                user_id=user_id,
+                seed=user_id,
+                points=100 - user_id,
+                wins=2,
+                top4_finishes=2,
+                top8_finishes=3,
+                last_place=8,
+            )
+            for user_id in range(1, 33)
+        ]
+
+        db = _FakeDB([stage, next_stage], participants)
+
+        await promote_top_between_stages(db, stage_id=90, top_n=4)
+
+        promoted_ids = [participant.user_id for participant in db.added]
+        self.assertEqual(len(promoted_ids), 16)
+        self.assertEqual(promoted_ids, [1, 2, 3, 4, 9, 10, 11, 12, 17, 18, 19, 20, 25, 26, 27, 28])
+
     async def test_stage_1_4_to_final_recreates_participants_with_zero_stats(self) -> None:
         stage = PlayoffStage(id=30, key="stage_1_4", title="Stage 3", stage_order=2, stage_size=16)
         next_stage = PlayoffStage(id=40, key="stage_final", title="Final", stage_order=3, stage_size=8)

@@ -225,6 +225,9 @@ def build_bracket_columns(
     user_by_id: Mapping[int, User],
     direct_invite_ids: list[int],
     tournament_winner_user_id: int | None = None,
+    *,
+    stage_1_promoted_count: int | None = None,
+    stage_2_size: int | None = None,
 ) -> list[BracketColumnVM]:
     def _empty_match(stage_key: str, group_number: int) -> BracketMatchVM:
         return {
@@ -274,7 +277,11 @@ def build_bracket_columns(
         stage = stage_by_key.get(column["key"])
         if not stage:
             if column["key"] == "stage_2":
-                preview_direct_invites = build_stage_2_direct_invite_preview(direct_invite_ids)
+                preview_direct_invites = build_stage_2_direct_invite_preview(
+                    direct_invite_ids,
+                    promoted_count=stage_1_promoted_count,
+                    stage_2_size=stage_2_size,
+                )
                 participants_by_group: dict[int, list[BracketParticipantVM]] = {}
                 for invited in preview_direct_invites:
                     user = user_by_id.get(invited["user_id"])
@@ -372,6 +379,9 @@ def build_tournament_tree_vm(
     direct_invite_ids: list[int],
     tournament_winner_user_id: int | None = None,
     active_stage_key: str = "group_stage",
+    *,
+    stage_1_promoted_count: int | None = None,
+    stage_2_size: int | None = None,
 ) -> TournamentTreeVM:
     stage_columns = build_bracket_columns(
         groups=groups,
@@ -379,6 +389,8 @@ def build_tournament_tree_vm(
         user_by_id=user_by_id,
         direct_invite_ids=direct_invite_ids,
         tournament_winner_user_id=tournament_winner_user_id,
+        stage_1_promoted_count=stage_1_promoted_count,
+        stage_2_size=stage_2_size,
     )
     columns_by_key = {column["key"]: column for column in stage_columns}
 

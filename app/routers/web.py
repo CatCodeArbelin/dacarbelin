@@ -56,6 +56,8 @@ from app.services.tournament import (
     finalize_limited_playoff_stage_if_ready,
     finalize_tournament_with_winner,
     get_playoff_stages_with_data,
+    get_current_tournament_profile_key,
+    get_current_tournament_profile_spec,
     override_playoff_match_winner,
     parse_manual_draw_user_ids,
     move_user_to_stage,
@@ -82,9 +84,12 @@ from app.services.tournament_view import (
 )
 
 from app.services.tournament_stage_config import (
+    get_tournament_profile_spec,
     FINAL_STAGE_SCORING_MODES,
     GROUP_STAGE_GAME_LIMIT,
     LEGACY_STAGE_KEY_ALIASES,
+    TOURNAMENT_PROFILE_SPECS,
+    normalize_tournament_profile_key,
     can_submit_stage_results,
     get_admin_playoff_stage_config,
     get_game_limit,
@@ -818,10 +823,17 @@ async def set_draw_applied(db: AsyncSession, value: bool) -> None:
     record.value = "1" if value else "0"
 
 
-async def validate_group_draw_integrity(db: AsyncSession) -> tuple[bool, str | None]:
+async def validate_group_draw_integrity(db: AsyncSession, *, profile_key: str | None = None) -> tuple[bool, str | None]:
+    profile_spec = get_tournament_profile_spec(profile_key)
+    expected_groups_count = int(profile_spec["stage_1_groups_count"])
+    expected_group_size = 8
+    expected_participants = expected_groups_count * expected_group_size
+
     groups = list((await db.scalars(select(TournamentGroup).where(TournamentGroup.stage == "group_stage"))).all())
     if not groups:
         return False, "draw_not_found"
+    if len(groups) != expected_groups_count:
+        return False, "draw_profile_groups_mismatch"
 
     group_ids = [group.id for group in groups]
     members = list((await db.scalars(select(GroupMember).where(GroupMember.group_id.in_(group_ids)))).all())
@@ -833,12 +845,14 @@ async def validate_group_draw_integrity(db: AsyncSession) -> tuple[bool, str | N
 
     if len(all_user_ids) != len(set(all_user_ids)):
         return False, "draw_duplicates_found"
+    if len(all_user_ids) != expected_participants:
+        return False, "draw_profile_participants_mismatch"
 
     for group in groups:
         group_members = by_group.get(group.id, [])
         if not group_members:
             return False, "draw_empty_group"
-        if len(group_members) != 8:
+        if len(group_members) != expected_group_size:
             return False, "draw_group_size_invalid"
 
     return True, None
@@ -1335,6 +1349,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             )
         ).all()
     )
+    tournament_profile_spec = await get_current_tournament_profile_spec(db)
 
     users = list((await db.scalars(select(User))).all())
     user_by_id = {user.id: user for user in users}
@@ -1370,7 +1385,14 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             winner_user_id,
         )
     except TypeError:
-        stage_columns = build_bracket_columns(groups, playoff_stages, user_by_id, direct_invite_ids)
+        stage_columns = build_bracket_columns(
+            groups,
+            playoff_stages,
+            user_by_id,
+            direct_invite_ids,
+            stage_1_promoted_count=int(tournament_profile_spec["stage_1_promoted_count"]),
+            stage_2_size=int(tournament_profile_spec["stage_2_size"]),
+        )
 
     lang = get_lang(request.cookies.get("lang"))
     active_playoff_stage = next((stage for stage in playoff_stages if stage.is_started), None)
@@ -1550,7 +1572,19 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     draw_exists = bool(group_stage_groups)
     groups_count = len(group_stage_groups)
     draw_applied = await get_draw_applied(db)
-    is_draw_valid, invalid_draw_reason = await validate_group_draw_integrity(db)
+    current_tournament_profile_key = await get_current_tournament_profile_key(db)
+    current_tournament_profile_spec = await get_current_tournament_profile_spec(db)
+    tournament_profile_options = [
+        {
+            "key": profile_key,
+            "title": str(profile_spec["title"]),
+        }
+        for profile_key, profile_spec in TOURNAMENT_PROFILE_SPECS.items()
+    ]
+    is_draw_valid, invalid_draw_reason = await validate_group_draw_integrity(
+        db,
+        profile_key=current_tournament_profile_key,
+    )
     if is_draw_valid:
         invalid_draw_reason = None
     group_stage_finished = bool(playoff_stages)
@@ -1731,6 +1765,9 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             draw_exists=draw_exists,
             groups_count=groups_count,
             invalid_draw_reason=invalid_draw_reason,
+            current_tournament_profile_key=current_tournament_profile_key,
+            current_tournament_profile_spec=current_tournament_profile_spec,
+            tournament_profile_options=tournament_profile_options,
             donation_links=donation_links,
             donation_methods=donation_methods,
             prize_pool_entries=prize_pool_entries,
@@ -2022,6 +2059,38 @@ async def admin_registration_toggle(
     return redirect_with_admin_msg("msg_status_ok")
 
 
+
+
+@router.post("/admin/tournament/profile")
+async def admin_set_tournament_profile(
+    profile_key: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    tournament_started = await get_tournament_started(db)
+    if tournament_started:
+        return redirect_with_admin_msg("msg_operation_failed", details="tournament_already_started")
+
+    normalized_profile_key = normalize_tournament_profile_key(profile_key)
+    if normalized_profile_key != profile_key.strip():
+        return redirect_with_admin_msg("msg_operation_failed", details="invalid_tournament_profile")
+
+    groups_count = await db.scalar(
+        select(func.count(TournamentGroup.id)).where(TournamentGroup.stage == "group_stage")
+    )
+    if groups_count:
+        is_compatible, draw_issue = await validate_group_draw_integrity(db, profile_key=normalized_profile_key)
+        if not is_compatible:
+            return redirect_with_admin_msg("msg_operation_failed", details=f"profile_incompatible_draw:{draw_issue}")
+
+    profile_row = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_profile"))
+    if not profile_row:
+        profile_row = SiteSetting(key="tournament_profile", value=normalized_profile_key)
+        db.add(profile_row)
+    profile_row.value = normalized_profile_key
+
+    await db.commit()
+    return redirect_with_admin_msg("msg_status_ok")
+
 @router.post("/admin/tournament/start")
 async def admin_start_tournament(db: AsyncSession = Depends(get_db)):
     groups_count = await db.scalar(
@@ -2034,7 +2103,8 @@ async def admin_start_tournament(db: AsyncSession = Depends(get_db)):
     if not draw_applied:
         return redirect_with_admin_msg("msg_operation_failed", details="draw_not_applied")
 
-    is_draw_valid, draw_issue = await validate_group_draw_integrity(db)
+    profile_key = await get_current_tournament_profile_key(db)
+    is_draw_valid, draw_issue = await validate_group_draw_integrity(db, profile_key=profile_key)
     if not is_draw_valid:
         return redirect_with_admin_msg("msg_operation_failed", details=f"invalid_draw:{draw_issue}")
 
@@ -2075,11 +2145,15 @@ async def admin_invite_user(
     profile = await fetch_autochess_data(steam_id)
     direct_invite_stage = "stage_2" if invite_type == "stage_2" else None
     if direct_invite_stage:
+        profile_spec = await get_current_tournament_profile_spec(db)
+        stage_1_promoted_count = int(profile_spec["stage_1_promoted_count"])
+        stage_2_size = int(profile_spec["stage_2_size"])
+        direct_invite_limit = max(0, stage_2_size - stage_1_promoted_count)
         direct_invite_count = await db.scalar(
             select(func.count(User.id)).where(User.direct_invite_stage == direct_invite_stage)
         )
-        if (direct_invite_count or 0) >= 11:
-            return redirect_with_admin_msg("msg_operation_failed")
+        if (direct_invite_count or 0) >= direct_invite_limit:
+            return redirect_with_admin_msg("msg_operation_failed", details=f"invite_limit:{direct_invite_limit}")
     user = User(
         nickname=nickname,
         steam_input=steam_input,
@@ -2258,7 +2332,8 @@ async def admin_apply_draw(db: AsyncSession = Depends(get_db)):
     if not groups_count:
         return redirect_with_admin_msg("msg_operation_failed", details="draw_not_created")
 
-    is_valid, details = await validate_group_draw_integrity(db)
+    profile_key = await get_current_tournament_profile_key(db)
+    is_valid, details = await validate_group_draw_integrity(db, profile_key=profile_key)
     if not is_valid:
         return redirect_with_admin_msg("msg_operation_failed", details=f"invalid_draw:{details}")
     await set_draw_applied(db, True)

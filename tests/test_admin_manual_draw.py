@@ -231,7 +231,7 @@ def test_admin_apply_draw_sets_draw_applied_flag(monkeypatch) -> None:
     """Проверяет позитивный сценарий применения жеребьевки и установки флага."""
     state: dict[str, bool] = {"committed": False, "set_true": False}
 
-    async def fake_validate_group_draw_integrity(db):
+    async def fake_validate_group_draw_integrity(db, **kwargs):
         return True, None
 
     async def fake_set_draw_applied(db, value: bool):

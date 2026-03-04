@@ -9,6 +9,8 @@ from app.services.tournament_stage_config import (
     GROUP_STAGE_GAME_LIMIT,
     LEGACY_STAGE_KEY_ALIASES,
     TOURNAMENT_FLOW_SPEC,
+    TOURNAMENT_PROFILE_SPECS,
+    get_tournament_profile_spec,
     LIMITED_PLAYOFF_STAGE_KEYS,
     PROMOTE_TOP_N_BY_STAGE,
     get_admin_playoff_stage_config,
@@ -29,6 +31,8 @@ class TournamentStageConfigTests(unittest.TestCase):
         self.assertEqual(TOURNAMENT_FLOW_SPEC["group_stage"]["participants"], 56)
         self.assertEqual(TOURNAMENT_FLOW_SPEC["group_stage"]["groups_count"], 7)
         self.assertEqual(LIMITED_PLAYOFF_STAGE_KEYS, {"stage_2", "stage_1_4"})
+        self.assertEqual(set(TOURNAMENT_PROFILE_SPECS.keys()), {"56", "48"})
+        self.assertEqual(get_tournament_profile_spec("48")["stage_1_groups_count"], 6)
         self.assertEqual(PROMOTE_TOP_N_BY_STAGE["stage_2"], 4)
         self.assertEqual(PROMOTE_TOP_N_BY_STAGE["stage_1_4"], 4)
         self.assertEqual(PROMOTE_TOP_N_BY_STAGE["stage_final"], 1)

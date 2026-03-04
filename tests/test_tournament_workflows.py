@@ -118,6 +118,33 @@ class TournamentWorkflowTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             build_stage_2_player_ids(list(range(1, 23)), list(range(101, 112)))
 
+
+    def test_stage_2_players_formed_for_48_profile(self) -> None:
+        promoted = list(range(1, 25))
+        direct_invites = list(range(101, 109))
+
+        stage_2_player_ids = build_stage_2_player_ids(
+            promoted,
+            direct_invites,
+            promoted_target_count=24,
+            stage_2_size=32,
+        )
+
+        self.assertEqual(len(stage_2_player_ids), 32)
+        self.assertEqual(stage_2_player_ids[:24], promoted)
+        self.assertEqual(stage_2_player_ids[24:], direct_invites)
+
+    def test_stage_2_direct_invite_preview_for_48_profile(self) -> None:
+        preview = build_stage_2_direct_invite_preview(
+            list(range(101, 120)),
+            promoted_count=24,
+            stage_2_size=32,
+        )
+
+        self.assertEqual(len(preview), 8)
+        self.assertEqual(preview[0], {"user_id": 101, "seed": 25, "group_number": 4})
+        self.assertEqual(preview[-1], {"user_id": 108, "seed": 32, "group_number": 4})
+
     def test_stage_2_players_validation_for_limit_and_duplicates(self) -> None:
         """Проверяет негативный сценарий `test_stage_2_players_validation_for_limit_and_duplicates`.
         Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
@@ -244,10 +271,10 @@ def test_tournament_page_context_contains_expected_keys_when_started(monkeypatch
     async def fake_get_playoff_stages_with_data(db):
         return [SimpleNamespace(key="stage_2", is_started=True)]
 
-    def fake_build_bracket_columns(groups, playoff_stages, user_by_id, direct_invite_ids):
+    def fake_build_bracket_columns(groups, playoff_stages, user_by_id, direct_invite_ids, *args, **kwargs):
         return [{"key": "group_stage"}, {"key": "stage_2"}]
 
-    def fake_build_tournament_tree_vm(groups, playoff_stages, user_by_id, direct_invite_ids, tournament_winner_user_id=None):
+    def fake_build_tournament_tree_vm(groups, playoff_stages, user_by_id, direct_invite_ids, tournament_winner_user_id=None, *args, **kwargs):
         return {"stages": [{"key": "group_stage", "title": "I этап", "level": 0, "matches": []}]}
 
     def fake_template_response(request, template_name, context):
@@ -506,7 +533,7 @@ def test_admin_auto_apply_start_then_group_score_flow(monkeypatch) -> None:
     async def fake_get_draw_applied(db):
         return bool(state["draw_applied"])
 
-    async def fake_validate_group_draw_integrity(db):
+    async def fake_validate_group_draw_integrity(db, **kwargs):
         return True, None
 
     async def fake_apply_game_results(db, group_id: int, ordered_user_ids: list[int]):
@@ -517,15 +544,20 @@ def test_admin_auto_apply_start_then_group_score_flow(monkeypatch) -> None:
     async def fake_generate_playoff_from_groups(db):
         return True, "ok"
 
+    async def fake_get_current_tournament_profile_key(db):
+        return "56"
+
     async def fake_scalar(self, statement):
         sql = str(statement)
         if "count(tournament_groups.id)" in sql:
             return state["groups_count"]
         if "FROM site_settings" in sql:
-            if not hasattr(fake_scalar, "_setting_calls"):
-                fake_scalar._setting_calls = 0
-            fake_scalar._setting_calls += 1
-            return tournament_started_setting if fake_scalar._setting_calls == 1 else registration_open_setting
+            if not hasattr(fake_scalar, "_site_setting_calls"):
+                fake_scalar._site_setting_calls = 0
+            fake_scalar._site_setting_calls += 1
+            if fake_scalar._site_setting_calls == 1:
+                return tournament_started_setting
+            return registration_open_setting
         return None
 
     async def fake_commit(self):
@@ -542,6 +574,7 @@ def test_admin_auto_apply_start_then_group_score_flow(monkeypatch) -> None:
     monkeypatch.setattr(web, "validate_group_draw_integrity", fake_validate_group_draw_integrity)
     monkeypatch.setattr(web, "apply_game_results", fake_apply_game_results)
     monkeypatch.setattr(web, "generate_playoff_from_groups", fake_generate_playoff_from_groups)
+    monkeypatch.setattr(web, "get_current_tournament_profile_key", fake_get_current_tournament_profile_key)
     monkeypatch.setattr(web.AsyncSession, "scalar", fake_scalar, raising=False)
     monkeypatch.setattr(web.AsyncSession, "commit", fake_commit, raising=False)
     monkeypatch.setattr(web.AsyncSession, "add", fake_add, raising=False)
