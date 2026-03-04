@@ -199,6 +199,16 @@ def can_submit_playoff_stage_results(stage: PlayoffStage) -> bool:
     return get_playoff_stage_submit_status(stage)["can_submit"]
 
 
+def is_stage_allowed_for_manual_winner(stage: PlayoffStage | None) -> bool:
+    if not stage:
+        return False
+    return is_final_stage(
+        stage.key,
+        stage_size=stage.stage_size,
+        scoring_mode=stage.scoring_mode,
+    )
+
+
 def get_playoff_stage_submit_status(stage: PlayoffStage) -> dict[str, bool | str]:
     stage_config = get_admin_playoff_stage_config(stage.key)
     if stage_config.game_limit is not None:
@@ -1097,15 +1107,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
         else {"can_submit": False, "reason": "stage_key_unrecognized"}
     )
     current_playoff_stage_can_submit_results = current_playoff_stage_submit_status["can_submit"]
-    current_playoff_stage_is_final = (
-        is_final_stage(
-            current_playoff_stage.key,
-            stage_size=current_playoff_stage.stage_size,
-            scoring_mode=current_playoff_stage.scoring_mode,
-        )
-        if current_playoff_stage
-        else False
-    )
+    current_playoff_stage_is_final = is_stage_allowed_for_manual_winner(current_playoff_stage)
     current_stage_groups = playoff_stage_groups.get(current_playoff_stage.id, []) if current_playoff_stage else []
     current_stage_participants = playoff_stage_participants.get(current_playoff_stage.id, []) if current_playoff_stage else []
     playoff_stage_finish_progress: list[dict[str, int | str]] = []
@@ -2019,9 +2021,8 @@ async def admin_playoff_override(
     stage = await _get_playoff_stage(db, stage_id)
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
-    stage_config = get_admin_playoff_stage_config(stage.key)
-    if not stage_config.is_final:
-        return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
+    if not is_stage_allowed_for_manual_winner(stage):
+        return redirect_with_admin_msg("msg_operation_failed", details="stage_not_final_by_policy")
 
     winner_participant = await db.scalar(
         select(PlayoffParticipant).where(
