@@ -5,7 +5,7 @@
 <h4>{{ tr('donate_links') }}</h4>
 <ul>
   {% for item in donation_links %}
-    <li><a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.title }}</a></li>
+    <li><a href="{{ item.url|e }}" target="_blank" rel="noopener">{{ item.title|e }}</a></li>
   {% else %}
     <li>{{ tr('donate_no_links') }}</li>
   {% endfor %}
@@ -14,7 +14,7 @@
 <h4>{{ tr('donate_card_crypto') }}</h4>
 <ul>
   {% for item in donation_methods %}
-    <li><strong>{{ item.method_type|upper }}:</strong> {{ item.label }} — {{ item.details }}</li>
+    <li><strong>{{ item.method_type|upper|e }}:</strong> {{ item.label|e }} — {{ item.details|e }}</li>
   {% else %}
     <li>{{ tr('donate_no_methods') }}</li>
   {% endfor %}
@@ -23,7 +23,7 @@
 <h4>{{ tr('donate_prize_pool') }}</h4>
 <ul>
   {% for item in prize_pool_entries %}
-    <li>{{ item.place_label }} — {{ item.reward }}</li>
+    <li>{{ item.place_label|e }} — {{ item.reward|e }}</li>
   {% else %}
     <li>{{ tr('donate_no_prize_pool') }}</li>
   {% endfor %}
@@ -32,7 +32,7 @@
 <h4>{{ tr('donate_donors') }}</h4>
 <ul>
   {% for donor in donors %}
-    <li>{{ donor.name }}{% if donor.amount %} ({{ donor.amount }}){% endif %}{% if donor.message %}: {{ donor.message }}{% endif %}</li>
+    <li>{{ donor.name|e }}{% if donor.amount %} ({{ donor.amount|e }}){% endif %}{% if donor.message %}: {{ donor.message|e }}{% endif %}</li>
   {% else %}
     <li>{{ tr('donate_no_donors') }}</li>
   {% endfor %}
