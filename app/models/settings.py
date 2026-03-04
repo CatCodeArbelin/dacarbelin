@@ -31,7 +31,8 @@ class DonationLink(Base):
     __tablename__ = "donation_links"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    title_ru: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    title_en: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     url: Mapped[str] = mapped_column(String(512), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -42,8 +43,10 @@ class DonationMethod(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     method_type: Mapped[str] = mapped_column(String(20), nullable=False)  # card | crypto
-    label: Mapped[str] = mapped_column(String(120), nullable=False)
-    details: Mapped[str] = mapped_column(Text, nullable=False)
+    label_ru: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    label_en: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    details_ru: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    details_en: Mapped[str] = mapped_column(Text, nullable=False, default="")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
@@ -52,8 +55,10 @@ class PrizePoolEntry(Base):
     __tablename__ = "prize_pool_entries"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    place_label: Mapped[str] = mapped_column(String(120), nullable=False)
-    reward: Mapped[str] = mapped_column(String(255), nullable=False)
+    place_label_ru: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    place_label_en: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    reward_ru: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    reward_en: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
 
@@ -63,7 +68,8 @@ class Donor(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     amount: Mapped[str] = mapped_column(String(120), default="")
-    message: Mapped[str] = mapped_column(Text, default="")
+    message_ru: Mapped[str] = mapped_column(Text, default="")
+    message_en: Mapped[str] = mapped_column(Text, default="")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
 
@@ -71,7 +77,8 @@ class RulesContent(Base):
     __tablename__ = "rules_content"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    body: Mapped[str] = mapped_column(Text, default="")
+    body_ru: Mapped[str] = mapped_column(Text, default="")
+    body_en: Mapped[str] = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
