@@ -187,8 +187,8 @@
                 place_input='number',
                 place_max=8,
                 progress_text=(tr('admin_group') ~ ' ' ~ group.group_label ~ ': ' ~ group.games_played ~ '/' ~ (group.game_limit if group.game_limit != 'special' else '∞')),
-                highlight_user_id=(none if current_playoff_stage.key == 'stage_final' else current_playoff_stage.final_candidate_user_id),
-                highlight_winner_eligible=(current_playoff_stage.key == 'stage_final'),
+                highlight_user_id=(none if current_playoff_stage_is_final else current_playoff_stage.final_candidate_user_id),
+                highlight_winner_eligible=current_playoff_stage_is_final,
                 can_submit_results=current_playoff_stage_can_submit_results,
                 submit_results_disabled_reason='Запись результатов для этой стадии запрещена: этап не является финальным и для него не настроен лимит игр.',
                 wrapper_class='w-100 h-100'
@@ -199,7 +199,7 @@
         </div>
         {% endif %}
 
-        {% if current_playoff_stage.key == 'stage_final' and final_group %}
+        {% if current_playoff_stage_is_final and final_group %}
         <div class="mt-3 border rounded p-3">
           <div class="fw-bold mb-2">Назначение победителя финала</div>
           <div class="small text-contrast-muted mb-2">Выберите победителя из 8 участников текущего финала. Победителем можно назначить только игрока с 22+ очками.</div>

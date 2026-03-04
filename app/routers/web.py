@@ -188,6 +188,14 @@ def build_playoff_stage_finish_status(
 
     return progress_items, False
 
+def can_submit_playoff_stage_results(stage: PlayoffStage) -> bool:
+    stage_config = get_admin_playoff_stage_config(stage.key)
+    return stage_config.game_limit is not None or is_final_stage(
+        stage.key,
+        stage_size=stage.stage_size,
+        scoring_mode=stage.scoring_mode,
+    )
+
 
 def get_empty_active_stage_alert(playoff_stages: list[PlayoffStage]) -> str | None:
     stage_by_order = {stage.stage_order: stage for stage in playoff_stages}
@@ -991,16 +999,18 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     current_playoff_stage_config = (
         get_admin_playoff_stage_config(current_playoff_stage.key) if current_playoff_stage else None
     )
-    current_playoff_stage_can_submit_results = False
-    if current_playoff_stage and current_playoff_stage_config:
-        is_final_like_stage = is_final_stage(
+    current_playoff_stage_can_submit_results = (
+        can_submit_playoff_stage_results(current_playoff_stage) if current_playoff_stage else False
+    )
+    current_playoff_stage_is_final = (
+        is_final_stage(
             current_playoff_stage.key,
             stage_size=current_playoff_stage.stage_size,
             scoring_mode=current_playoff_stage.scoring_mode,
         )
-        current_playoff_stage_can_submit_results = (
-            current_playoff_stage_config.game_limit is not None or is_final_like_stage
-        )
+        if current_playoff_stage
+        else False
+    )
     current_stage_groups = playoff_stage_groups.get(current_playoff_stage.id, []) if current_playoff_stage else []
     current_stage_participants = playoff_stage_participants.get(current_playoff_stage.id, []) if current_playoff_stage else []
     playoff_stage_finish_progress: list[dict[str, int | str]] = []
@@ -1060,6 +1070,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             current_playoff_stage=current_playoff_stage,
             current_playoff_stage_config=current_playoff_stage_config,
             current_playoff_stage_can_submit_results=current_playoff_stage_can_submit_results,
+            current_playoff_stage_is_final=current_playoff_stage_is_final,
             current_stage_groups=current_stage_groups,
             current_stage_participants=current_stage_participants,
             playoff_stage_finish_progress=playoff_stage_finish_progress,
@@ -1757,9 +1768,7 @@ async def admin_playoff_score(
     stage = await _get_playoff_stage(db, stage_id)
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
-    stage_config = get_admin_playoff_stage_config(stage.key)
-    is_final_like_stage = is_final_stage(stage.key, stage_size=stage.stage_size, scoring_mode=stage.scoring_mode)
-    if stage_config.game_limit is None and not is_final_like_stage:
+    if not can_submit_playoff_stage_results(stage):
         return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
     try:
         if placements_list:
@@ -1781,9 +1790,7 @@ async def admin_finish_playoff_group(
     stage = await _get_playoff_stage(db, stage_id)
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
-    stage_config = get_admin_playoff_stage_config(stage.key)
-    is_final_like_stage = is_final_stage(stage.key, stage_size=stage.stage_size, scoring_mode=stage.scoring_mode)
-    if stage_config.game_limit is None and not is_final_like_stage:
+    if not can_submit_playoff_stage_results(stage):
         return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
 
     participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))).all())
@@ -1865,9 +1872,7 @@ async def admin_playoff_results_batch(
     stage = await _get_playoff_stage(db, stage_id)
     if not stage:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
-    stage_config = get_admin_playoff_stage_config(stage.key)
-    is_final_like_stage = is_final_stage(stage.key, stage_size=stage.stage_size, scoring_mode=stage.scoring_mode)
-    if stage_config.game_limit is None and not is_final_like_stage:
+    if not can_submit_playoff_stage_results(stage):
         return redirect_with_admin_msg("msg_operation_failed", details="stage_action_not_allowed")
     try:
         if len(user_ids) != len(places):

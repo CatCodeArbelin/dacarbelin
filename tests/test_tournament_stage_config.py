@@ -98,6 +98,8 @@ class TournamentStageConfigTests(unittest.TestCase):
         self.assertEqual(LEGACY_STAGE_KEY_ALIASES["stage_4"], "stage_final")
         self.assertEqual(normalize_stage_key("final"), "stage_final")
         self.assertEqual(normalize_stage_key("stage_4"), "stage_final")
+        self.assertEqual(normalize_stage_key("stage4"), "stage_final")
+        self.assertEqual(normalize_stage_key("stage_4_final"), "stage_final")
 
         legacy_final_config = get_admin_playoff_stage_config("final")
         legacy_stage_4_config = get_admin_playoff_stage_config("stage_4")
@@ -121,6 +123,8 @@ class TournamentStageConfigTests(unittest.TestCase):
 
         self.assertTrue(is_final_stage("custom_final", scoring_mode="final_22_top1"))
         self.assertTrue(is_final_stage("unknown", stage_size=8))
+        self.assertTrue(is_final_stage("unknown", stage_size="8"))
+        self.assertTrue(is_final_stage("stage_4_final", stage_size=16, scoring_mode="standard"))
         self.assertFalse(is_final_stage("stage_1_4", stage_size=16, scoring_mode="standard"))
 
     def test_build_playoff_standings_marks_status_by_configured_limits_and_promotion(self) -> None:

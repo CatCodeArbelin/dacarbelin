@@ -198,7 +198,7 @@ class PlayoffGroupFinishFlowTests(unittest.IsolatedAsyncioTestCase):
 
 
     async def test_scoring_mode_final_stage_allows_score_submission(self) -> None:
-        legacy_final_stage = PlayoffStage(id=75, key="stage_4_final", title="Final", stage_order=4, stage_size=16, scoring_mode="final_22_top1")
+        legacy_final_stage = PlayoffStage(id=75, key="stage_4_final", title="Final", stage_order=4, stage_size=16, scoring_mode="standard")
         db = AsyncMock()
         db.scalar = AsyncMock(side_effect=[legacy_final_stage])
 
