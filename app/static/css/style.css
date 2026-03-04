@@ -553,6 +553,22 @@ body {
   overflow-wrap: anywhere;
 }
 
+.tournament-tree-participant-promoted .tournament-tree-participant-name {
+  color: #8dff91;
+}
+
+.tournament-tree-participant-eliminated .tournament-tree-participant-name {
+  color: #ff6b7f;
+}
+
+.tournament-tree-participant-final-qualified .tournament-tree-participant-name {
+  color: #ffd166;
+}
+
+.tournament-tree-participant-normal .tournament-tree-participant-name {
+  color: #ffffff;
+}
+
 .tournament-tree-participant-points {
   min-width: 1.9rem;
   text-align: center;
