@@ -6,12 +6,14 @@ from app.models.tournament import PlayoffMatch, PlayoffParticipant, PlayoffStage
 from app.services.tournament_stage_config import (
     ADMIN_PLAYOFF_STAGE_CONFIGS,
     GROUP_STAGE_GAME_LIMIT,
+    LEGACY_STAGE_KEY_ALIASES,
     LIMITED_PLAYOFF_STAGE_KEYS,
     PROMOTE_TOP_N_BY_STAGE,
     get_admin_playoff_stage_config,
     get_game_limit,
     get_promote_top_n,
     is_limited_stage,
+    normalize_stage_key,
 )
 from app.services.tournament import get_playoff_stage_columns, get_playoff_stage_sequence_keys, get_public_stage_display_sequence
 from app.services.tournament_view import build_playoff_standings, resolve_current_stage_label
@@ -88,6 +90,19 @@ class TournamentStageConfigTests(unittest.TestCase):
             get_playoff_stage_sequence_keys(),
         )
         self.assertEqual(get_public_stage_display_sequence(), ["group_stage", *get_playoff_stage_sequence_keys()])
+
+    def test_legacy_stage_key_aliases_map_to_current_final_stage(self) -> None:
+        self.assertEqual(LEGACY_STAGE_KEY_ALIASES["final"], "stage_final")
+        self.assertEqual(normalize_stage_key("final"), "stage_final")
+
+        legacy_final_config = get_admin_playoff_stage_config("final")
+        canonical_final_config = get_admin_playoff_stage_config("stage_final")
+
+        self.assertEqual(legacy_final_config, canonical_final_config)
+        self.assertTrue(legacy_final_config.is_final)
+        self.assertIsNone(get_game_limit("final"))
+        self.assertEqual(get_promote_top_n("final"), 1)
+        self.assertFalse(is_limited_stage("final"))
 
     def test_build_playoff_standings_marks_status_by_configured_limits_and_promotion(self) -> None:
         stage = PlayoffStage(
