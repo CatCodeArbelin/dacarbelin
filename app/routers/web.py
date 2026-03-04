@@ -69,6 +69,7 @@ from app.services.tournament import (
     shuffle_stage_2_participants,
     simulate_three_random_games_for_stage,
     snapshot_tournament_archive,
+    reset_tournament_cycle_after_finish,
 )
 from app.services.tournament_view import (
     build_bracket_columns,
@@ -2189,15 +2190,17 @@ async def admin_finish_tournament(
         return redirect_with_admin_msg("msg_operation_failed", details="winner_points_below_threshold")
 
     try:
-        await snapshot_tournament_archive(
-            db,
-            winner_user_id=winner_user_id,
-            title=final_stage.title,
-            season=datetime.utcnow().strftime("%Y"),
-            source_tournament_version="playoff_v2",
-            is_public=True,
-        )
-        winner_nickname = await finalize_tournament_with_winner(db, winner_user_id)
+        async with db.begin():
+            await snapshot_tournament_archive(
+                db,
+                winner_user_id=winner_user_id,
+                title=final_stage.title,
+                season=datetime.utcnow().strftime("%Y"),
+                source_tournament_version="playoff_v2",
+                is_public=True,
+            )
+            winner_nickname = await finalize_tournament_with_winner(db, winner_user_id)
+            await reset_tournament_cycle_after_finish(db)
         return redirect_with_admin_msg("msg_status_ok", details=f"tournament_finished_and_archived:{winner_nickname}")
     except Exception:
         await db.rollback()
