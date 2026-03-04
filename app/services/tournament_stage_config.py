@@ -5,6 +5,25 @@ from collections.abc import Mapping
 
 GROUP_STAGE_GAME_LIMIT = 3
 FINAL_STAGE_SCORING_MODE = "final_22_top1"
+DEFAULT_TOURNAMENT_PROFILE_KEY = "56"
+
+
+TOURNAMENT_PROFILE_SPECS: Mapping[str, Mapping[str, object]] = {
+    "56": {
+        "key": "56",
+        "title": "56 участников (7x8 → 21 → 32)",
+        "stage_1_groups_count": 7,
+        "stage_1_promoted_count": 21,
+        "stage_2_size": 32,
+    },
+    "48": {
+        "key": "48",
+        "title": "48 участников (6x8 → 24 → 32)",
+        "stage_1_groups_count": 6,
+        "stage_1_promoted_count": 24,
+        "stage_2_size": 32,
+    },
+}
 
 
 TOURNAMENT_FLOW_SPEC: Mapping[str, Mapping[str, object]] = {
@@ -203,3 +222,15 @@ def is_final_stage(
         return int(stage_size) == 8 if stage_size is not None else False
     except (TypeError, ValueError):
         return False
+
+
+def normalize_tournament_profile_key(profile_key: str | None) -> str:
+    key = (profile_key or "").strip()
+    if key in TOURNAMENT_PROFILE_SPECS:
+        return key
+    return DEFAULT_TOURNAMENT_PROFILE_KEY
+
+
+def get_tournament_profile_spec(profile_key: str | None = None) -> Mapping[str, object]:
+    normalized_key = normalize_tournament_profile_key(profile_key)
+    return TOURNAMENT_PROFILE_SPECS[normalized_key]

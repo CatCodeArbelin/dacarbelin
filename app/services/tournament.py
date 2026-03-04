@@ -21,9 +21,11 @@ from app.models.tournament import (
 )
 from app.models.user import Basket, User
 from app.services.tournament_stage_config import (
+    DEFAULT_TOURNAMENT_PROFILE_KEY,
     FINAL_STAGE_SCORING_MODES,
     GROUP_STAGE_GAME_LIMIT,
     TOURNAMENT_FLOW_SPEC,
+    get_tournament_profile_spec,
     get_promote_top_n,
     get_stage_group_count,
     get_stage_group_label as get_stage_group_label_from_spec,
@@ -75,7 +77,7 @@ async def clear_group_stage(db: AsyncSession) -> None:
 
 
 async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
-    """Создает автоматическую жеребьевку в формате 7x8 для стартового этапа."""
+    """Создает автоматическую жеребьевку для стартового этапа по активному профилю."""
     users = list(
         (
             await db.scalars(
@@ -85,10 +87,17 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
             )
         ).all()
     )
-    if len(users) < 56:
-        return False, "Автожеребьевка недоступна: требуется минимум 56 валидных участников (формат 7x8). Доступна только ручная жеребьевка."
+    profile_spec = await get_current_tournament_profile_spec(db)
+    expected_group_count = int(profile_spec["stage_1_groups_count"])
+    stage_group_size = int(TOURNAMENT_FLOW_SPEC["group_stage"]["group_size"])
+    expected_participants = expected_group_count * stage_group_size
 
-    expected_group_count = 7
+    if len(users) < expected_participants:
+        return False, (
+            "Автожеребьевка недоступна: требуется минимум "
+            f"{expected_participants} валидных участников (формат {expected_group_count}x{stage_group_size}). "
+            "Доступна только ручная жеребьевка."
+        )
 
     try:
         await clear_group_stage(db)
@@ -110,7 +119,7 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
 
                     if by_basket[source_basket]:
                         picked.append(by_basket[source_basket].pop())
-                if len(picked) >= 8:
+                if len(picked) >= stage_group_size:
                     break
 
             fallback_pool: list[User] = []
@@ -119,25 +128,28 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
                     continue
                 fallback_pool.extend(by_basket[basket])
             random.shuffle(fallback_pool)
-            while len(picked) < 8 and fallback_pool:
+            while len(picked) < stage_group_size and fallback_pool:
                 candidate = fallback_pool.pop()
                 if candidate not in picked and candidate in by_basket[candidate.basket]:
                     by_basket[candidate.basket].remove(candidate)
                     picked.append(candidate)
 
             unique_ids = {player.id for player in picked}
-            if len(picked) != 8 or len(unique_ids) != 8:
+            if len(picked) != stage_group_size or len(unique_ids) != stage_group_size:
                 raise ValueError(
-                    "Не удалось собрать 8 уникальных участников для группы в формате 7x8. Доступна только ручная жеребьевка."
+                    "Не удалось собрать "
+                    f"{stage_group_size} уникальных участников для группы в формате {expected_group_count}x{stage_group_size}. "
+                    "Доступна только ручная жеребьевка."
                 )
 
             assigned_by_group.append(picked)
 
         assigned_players_count = sum(len(group_players) for group_players in assigned_by_group)
-        if len(assigned_by_group) != 7 or assigned_players_count != 56:
+        if len(assigned_by_group) != expected_group_count or assigned_players_count != expected_participants:
             raise ValueError(
-                "Итоговая автожеребьевка невалидна: требуется ровно 7 групп и 56 назначенных участников (7x8). "
-                "Доступна только ручная жеребьевка."
+                "Итоговая автожеребьевка невалидна: требуется ровно "
+                f"{expected_group_count} групп и {expected_participants} назначенных участников "
+                f"({expected_group_count}x{stage_group_size}). Доступна только ручная жеребьевка."
             )
 
         groups: list[TournamentGroup] = []
@@ -452,7 +464,26 @@ PLAYOFF_STAGE_COLUMNS = [
 ]
 FINAL_SCORING_MODE = str(TOURNAMENT_FLOW_SPEC["stage_final"]["scoring_mode"])
 DIRECT_INVITE_STAGE_2 = "stage_2"
-STAGE_2_DIRECT_INVITES_LIMIT = 11
+
+
+async def get_current_tournament_profile_key(db: AsyncSession) -> str:
+    if hasattr(db, "scalar"):
+        profile_row = await db.scalar(select(SiteSetting).where(SiteSetting.key == "tournament_profile"))
+    else:
+        profile_rows = list((await db.scalars(select(SiteSetting).where(SiteSetting.key == "tournament_profile"))).all())
+        profile_row = profile_rows[0] if profile_rows else None
+    return (profile_row.value or DEFAULT_TOURNAMENT_PROFILE_KEY) if profile_row else DEFAULT_TOURNAMENT_PROFILE_KEY
+
+
+async def get_current_tournament_profile_spec(db: AsyncSession) -> dict[str, int | str]:
+    profile_key = await get_current_tournament_profile_key(db)
+    profile_spec = get_tournament_profile_spec(profile_key)
+    return {
+        "key": str(profile_spec["key"]),
+        "stage_1_groups_count": int(profile_spec["stage_1_groups_count"]),
+        "stage_1_promoted_count": int(profile_spec["stage_1_promoted_count"]),
+        "stage_2_size": int(profile_spec["stage_2_size"]),
+    }
 
 
 def get_playoff_stage_sequence_keys() -> list[str]:
@@ -531,13 +562,25 @@ def get_stage_group_label(stage_key: str, group_number: int) -> str:
     return get_stage_group_label_from_spec(stage_key, group_number)
 
 
-def build_stage_2_player_ids(stage_1_promoted_ids: list[int], direct_invite_ids: list[int]) -> list[int]:
-    if len(stage_1_promoted_ids) != 21:
-        raise ValueError("Во II этап должны проходить ровно 21 участник из I этапа")
-    if len(direct_invite_ids) > STAGE_2_DIRECT_INVITES_LIMIT:
-        raise ValueError("Нельзя превысить 11 прямых инвайтов во II этап")
+def build_stage_2_player_ids(
+    stage_1_promoted_ids: list[int],
+    direct_invite_ids: list[int],
+    *,
+    promoted_target_count: int | None = None,
+    stage_2_size: int | None = None,
+) -> list[int]:
+    profile_spec = get_tournament_profile_spec()
+    promoted_target_count = int(promoted_target_count or profile_spec["stage_1_promoted_count"])
+    stage_2_size = int(stage_2_size or profile_spec["stage_2_size"])
+    if len(stage_1_promoted_ids) != promoted_target_count:
+        raise ValueError(f"Во II этап должны проходить ровно {promoted_target_count} участников из I этапа")
 
-    required_invites = 32 - len(stage_1_promoted_ids)
+    required_invites = stage_2_size - len(stage_1_promoted_ids)
+    if required_invites < 0:
+        raise ValueError(f"Количество участников I этапа не может превышать размер II этапа ({stage_2_size})")
+    if len(direct_invite_ids) > required_invites:
+        raise ValueError(f"Нельзя превысить {required_invites} прямых инвайтов во II этап")
+
     if len(direct_invite_ids) < required_invites:
         raise ValueError(f"Для II этапа требуется минимум {required_invites} прямых инвайтов")
 
@@ -551,18 +594,22 @@ def build_stage_2_player_ids(stage_1_promoted_ids: list[int], direct_invite_ids:
         raise ValueError("Игрок не может быть одновременно прошедшим и прямым инвайтом")
 
     stage_2_player_ids = [*stage_1_promoted_ids, *direct_invite_ids]
-    if len(stage_2_player_ids) != 32:
-        raise ValueError("Во II этапе должно быть ровно 32 участника")
+    if len(stage_2_player_ids) != stage_2_size:
+        raise ValueError(f"Во II этапе должно быть ровно {stage_2_size} участников")
     return stage_2_player_ids
 
 
 def build_stage_2_direct_invite_preview(
     direct_invite_ids: list[int],
     *,
-    promoted_count: int = 21,
+    promoted_count: int | None = None,
+    stage_2_size: int | None = None,
 ) -> list[dict[str, int]]:
     """Строит preview по прямым инвайтам во II этап с теми же seed, что и при генерации этапа."""
-    required_invites = max(0, 32 - promoted_count)
+    profile_spec = get_tournament_profile_spec()
+    promoted_count = int(promoted_count or profile_spec["stage_1_promoted_count"])
+    stage_2_size = int(stage_2_size or profile_spec["stage_2_size"])
+    required_invites = max(0, stage_2_size - promoted_count)
     seed_start = promoted_count + 1
     preview: list[dict[str, int]] = []
     for index, user_id in enumerate(direct_invite_ids[:required_invites]):
@@ -615,9 +662,9 @@ async def shuffle_stage_2_participants(db: AsyncSession) -> None:
     await db.commit()
 
 
-async def rebuild_playoff_stages(db: AsyncSession, player_ids: list[int]) -> list[PlayoffStage]:
+async def rebuild_playoff_stages(db: AsyncSession, player_ids: list[int], *, stage_2_size: int) -> list[PlayoffStage]:
     usable_count = len(player_ids)
-    stages_to_create = get_playoff_stage_blueprint(usable_count)
+    stages_to_create = get_playoff_stage_blueprint(stage_2_size)
     if not stages_to_create:
         raise ValueError("Недостаточно игроков для playoff-этапов")
 
@@ -668,9 +715,17 @@ async def rebuild_playoff_stages(db: AsyncSession, player_ids: list[int]) -> lis
 
 
 async def generate_playoff_from_groups(db: AsyncSession) -> tuple[bool, str]:
+    profile_spec = await get_current_tournament_profile_spec(db)
+    expected_stage_1_groups = int(profile_spec["stage_1_groups_count"])
+    expected_promoted_count = int(profile_spec["stage_1_promoted_count"])
+    stage_2_size = int(profile_spec["stage_2_size"])
+
     groups = list((await db.scalars(select(TournamentGroup).where(TournamentGroup.stage == "group_stage"))).all())
     if not groups:
         return False, "Сначала требуется сформировать групповой этап"
+
+    if len(groups) != expected_stage_1_groups:
+        return False, f"Недостаточно групп: ожидается {expected_stage_1_groups} групп I этапа"
 
     group_ids = [group.id for group in groups]
     group_games_played_rows = (
@@ -693,10 +748,11 @@ async def generate_playoff_from_groups(db: AsyncSession) -> tuple[bool, str]:
     stage_1_promoted_ids: list[int] = []
     for group in groups:
         ranked = sort_members_for_table(by_group.get(group.id, []))
-        stage_1_promoted_ids.extend([member.user_id for member in ranked[:3]])
+        per_group_promote_count = max(1, expected_promoted_count // expected_stage_1_groups)
+        stage_1_promoted_ids.extend([member.user_id for member in ranked[:per_group_promote_count]])
 
-    if len(stage_1_promoted_ids) != 21:
-        return False, "Недостаточно участников: из I этапа должны пройти ровно 21 участник"
+    if len(stage_1_promoted_ids) != expected_promoted_count:
+        return False, f"Недостаточно участников: из I этапа должны пройти ровно {expected_promoted_count} участников"
 
     direct_invite_ids = list(
         (
@@ -709,11 +765,16 @@ async def generate_playoff_from_groups(db: AsyncSession) -> tuple[bool, str]:
     )
 
     try:
-        stage_2_player_ids = build_stage_2_player_ids(stage_1_promoted_ids, direct_invite_ids)
+        stage_2_player_ids = build_stage_2_player_ids(
+            stage_1_promoted_ids,
+            direct_invite_ids,
+            promoted_target_count=expected_promoted_count,
+            stage_2_size=stage_2_size,
+        )
     except ValueError as exc:
         return False, str(exc)
 
-    await rebuild_playoff_stages(db, stage_2_player_ids)
+    await rebuild_playoff_stages(db, stage_2_player_ids, stage_2_size=stage_2_size)
     return True, "Playoff-этапы сформированы"
 
 
@@ -899,7 +960,7 @@ async def finalize_limited_playoff_stage_if_ready(db: AsyncSession, stage_id: in
 
     participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))).all())
     matches = list((await db.scalars(select(PlayoffMatch).where(PlayoffMatch.stage_id == stage_id))).all())
-    expected_group_count = max((stage.stage_size or 0) // 8, 0)
+    expected_group_count = get_group_count_for_stage(stage.stage_size, stage.key)
     expected_group_numbers = list(range(1, expected_group_count + 1))
     if not expected_group_numbers:
         raise ValueError("stage_groups_missing")

@@ -16,15 +16,20 @@ class _FakeScalarsResult:
 
 
 class _FakeSession:
-    def __init__(self, users):
+    def __init__(self, users, profile_key: str = "56"):
         self._users = users
+        self._profile_key = profile_key
         self._scalars_calls = 0
         self.added = []
         self._group_seq = 1
         self.committed = False
         self.rolled_back = False
 
-    async def scalars(self, _query):
+    async def scalars(self, query):
+        query_text = str(query)
+        if "site_settings" in query_text:
+            return _FakeScalarsResult([type("_Setting", (), {"value": self._profile_key})()])
+
         self._scalars_calls += 1
         if self._scalars_calls == 1:
             return _FakeScalarsResult(self._users)
@@ -163,6 +168,17 @@ class TournamentAutoDrawTests(unittest.IsolatedAsyncioTestCase):
         for member in members:
             members_by_group[member.group_id] = members_by_group.get(member.group_id, 0) + 1
         self.assertEqual(sorted(members_by_group.values()), [8, 8, 8, 8, 8, 8, 8])
+
+    async def test_create_auto_draw_accepts_48_profile_grid_6x8(self) -> None:
+        session = _FakeSession(users=_make_users(48), profile_key="48")
+
+        ok, _message = await create_auto_draw(session)
+
+        self.assertTrue(ok)
+        groups = [obj for obj in session.added if isinstance(obj, TournamentGroup)]
+        members = [obj for obj in session.added if isinstance(obj, GroupMember)]
+        self.assertEqual(len(groups), 6)
+        self.assertEqual(len(members), 48)
 
     async def test_create_auto_draw_rejects_if_less_than_56_players(self) -> None:
         """Проверяет негативный сценарий `test_create_auto_draw_rejects_if_less_than_56_players`.
