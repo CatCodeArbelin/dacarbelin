@@ -18,13 +18,13 @@
         <ul class="{{ block_class }}-participants list-unstyled mb-0 mt-2">
           {% if match.participants %}
             {% for participant in match.participants %}
-            <li class="{% if participant.is_promoted_highlight %}playoff-participant-promoted{% endif %} {% if participant.is_tournament_winner or participant.is_winner %}tournament-winner-highlight archive-winner{% endif %}">
-              {% if participant.user_id %}#{{ participant.user_id }} · {% endif %}{{ participant.nickname }}
+            <li class="{{ block_class }}-participant {% if participant.is_promoted_highlight %}playoff-participant-promoted{% endif %} {% if participant.is_tournament_winner or participant.is_winner %}tournament-winner-highlight archive-winner{% endif %}">
+              <span class="{{ block_class }}-participant-name">{% if participant.user_id %}#{{ participant.user_id }} · {% endif %}{{ participant.nickname }}</span>
               {% if participant.is_tournament_winner %}
               <span class="badge neon-accent-badge neon-accent-badge-winner tournament-winner-badge">{{ tr(participant.winner_label_key or 'tournament_winner') }}</span>
               {% endif %}
               {% if participant.points != '' and participant.points is not none %}
-              — <strong>{{ participant.points }}</strong>
+              <span class="{{ block_class }}-participant-points">{{ participant.points }}</span>
               {% endif %}
             </li>
             {% endfor %}

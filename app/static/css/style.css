@@ -435,13 +435,18 @@ body {
   grid-template-columns: repeat(4, minmax(220px, 1fr));
   gap: 1.25rem;
   overflow-x: auto;
-  padding-bottom: 0.5rem;
+  padding: 0.5rem 0.5rem 1rem;
 }
 
 .tournament-tree-stage,
 .archive-tree-stage {
   position: relative;
   min-width: 220px;
+  border: 1px solid rgba(95, 168, 255, 0.4);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(12, 18, 31, 0.92), rgba(7, 11, 19, 0.96));
+  box-shadow: inset 0 0 0 1px rgba(92, 209, 255, 0.12), 0 0 16px rgba(0, 166, 255, 0.16);
+  padding: 0.75rem;
 }
 
 .tournament-tree-stage:not(:last-child)::after,
@@ -449,15 +454,20 @@ body {
   content: "";
   position: absolute;
   top: 50%;
-  right: -0.8rem;
-  width: 0.8rem;
-  border-top: 2px solid rgba(0, 212, 255, 0.35);
+  right: -1rem;
+  width: 1rem;
+  border-top: 2px solid rgba(90, 223, 255, 0.65);
+  filter: drop-shadow(0 0 6px rgba(90, 223, 255, 0.6));
 }
 
 .tournament-tree-stage-title,
 .archive-tree-stage-title {
   margin: 0 0 0.75rem;
-  color: var(--bs-info);
+  color: #d9f6ff;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-shadow: 0 0 9px rgba(0, 214, 255, 0.5);
 }
 
 .tournament-tree-matches,
@@ -469,16 +479,26 @@ body {
 
 .tournament-tree-match,
 .archive-tree-match {
-  border: 1px solid rgba(0, 212, 255, 0.3);
+  border: 1px solid rgba(95, 196, 255, 0.35);
   border-radius: 0.75rem;
-  padding: 0.6rem 0.75rem;
-  background: rgba(255, 255, 255, 0.02);
+  padding: 0.75rem;
+  background: linear-gradient(180deg, rgba(10, 19, 35, 0.95), rgba(8, 13, 24, 0.96));
+  box-shadow: inset 0 0 0 1px rgba(76, 176, 255, 0.12), 0 0 14px rgba(18, 145, 255, 0.15);
 }
 
 .tournament-tree-match-head,
 .archive-tree-match-head {
-  font-size: 0.85rem;
-  color: var(--bs-secondary-color);
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  margin-bottom: 0.4rem;
+  border: 1px solid rgba(0, 221, 255, 0.4);
+  background: rgba(0, 124, 185, 0.24);
+  color: #d1f4ff !important;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
 .tournament-tree-sources,
@@ -492,16 +512,53 @@ body {
 .tournament-tree-source,
 .archive-tree-source {
   font-size: 0.75rem;
-  color: #9ed6ff;
-  background: rgba(0, 158, 227, 0.2);
+  color: #caf0ff;
+  background: rgba(37, 159, 255, 0.28);
   border-radius: 999px;
   padding: 0.1rem 0.45rem;
+  border: 1px solid rgba(126, 213, 255, 0.45);
 }
 
 .tournament-tree-participants li,
 .archive-tree-participants li {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 0.75rem;
-  padding: 0.1rem 0;
+  padding: 0.35rem 0.5rem;
+}
+
+.tournament-tree-participant {
+  border-radius: 10px;
+  border-left: 2px solid rgba(67, 197, 255, 0.7);
+  background: rgba(18, 36, 60, 0.75);
+}
+
+.tournament-tree-participant-name {
+  overflow-wrap: anywhere;
+}
+
+.tournament-tree-participant-points {
+  min-width: 1.9rem;
+  text-align: center;
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  font-weight: 700;
+  border: 1px solid rgba(74, 220, 255, 0.6);
+  background: rgba(0, 167, 204, 0.2);
+  box-shadow: 0 0 8px rgba(46, 213, 255, 0.35);
+}
+
+.tournament-tree .playoff-status-finished {
+  border-color: rgba(89, 249, 159, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(64, 208, 133, 0.2), 0 0 16px rgba(80, 255, 154, 0.2);
+}
+
+.tournament-tree .playoff-status-in_progress {
+  border-color: rgba(255, 212, 71, 0.75);
+  box-shadow: inset 0 0 0 1px rgba(255, 195, 56, 0.2), 0 0 16px rgba(255, 197, 70, 0.22);
+}
+
+.tournament-tree .playoff-status-pending {
+  border-color: rgba(96, 181, 255, 0.45);
 }
