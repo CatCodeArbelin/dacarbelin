@@ -21,7 +21,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("admin_name", sa.String(length=120), nullable=False, server_default="admin"),
         sa.Column("action_type", sa.String(length=100), nullable=False),
-        sa.Column("dry_run", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+        sa.Column("dry_run", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("target_stage_id", sa.Integer(), sa.ForeignKey("playoff_stages.id", ondelete="SET NULL"), nullable=True),
         sa.Column("details_json", sa.Text(), nullable=False, server_default="{}"),
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
