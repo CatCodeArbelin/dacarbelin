@@ -763,10 +763,18 @@ def template_context(request: Request, **extra):
 
 
 def _get_twitch_embed_parents(request: Request) -> list[str]:
-    host = (request.url.hostname or "").strip().lower()
-    if not host:
-        return ["localhost"]
-    return [host.split(":", 1)[0]]
+    raw_config = settings.twitch_parent_domains or ""
+    raw_domains = [part.strip().lower() for part in raw_config.split(",") if part.strip()]
+    if not raw_domains:
+        host = (request.url.hostname or "").strip().lower()
+        raw_domains = [host] if host else ["localhost"]
+
+    normalized_domains: list[str] = []
+    for domain in raw_domains:
+        normalized_domain = domain.split(":", 1)[0].strip()
+        if normalized_domain and normalized_domain not in normalized_domains:
+            normalized_domains.append(normalized_domain)
+    return normalized_domains or ["localhost"]
 
 
 def redirect_with_msg(url: str, msg_key: str, status_code: int = 303) -> RedirectResponse:
@@ -1889,8 +1897,11 @@ async def watch_page(request: Request):
         "watch.html",
         template_context(
             request,
-            twitch_channel="loyrensss",
+            twitch_channel=settings.twitch_channel,
             twitch_embed_parents=_get_twitch_embed_parents(request),
+            twitch_embed_mode=(settings.twitch_embed_mode or "iframe").strip().lower(),
+            twitch_autoplay=settings.twitch_autoplay,
+            twitch_muted=settings.twitch_muted,
         ),
     )
 

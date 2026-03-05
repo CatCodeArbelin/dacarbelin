@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     admin_key: str
     steam_api_key: str = ""
     secret_key: str = "change_me"
+    twitch_channel: str = "loyrensss"
+    twitch_parent_domains: str = ""
+    twitch_embed_mode: str = "iframe"
+    twitch_autoplay: bool = True
+    twitch_muted: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
