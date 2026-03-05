@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+<div class="admin-content-page">
 <h2>Блоки контента</h2>
 {% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}{% if request.query_params.get('details') %}: <span class="small">{{ request.query_params.get('details') }}</span>{% endif %}</div>{% endif %}
 <div class="d-flex justify-content-end align-items-center gap-2 mb-3">
@@ -115,4 +116,5 @@
     });
   })();
 </script>
+</div>
 {% endblock %}
