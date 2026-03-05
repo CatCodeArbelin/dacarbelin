@@ -145,6 +145,32 @@ class TournamentWorkflowTests(unittest.TestCase):
         self.assertEqual(preview[0], {"user_id": 101, "seed": 25, "group_number": 4})
         self.assertEqual(preview[-1], {"user_id": 108, "seed": 32, "group_number": 4})
 
+    def test_stage_2_direct_invites_respect_selected_group(self) -> None:
+        promoted = list(range(1, 22))
+        direct_invites = [101, 102, 103]
+        direct_invite_groups = {101: 1, 102: 2, 103: 4}
+
+        stage_2_player_ids = build_stage_2_player_ids(
+            promoted,
+            [*direct_invites, *list(range(104, 112))],
+            direct_invite_groups=direct_invite_groups,
+        )
+
+        seed_by_user = {user_id: seed for seed, user_id in enumerate(stage_2_player_ids, start=1)}
+        self.assertEqual(get_stage_group_number_by_seed(seed_by_user[101]), 1)
+        self.assertEqual(get_stage_group_number_by_seed(seed_by_user[102]), 2)
+        self.assertEqual(get_stage_group_number_by_seed(seed_by_user[103]), 4)
+
+    def test_stage_2_preview_respect_selected_group(self) -> None:
+        preview = build_stage_2_direct_invite_preview(
+            [101, 102, 103],
+            direct_invite_groups={101: 1, 102: 2, 103: 4},
+        )
+
+        self.assertEqual(preview[0]["group_number"], 1)
+        self.assertEqual(preview[1]["group_number"], 2)
+        self.assertEqual(preview[2]["group_number"], 4)
+
     def test_stage_2_players_validation_for_limit_and_duplicates(self) -> None:
         """Проверяет негативный сценарий `test_stage_2_players_validation_for_limit_and_duplicates`.
         Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.

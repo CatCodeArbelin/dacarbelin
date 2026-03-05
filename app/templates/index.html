@@ -62,7 +62,7 @@
         </div>
         <form action="/chat/send" method="post" class="mb-3" id="chat-form" data-cooldown-seconds="{{ chat_settings.cooldown_seconds }}">
           {% if not chat_settings.is_enabled %}<div class="alert alert-warning">{{ tr('msg_chat_disabled_admin') }}</div>{% endif %}
-          <input class="form-control mb-2" name="temp_nick" placeholder="{{ tr('index_temp_nick') }}" required>
+          <input class="form-control mb-2" name="temp_nick" placeholder="{{ tr('index_temp_nick') }}" value="{{ chat_saved_nick }}" required>
           <div class="chat-color-picker mb-2" role="radiogroup" aria-label="{{ tr('index_temp_nick') }} color">
             {% for color in chat_nick_colors %}
               <label class="chat-color-swatch" style="--swatch-color: {{ color }};" title="{{ color }}">

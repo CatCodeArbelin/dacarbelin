@@ -158,6 +158,7 @@ def test_send_chat_with_cyrillic_temp_nick_sets_ascii_sender_token(monkeypatch) 
     assert state["saved_message"].temp_nick == "Кириллица"
     assert web.CHAT_SENDER_TOKEN_RE.fullmatch(state["saved_message"].sender_token)
     assert "chat_sender=" in response.headers["set-cookie"]
+    assert "chat_nick=" in response.headers["set-cookie"]
     cookie_token = response.headers["set-cookie"].split("chat_sender=", 1)[1].split(";", 1)[0]
     assert web.CHAT_SENDER_TOKEN_RE.fullmatch(cookie_token)
 

@@ -568,6 +568,7 @@ def build_stage_2_player_ids(
     *,
     promoted_target_count: int | None = None,
     stage_2_size: int | None = None,
+    direct_invite_groups: dict[int, int] | None = None,
 ) -> list[int]:
     profile_spec = get_tournament_profile_spec()
     promoted_target_count = int(promoted_target_count or profile_spec["stage_1_promoted_count"])
@@ -593,7 +594,36 @@ def build_stage_2_player_ids(
     if promoted_set.intersection(direct_set):
         raise ValueError("Игрок не может быть одновременно прошедшим и прямым инвайтом")
 
-    stage_2_player_ids = [*stage_1_promoted_ids, *direct_invite_ids]
+    stage_2_player_ids: list[int | None] = [None] * stage_2_size
+    stage_group_count = get_group_count_for_stage(stage_2_size, "stage_2")
+    stage_group_size = max(1, stage_2_size // max(1, stage_group_count))
+
+    for user_id in direct_invite_ids:
+        group_number = (direct_invite_groups or {}).get(user_id)
+        if group_number is None:
+            continue
+        if group_number < 1 or group_number > stage_group_count:
+            raise ValueError("Некорректная группа прямого инвайта")
+
+        group_start = (group_number - 1) * stage_group_size
+        group_end = min(group_start + stage_group_size, stage_2_size)
+        target_index = next((idx for idx in range(group_start, group_end) if stage_2_player_ids[idx] is None), None)
+        if target_index is None:
+            raise ValueError(f"Группа {group_number} переполнена прямыми инвайтами")
+        stage_2_player_ids[target_index] = user_id
+
+    staged_user_ids = [
+        *stage_1_promoted_ids,
+        *[user_id for user_id in direct_invite_ids if user_id not in set(stage_2_player_ids)],
+    ]
+    staged_index = 0
+    for idx, current in enumerate(stage_2_player_ids):
+        if current is not None:
+            continue
+        stage_2_player_ids[idx] = staged_user_ids[staged_index]
+        staged_index += 1
+
+    stage_2_player_ids = [int(user_id) for user_id in stage_2_player_ids]
     if len(stage_2_player_ids) != stage_2_size:
         raise ValueError(f"Во II этапе должно быть ровно {stage_2_size} участников")
     return stage_2_player_ids
@@ -604,6 +634,7 @@ def build_stage_2_direct_invite_preview(
     *,
     promoted_count: int | None = None,
     stage_2_size: int | None = None,
+    direct_invite_groups: dict[int, int] | None = None,
 ) -> list[dict[str, int]]:
     """Строит preview по прямым инвайтам во II этап с теми же seed, что и при генерации этапа."""
     profile_spec = get_tournament_profile_spec()
@@ -611,9 +642,26 @@ def build_stage_2_direct_invite_preview(
     stage_2_size = int(stage_2_size or profile_spec["stage_2_size"])
     required_invites = max(0, stage_2_size - promoted_count)
     seed_start = promoted_count + 1
+    stage_group_count = get_group_count_for_stage(stage_2_size, "stage_2")
+    stage_group_size = max(1, stage_2_size // max(1, stage_group_count))
+    taken_seeds: set[int] = set()
     preview: list[dict[str, int]] = []
     for index, user_id in enumerate(direct_invite_ids[:required_invites]):
-        seed = seed_start + index
+        preferred_group = (direct_invite_groups or {}).get(user_id)
+        if preferred_group and 1 <= preferred_group <= stage_group_count:
+            group_seed_start = (preferred_group - 1) * stage_group_size + 1
+            group_seed_end = min(group_seed_start + stage_group_size - 1, stage_2_size)
+            seed = next((candidate for candidate in range(group_seed_start, group_seed_end + 1) if candidate not in taken_seeds), seed_start + index)
+        else:
+            seed = seed_start + index
+            while seed in taken_seeds and seed <= stage_2_size:
+                seed += 1
+            if seed > stage_2_size:
+                seed = seed_start + index
+                while seed in taken_seeds:
+                    seed += 1
+
+        taken_seeds.add(seed)
         preview.append(
             {
                 "user_id": user_id,
@@ -754,15 +802,21 @@ async def generate_playoff_from_groups(db: AsyncSession) -> tuple[bool, str]:
     if len(stage_1_promoted_ids) != expected_promoted_count:
         return False, f"Недостаточно участников: из I этапа должны пройти ровно {expected_promoted_count} участников"
 
-    direct_invite_ids = list(
+    direct_invite_users = list(
         (
             await db.scalars(
-                select(User.id)
+                select(User)
                 .where(User.direct_invite_stage == DIRECT_INVITE_STAGE_2)
-                .order_by(User.created_at)
+                .order_by(User.direct_invite_group_number.asc().nullslast(), User.created_at)
             )
         ).all()
     )
+    direct_invite_ids = [user.id for user in direct_invite_users]
+    direct_invite_groups = {
+        user.id: int(user.direct_invite_group_number)
+        for user in direct_invite_users
+        if user.direct_invite_group_number is not None
+    }
 
     try:
         stage_2_player_ids = build_stage_2_player_ids(
@@ -770,6 +824,7 @@ async def generate_playoff_from_groups(db: AsyncSession) -> tuple[bool, str]:
             direct_invite_ids,
             promoted_target_count=expected_promoted_count,
             stage_2_size=stage_2_size,
+            direct_invite_groups=direct_invite_groups,
         )
     except ValueError as exc:
         return False, str(exc)
