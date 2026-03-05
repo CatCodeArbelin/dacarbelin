@@ -120,7 +120,7 @@ HOME_STAGE_KEY_TO_NUMBER = {
     "group_stage": 1,
     "stage_2": 2,
     "stage_1_4": 3,
-    "stage_final": 3,
+    "stage_final": None,
 }
 
 CHAT_NICK_COLORS = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff66c4", "#5ce1e6", "#f48c06", "#90be6d", "#4cc9f0"]
@@ -814,9 +814,13 @@ def template_context(request: Request, **extra):
 def _get_twitch_embed_parents(request: Request) -> list[str]:
     raw_config = settings.twitch_parent_domains or ""
     raw_domains = [part.strip().lower() for part in raw_config.split(",") if part.strip()]
+
+    request_host = (request.url.hostname or "").strip().lower()
+    if request_host:
+        raw_domains.append(request_host)
+
     if not raw_domains:
-        host = (request.url.hostname or "").strip().lower()
-        raw_domains = [host] if host else ["localhost"]
+        raw_domains = ["localhost"]
 
     normalized_domains: list[str] = []
     for domain in raw_domains:
@@ -1071,8 +1075,9 @@ async def get_home_stage_progress(db: AsyncSession) -> tuple[int | None, dict[in
         .order_by(desc(PlayoffStage.stage_order))
         .limit(1)
     )
-    current_stage_number = HOME_STAGE_KEY_TO_NUMBER.get(str(active_playoff_key), None)
-    if current_stage_number is None:
+    normalized_active_playoff_key = normalize_stage_key(str(active_playoff_key)) if active_playoff_key else ""
+    current_stage_number = HOME_STAGE_KEY_TO_NUMBER.get(normalized_active_playoff_key, None)
+    if current_stage_number is None and normalized_active_playoff_key != "stage_final":
         if stage_3_count > 0:
             current_stage_number = 3
         elif stage_2_count > 0:
