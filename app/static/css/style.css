@@ -686,12 +686,6 @@ body {
   font-weight: 700;
 }
 
-.tournament-winner-star {
-  color: #ffd700;
-  font-size: 0.95rem;
-  text-shadow: 0 0 8px rgba(255, 210, 77, 0.9);
-}
-
 .archive-champion {
   color: #8dff91;
   font-weight: 700;
