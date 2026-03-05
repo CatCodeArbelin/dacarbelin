@@ -178,11 +178,35 @@ ALLOWED_CONTENT_HTML_TAGS = {
     "tr",
     "th",
     "td",
+    "span",
+    "img",
+    "figure",
+    "figcaption",
 }
 ALLOWED_CONTENT_HTML_ATTRS = {
     "a": {"href", "title", "target", "rel"},
+    "p": {"style"},
+    "h1": {"style"},
+    "h2": {"style"},
+    "h3": {"style"},
+    "h4": {"style"},
+    "h5": {"style"},
+    "h6": {"style"},
+    "ul": {"style"},
+    "ol": {"style"},
+    "li": {"style"},
+    "span": {"style"},
+    "table": {"style"},
+    "thead": {"style"},
+    "tbody": {"style"},
+    "tr": {"style"},
+    "th": {"style", "colspan", "rowspan"},
+    "td": {"style", "colspan", "rowspan"},
+    "img": {"src", "alt", "title", "width", "height"},
 }
 ALLOWED_LINK_SCHEMES = ("http://", "https://", "mailto:", "#", "/")
+ALLOWED_IMAGE_SCHEMES = ("http://", "https://", "data:image/")
+ALLOWED_STYLE_PROPS = {"color", "background-color", "text-align"}
 
 
 class _ContentHtmlSanitizer(HTMLParser):
@@ -205,6 +229,9 @@ class _ContentHtmlSanitizer(HTMLParser):
             if key == "href":
                 if not value.startswith(ALLOWED_LINK_SCHEMES):
                     continue
+            if key == "src":
+                if not value.startswith(ALLOWED_IMAGE_SCHEMES):
+                    continue
             if key == "target":
                 if value not in {"_blank", "_self"}:
                     continue
@@ -212,11 +239,37 @@ class _ContentHtmlSanitizer(HTMLParser):
                 value = " ".join(item for item in value.split() if item in {"noopener", "noreferrer", "nofollow"})
                 if not value:
                     continue
+            if key in {"width", "height", "colspan", "rowspan"}:
+                if not value.isdigit():
+                    continue
+            if key == "style":
+                safe_styles: list[str] = []
+                for declaration in value.split(";"):
+                    if ":" not in declaration:
+                        continue
+                    prop, raw_prop_value = declaration.split(":", 1)
+                    prop = prop.strip().lower()
+                    prop_value = raw_prop_value.strip()
+                    if prop not in ALLOWED_STYLE_PROPS:
+                        continue
+                    if not prop_value:
+                        continue
+                    if any(token in prop_value.lower() for token in ("javascript:", "expression(", "url(")):
+                        continue
+                    safe_styles.append(f"{prop}: {prop_value}")
+                if not safe_styles:
+                    continue
+                value = "; ".join(safe_styles)
 
             rendered_attrs.append(f' {key}="{escape(value, quote=True)}"')
         return "".join(rendered_attrs)
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag not in ALLOWED_CONTENT_HTML_TAGS:
+            return
+        self._chunks.append(f"<{tag}{self._sanitize_attrs(tag, attrs)}>")
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag not in ALLOWED_CONTENT_HTML_TAGS:
             return
         self._chunks.append(f"<{tag}{self._sanitize_attrs(tag, attrs)}>")

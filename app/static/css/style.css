@@ -172,30 +172,15 @@ body {
   transition: width 0.2s linear;
 }
 
-.admin-content-page .ql-toolbar,
-.admin-content-page .ql-container {
-  background-color: #ffffff;
-  color: #000000;
+.admin-content-page .tox,
+.admin-content-page .tox * {
   text-shadow: none;
 }
 
-.admin-content-page .ql-toolbar .ql-stroke {
-  stroke: #000000;
-}
-
-.admin-content-page .ql-toolbar .ql-fill {
-  fill: #000000;
-}
-
-.admin-content-page #rules-editor,
-.admin-content-page #rules-editor * {
-  color: #000000 !important;
-  text-shadow: none !important;
-  caret-color: #000000;
-}
-
-.admin-content-page .ql-editor.ql-blank::before {
-  color: #6c757d !important;
+.admin-content-page .tox .tox-edit-area__iframe,
+.admin-content-page .tox .tox-toolbar,
+.admin-content-page .tox .tox-statusbar {
+  background-color: #ffffff;
 }
 
 

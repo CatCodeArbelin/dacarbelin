@@ -60,8 +60,7 @@
     <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donors') }}</button>
   </form>
 </div></div>
-<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
-<link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
   (function () {
     const langSelector = document.getElementById('content-lang-selector');
@@ -72,23 +71,31 @@
     const forms = Array.from(document.querySelectorAll('.editor-form'));
     const contentByLang = {{ content_by_lang|tojson }};
 
-    if (!langSelector || !window.Quill) {
+    if (!langSelector || !window.tinymce) {
       return;
     }
 
-    document.querySelectorAll('.editor-root').forEach((root) => {
-      editorByKey.set(root.dataset.key, new Quill(root, {
-        theme: 'snow',
-        modules: {
-          toolbar: [
-            [{ header: [1, 2, 3, false] }],
-            ['bold', 'italic', 'underline', 'strike'],
-            [{ list: 'ordered' }, { list: 'bullet' }],
-            ['blockquote', 'code-block', 'link'],
-            ['clean']
-          ]
+    const toolbarItems = 'undo redo | styles | bold italic underline strikethrough forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table image media link blockquote hr | removeformat code';
+
+    const initPromises = Array.from(document.querySelectorAll('.editor-root')).map((root) => {
+      return tinymce.init({
+        target: root,
+        menubar: 'file edit view insert format table tools help',
+        plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount quickbars',
+        toolbar: toolbarItems,
+        toolbar_sticky: true,
+        min_height: Number(root.style.minHeight.replace('px', '')) || 180,
+        skin: 'oxide',
+        content_css: 'default',
+        content_style: 'body { color: #000000; background-color: #ffffff; font-size: 14px; }',
+        image_title: true,
+        automatic_uploads: false,
+        convert_urls: false,
+        branding: false,
+        setup(editor) {
+          editorByKey.set(root.dataset.key, editor);
         }
-      }));
+      });
     });
 
     function applyLang(lang) {
@@ -98,7 +105,7 @@
         source.value = value;
         const editor = editorByKey.get(key);
         if (editor) {
-          editor.root.innerHTML = value || '<p>{{ tr("admin_wysiwyg_placeholder") }}</p>';
+          editor.setContent(value || '<p>{{ tr("admin_wysiwyg_placeholder") }}</p>');
         }
       });
       langInputs.forEach((input) => {
@@ -109,23 +116,25 @@
       }
     }
 
-    applyLang(langSelector.value || 'ru');
+    Promise.all(initPromises).then(() => {
+      applyLang(langSelector.value || 'ru');
 
-    langSelector.addEventListener('change', function () {
-      const currentLang = langSelector.value || 'ru';
-      const params = new URLSearchParams(window.location.search);
-      params.set('content_lang', currentLang);
-      window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
-      applyLang(currentLang);
-    });
+      langSelector.addEventListener('change', function () {
+        const currentLang = langSelector.value || 'ru';
+        const params = new URLSearchParams(window.location.search);
+        params.set('content_lang', currentLang);
+        window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+        applyLang(currentLang);
+      });
 
-    forms.forEach((form) => {
-      form.addEventListener('submit', function () {
-        sourceByKey.forEach((source, key) => {
-          const editor = editorByKey.get(key);
-          if (editor) {
-            source.value = editor.root.innerHTML;
-          }
+      forms.forEach((form) => {
+        form.addEventListener('submit', function () {
+          sourceByKey.forEach((source, key) => {
+            const editor = editorByKey.get(key);
+            if (editor) {
+              source.value = editor.getContent();
+            }
+          });
         });
       });
     });
