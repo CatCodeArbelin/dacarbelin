@@ -7,7 +7,7 @@ import uuid
 import re
 from html import escape, unescape
 from html.parser import HTMLParser
-from urllib.parse import urlencode
+from urllib.parse import quote, unquote, urlencode
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Form, Query, Request
@@ -849,6 +849,13 @@ def redirect_with_admin_users_msg(msg_key: str, details: str | None = None) -> R
     return RedirectResponse(url=f"/admin/users?{urlencode(params)}", status_code=303)
 
 
+def redirect_with_admin_emergency_msg(msg_key: str, details: str | None = None) -> RedirectResponse:
+    params: dict[str, str] = {"msg": msg_key}
+    if details:
+        params["details"] = details
+    return RedirectResponse(url=f"/admin/emergency?{urlencode(params)}", status_code=303)
+
+
 def _parse_user_id_list(raw_user_ids: str) -> list[int]:
     normalized = [part.strip() for part in (raw_user_ids or "").split(",") if part.strip()]
     user_ids: list[int] = []
@@ -901,6 +908,13 @@ async def _render_admin_emergency_page(
     preview_title: str | None = None,
     preview_payload: dict[str, object] | None = None,
 ):
+    judge_setting = await db.scalar(select(SiteSetting).where(SiteSetting.key == "judge_login_token"))
+    judge_login_token = (judge_setting.value if judge_setting else "")
+    judge_login_url = ""
+    if judge_login_token:
+        judge_login_url = str(request.url_for("admin_page")).rstrip("/") + f"?judge_token={judge_login_token}"
+    registration_open = await get_registration_open(db)
+
     manual_draw_users = (
         await db.scalars(
             select(User)
@@ -922,6 +936,8 @@ async def _render_admin_emergency_page(
             emergency_logs=emergency_logs,
             preview_title=preview_title,
             preview_payload=preview_payload,
+            registration_open=registration_open,
+            judge_login_url=judge_login_url,
         ),
     )
 
@@ -1239,6 +1255,7 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
             chat_settings=chat_settings,
             current_stage_number=current_stage_number,
             stage_percentages=stage_percentages,
+            chat_saved_nick=unquote((request.cookies.get("chat_nick") or "")).strip()[:120],
         ),
     )
 
@@ -1372,6 +1389,7 @@ async def send_chat(
     await db.commit()
     await chat_event_broker.publish()
     redirect = RedirectResponse(url="/#chat", status_code=303)
+    redirect.set_cookie("chat_nick", quote(safe_nick, safe=""), max_age=60 * 60 * 24 * 365, samesite="lax")
     if should_set_chat_sender_cookie:
         redirect.set_cookie("chat_sender", chat_sender, max_age=60 * 60 * 24 * 365, samesite="lax")
     return redirect
@@ -1488,15 +1506,21 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
     )
     playoff_stages = await get_playoff_stages_with_data(db) if tournament_started else []
 
-    direct_invite_ids = list(
+    direct_invite_users = list(
         (
             await db.scalars(
-                select(User.id)
+                select(User)
                 .where(User.direct_invite_stage == "stage_2")
-                .order_by(User.created_at)
+                .order_by(User.direct_invite_group_number.asc().nullslast(), User.created_at)
             )
         ).all()
     )
+    direct_invite_ids = [user.id for user in direct_invite_users]
+    direct_invite_groups = {
+        user.id: int(user.direct_invite_group_number)
+        for user in direct_invite_users
+        if user.direct_invite_group_number is not None
+    }
     tournament_profile_spec = await get_current_tournament_profile_spec(db)
 
     users = list((await db.scalars(select(User))).all())
@@ -1531,6 +1555,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             user_by_id,
             direct_invite_ids,
             winner_user_id,
+            direct_invite_groups=direct_invite_groups,
         )
     except TypeError:
         stage_columns = build_bracket_columns(
@@ -1540,6 +1565,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             direct_invite_ids,
             stage_1_promoted_count=int(tournament_profile_spec["stage_1_promoted_count"]),
             stage_2_size=int(tournament_profile_spec["stage_2_size"]),
+            direct_invite_groups=direct_invite_groups,
         )
 
     lang = get_lang(request.cookies.get("lang"))
@@ -1554,6 +1580,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             direct_invite_ids,
             winner_user_id,
             active_stage_key=active_stage_key,
+            direct_invite_groups=direct_invite_groups,
         )
     except TypeError:
         tournament_tree = build_tournament_tree_vm(
@@ -1562,6 +1589,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             user_by_id,
             direct_invite_ids,
             winner_user_id,
+            direct_invite_groups=direct_invite_groups,
         )
     playoff_empty_active_stage_alert = get_empty_active_stage_alert(playoff_stages)
 
@@ -2221,7 +2249,7 @@ async def admin_registration_toggle(
         db.add(row)
     row.value = "1" if registration_open else "0"
     await db.commit()
-    return redirect_with_admin_msg("msg_status_ok")
+    return redirect_with_admin_emergency_msg("msg_status_ok")
 
 
 
@@ -2296,20 +2324,24 @@ async def admin_invite_user(
     telegram: str = Form(default=""),
     discord: str = Form(default=""),
     invite_type: str = Form(default="regular"),
+    direct_invite_group: int | None = Form(default=None),
     db: AsyncSession = Depends(get_db),
 ):
     # Добавляем участника вручную в корзину invited.
     steam_id = await normalize_steam_id(steam_input)
     if not steam_id:
-        return redirect_with_admin_msg("msg_invalid_steam_id")
+        return redirect_with_admin_emergency_msg("msg_invalid_steam_id")
 
     exists = await db.scalar(select(User).where(User.steam_id == steam_id))
     if exists:
-        return redirect_with_admin_msg("msg_user_exists")
+        return redirect_with_admin_emergency_msg("msg_user_exists")
 
     profile = await fetch_autochess_data(steam_id)
     direct_invite_stage = "stage_2" if invite_type == "stage_2" else None
+    direct_invite_group_number = None
     if direct_invite_stage:
+        if direct_invite_group not in {1, 2, 3, 4}:
+            return redirect_with_admin_emergency_msg("msg_operation_failed", details="invalid_direct_invite_group")
         profile_spec = await get_current_tournament_profile_spec(db)
         stage_1_promoted_count = int(profile_spec["stage_1_promoted_count"])
         stage_2_size = int(profile_spec["stage_2_size"])
@@ -2318,7 +2350,8 @@ async def admin_invite_user(
             select(func.count(User.id)).where(User.direct_invite_stage == direct_invite_stage)
         )
         if (direct_invite_count or 0) >= direct_invite_limit:
-            return redirect_with_admin_msg("msg_operation_failed", details=f"invite_limit:{direct_invite_limit}")
+            return redirect_with_admin_emergency_msg("msg_operation_failed", details=f"invite_limit:{direct_invite_limit}")
+        direct_invite_group_number = direct_invite_group
     user = User(
         nickname=nickname,
         steam_input=steam_input,
@@ -2330,11 +2363,12 @@ async def admin_invite_user(
         discord=discord or None,
         basket=Basket.INVITED.value,
         direct_invite_stage=direct_invite_stage,
+        direct_invite_group_number=direct_invite_group_number,
         extra_data=json.dumps(profile["raw"], ensure_ascii=False),
     )
     db.add(user)
     await db.commit()
-    return redirect_with_admin_msg("msg_invited_added")
+    return redirect_with_admin_emergency_msg("msg_invited_added")
 
 
 @router.post("/admin/draw/auto")
@@ -3252,7 +3286,7 @@ async def admin_regenerate_judge_link(db: AsyncSession = Depends(get_db)):
     else:
         row.value = token
     await db.commit()
-    return redirect_with_admin_msg("msg_status_ok")
+    return redirect_with_admin_emergency_msg("msg_status_ok")
 
 
 @router.post("/admin/chat-settings")
