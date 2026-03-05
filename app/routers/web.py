@@ -25,7 +25,7 @@ from app.core.admin_session import (
     create_judge_login_token,
     is_admin_session,
 )
-from app.core.config import parse_twitch_parent_domains_csv, settings
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.chat import ChatMessage
 from app.models.settings import (
@@ -865,32 +865,6 @@ def template_context(request: Request, **extra):
     context.update(extra)
     return context
 
-
-def _get_twitch_embed_parents(request: Request) -> list[str]:
-    forwarded_host = (request.headers.get("x-forwarded-host") or "").split(",", 1)[0].strip().lower()
-    host_header = (request.headers.get("host") or "").split(",", 1)[0].strip().lower()
-    fallback_url_host = (request.url.hostname or "").strip().lower()
-
-    request_host = (forwarded_host or host_header or fallback_url_host).split(":", 1)[0].strip()
-    configured_domains = parse_twitch_parent_domains_csv(settings.twitch_parent_domains)
-
-    merged_domains: list[str] = []
-    if request_host:
-        merged_domains.append(request_host)
-    for domain in configured_domains:
-        if domain and domain not in merged_domains:
-            merged_domains.append(domain)
-
-    if merged_domains:
-        return merged_domains
-
-    if request_host:
-        return [request_host]
-
-    logger.warning(
-        "Twitch embed parent domains are empty and request host is unavailable; iframe URL will not include parent parameter."
-    )
-    return []
 
 
 def redirect_with_msg(url: str, msg_key: str, status_code: int = 303) -> RedirectResponse:
@@ -2076,21 +2050,6 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     )
 
 
-@router.get("/watch", response_class=HTMLResponse)
-async def watch_page(request: Request):
-    return templates.TemplateResponse(
-        request,
-        "watch.html",
-        template_context(
-            request,
-            twitch_channel=settings.twitch_channel,
-            twitch_embed_parents=_get_twitch_embed_parents(request),
-            twitch_embed_mode=(settings.twitch_embed_mode or "iframe").strip().lower(),
-            twitch_autoplay=settings.twitch_autoplay,
-            twitch_muted=settings.twitch_muted,
-        ),
-    )
-
 
 @router.get("/admin/users", response_class=HTMLResponse)
 async def admin_users_page(request: Request, db: AsyncSession = Depends(get_db)):
@@ -2229,6 +2188,7 @@ async def admin_content_page(request: Request, db: AsyncSession = Depends(get_db
             request,
             selected_content_lang=selected_lang,
             content_by_lang=content_by_lang,
+            tiny_mce_api_key=settings.tiny_mce_api_key,
         ),
     )
 

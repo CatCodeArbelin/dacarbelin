@@ -35,16 +35,6 @@ body {
   text-shadow: 0 0 10px rgba(0, 183, 255, 0.75);
 }
 
-.nav-main-link--twitch {
-  color: #d6b7ff !important;
-}
-
-.nav-main-link--twitch:hover,
-.nav-main-link--twitch:focus-visible {
-  color: #f4e9ff !important;
-  border-bottom-color: #9146ff;
-  text-shadow: 0 0 10px rgba(145, 70, 255, 0.85);
-}
 
 .list-group-item { color: #fff !important; }
 .neon-border-blue { border: 1px solid #00b7ff !important; box-shadow: 0 0 8px #00b7ff66; }
@@ -134,19 +124,6 @@ body {
   font-style: italic;
 }
 
-.twitch-watch-btn {
-  background: linear-gradient(135deg, #9146ff, #6f2bcf);
-  border: 1px solid #a970ff;
-  color: #ffffff !important;
-  font-weight: 600;
-  box-shadow: 0 0 12px rgba(145, 70, 255, 0.4);
-}
-
-.twitch-watch-btn:hover {
-  background: linear-gradient(135deg, #a970ff, #7f3fe0);
-  border-color: #c49cff;
-  box-shadow: 0 0 16px rgba(169, 112, 255, 0.55);
-}
 
 .chat-cooldown-timer {
   max-width: 260px;

@@ -60,7 +60,7 @@
     <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donors') }}</button>
   </form>
 </div></div>
-<script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+<script src="https://cdn.tiny.cloud/1/{{ tiny_mce_api_key|e }}/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
   (function () {
     const langSelector = document.getElementById('content-lang-selector');

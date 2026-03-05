@@ -74,8 +74,8 @@ def test_index_stage_progress_fallback_for_empty_tournament() -> None:
     assert "1 Stage (0%)" in response.text
     assert "2 Stage (0%)" in response.text
     assert "3 Stage (0%)" in response.text
-    assert "Final LIVE on Twitch" in response.text
-    assert response.text.index("Final LIVE on Twitch") < response.text.index('id="chat"')
+    assert "LIVE Twitch" in response.text
+    assert response.text.index("LIVE Twitch") < response.text.index('id="chat"')
 
 
 
