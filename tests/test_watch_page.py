@@ -24,9 +24,9 @@ def test_watch_page_renders_twitch_embed_from_config() -> None:
     assert response.status_code == 200
     assert "player.twitch.tv" in response.text
     assert "channel=mychannel" in response.text
+    assert "parent=dac.example.com" in response.text
     assert "parent=example.com" in response.text
     assert "parent=www.example.com" in response.text
-    assert "parent=dac.example.com" in response.text
 
 
 def test_watch_page_renders_interactive_embed_when_enabled() -> None:
@@ -50,4 +50,36 @@ def test_watch_page_renders_interactive_embed_when_enabled() -> None:
     assert "player.twitch.tv" in response.text
     assert "embed/v1.js" in response.text
     assert 'channel: "anotherchannel"' in response.text
-    assert 'parent: ["example.com", "embed.localhost"]' in response.text
+    assert 'parent: ["embed.localhost", "example.com"]' in response.text
+
+
+def test_watch_page_uses_x_forwarded_host_for_parent() -> None:
+    original_domains = settings.twitch_parent_domains
+
+    settings.twitch_parent_domains = "example.com"
+
+    try:
+        with TestClient(app) as client:
+            response = client.get("/watch", headers={"x-forwarded-host": "Proxy.Example.com:8443", "host": "ignored.local"})
+    finally:
+        settings.twitch_parent_domains = original_domains
+
+    assert response.status_code == 200
+    assert "parent=proxy.example.com" in response.text
+    assert "parent=example.com" in response.text
+
+
+def test_watch_page_strips_scheme_from_configured_parents() -> None:
+    original_domains = settings.twitch_parent_domains
+
+    settings.twitch_parent_domains = "https://Example.com:443/path,http://sub.example.com"
+
+    try:
+        with TestClient(app) as client:
+            response = client.get("/watch", headers={"host": "dac.example.com"})
+    finally:
+        settings.twitch_parent_domains = original_domains
+
+    assert response.status_code == 200
+    assert "parent=example.com" in response.text
+    assert "parent=sub.example.com" in response.text

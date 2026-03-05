@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import math
 import uuid
 import re
@@ -24,7 +25,7 @@ from app.core.admin_session import (
     create_judge_login_token,
     is_admin_session,
 )
-from app.core.config import settings
+from app.core.config import parse_twitch_parent_domains_csv, settings
 from app.db.session import get_db
 from app.models.chat import ChatMessage
 from app.models.settings import (
@@ -148,6 +149,7 @@ class ChatEventBroker:
 
 
 chat_event_broker = ChatEventBroker()
+logger = logging.getLogger(__name__)
 
 
 ALLOWED_CONTENT_HTML_TAGS = {
@@ -865,22 +867,30 @@ def template_context(request: Request, **extra):
 
 
 def _get_twitch_embed_parents(request: Request) -> list[str]:
-    raw_config = settings.twitch_parent_domains or ""
-    raw_domains = [part.strip().lower() for part in raw_config.split(",") if part.strip()]
+    forwarded_host = (request.headers.get("x-forwarded-host") or "").split(",", 1)[0].strip().lower()
+    host_header = (request.headers.get("host") or "").split(",", 1)[0].strip().lower()
+    fallback_url_host = (request.url.hostname or "").strip().lower()
 
-    request_host = (request.url.hostname or "").strip().lower()
+    request_host = (forwarded_host or host_header or fallback_url_host).split(":", 1)[0].strip()
+    configured_domains = parse_twitch_parent_domains_csv(settings.twitch_parent_domains)
+
+    merged_domains: list[str] = []
     if request_host:
-        raw_domains.append(request_host)
+        merged_domains.append(request_host)
+    for domain in configured_domains:
+        if domain and domain not in merged_domains:
+            merged_domains.append(domain)
 
-    if not raw_domains:
-        raw_domains = ["localhost"]
+    if merged_domains:
+        return merged_domains
 
-    normalized_domains: list[str] = []
-    for domain in raw_domains:
-        normalized_domain = domain.split(":", 1)[0].strip()
-        if normalized_domain and normalized_domain not in normalized_domains:
-            normalized_domains.append(normalized_domain)
-    return normalized_domains or ["localhost"]
+    if request_host:
+        return [request_host]
+
+    logger.warning(
+        "Twitch embed parent domains are empty and request host is unavailable; iframe URL will not include parent parameter."
+    )
+    return []
 
 
 def redirect_with_msg(url: str, msg_key: str, status_code: int = 303) -> RedirectResponse:
