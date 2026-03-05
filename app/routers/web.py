@@ -5,7 +5,7 @@ import json
 import math
 import uuid
 import re
-from html import escape
+from html import escape, unescape
 from html.parser import HTMLParser
 from urllib.parse import urlencode
 from datetime import datetime, timedelta
@@ -172,6 +172,12 @@ ALLOWED_CONTENT_HTML_TAGS = {
     "h6",
     "code",
     "pre",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
 }
 ALLOWED_CONTENT_HTML_ATTRS = {
     "a": {"href", "title", "target", "rel"},
@@ -239,6 +245,49 @@ def sanitize_content_html(raw_html: str | None) -> str:
     sanitizer.feed(raw_html)
     sanitizer.close()
     return sanitizer.get_html()
+
+
+def _strip_html_tags(raw: str) -> str:
+    text = re.sub(r"<[^>]+>", "", raw)
+    return unescape(text).strip()
+
+
+def parse_visual_editor_rows(payload: str) -> list[list[str]]:
+    source = (payload or "").strip()
+    if not source:
+        return []
+
+    data = _safe_json_loads(source)
+    if isinstance(data, list):
+        rows: list[list[str]] = []
+        for item in data:
+            if isinstance(item, list):
+                rows.append([str(cell).strip() for cell in item])
+            elif isinstance(item, dict):
+                rows.append([str(value).strip() for value in item.values()])
+        if rows:
+            return rows
+
+    if "<" in source and ">" in source:
+        tr_blocks = re.findall(r"<tr[^>]*>(.*?)</tr>", source, flags=re.IGNORECASE | re.DOTALL)
+        if tr_blocks:
+            rows = []
+            for block in tr_blocks:
+                cells = re.findall(r"<(?:td|th)[^>]*>(.*?)</(?:td|th)>", block, flags=re.IGNORECASE | re.DOTALL)
+                if cells:
+                    rows.append([_strip_html_tags(cell) for cell in cells])
+            if rows:
+                return rows
+
+        li_blocks = re.findall(r"<li[^>]*>(.*?)</li>", source, flags=re.IGNORECASE | re.DOTALL)
+        if li_blocks:
+            return [[_strip_html_tags(item)] for item in li_blocks if _strip_html_tags(item)]
+
+        normalized_html = re.sub(r"<br\s*/?>", "\n", source, flags=re.IGNORECASE)
+        normalized_html = re.sub(r"</(?:p|div|h\d)>", "\n", normalized_html, flags=re.IGNORECASE)
+        source = _strip_html_tags(normalized_html)
+
+    return [[part.strip() for part in line.split("|")] for line in source.splitlines() if line.strip()]
 
 
 def _safe_json_loads(payload: str | None) -> dict | list | None:
@@ -1113,18 +1162,29 @@ def dump_admin_content_for_lang(
     prize_pool_entries: list[PrizePoolEntry],
     donors: list[Donor],
 ) -> ContentLocalePayload:
-    donation_links_items = "\n".join(
-        f"{localized_attr(row, 'title', lang)}|{row.url}|{1 if row.is_active else 0}" for row in donation_links
+    def render_table(rows: list[list[str]]) -> str:
+        if not rows:
+            return ""
+        body = "".join(
+            "<tr>" + "".join(f"<td>{escape(cell)}</td>" for cell in row) + "</tr>"
+            for row in rows
+        )
+        return f"<table><tbody>{body}</tbody></table>"
+
+    donation_links_items = render_table(
+        [[localized_attr(row, "title", lang), row.url, "1" if row.is_active else "0"] for row in donation_links]
     )
-    donation_methods_items = "\n".join(
-        f"{row.method_type}|{localized_attr(row, 'label', lang)}|{localized_attr(row, 'details', lang)}|{1 if row.is_active else 0}"
-        for row in donation_methods
+    donation_methods_items = render_table(
+        [
+            [row.method_type, localized_attr(row, "label", lang), localized_attr(row, "details", lang), "1" if row.is_active else "0"]
+            for row in donation_methods
+        ]
     )
-    prize_pool_items = "\n".join(
-        f"{localized_attr(row, 'place_label', lang)}|{localized_attr(row, 'reward', lang)}" for row in prize_pool_entries
+    prize_pool_items = render_table(
+        [[localized_attr(row, "place_label", lang), localized_attr(row, "reward", lang)] for row in prize_pool_entries]
     )
-    donors_items = "\n".join(
-        f"{row.name}|{row.amount}|{localized_attr(row, 'message', lang)}" for row in donors
+    donors_items = render_table(
+        [[row.name, row.amount, localized_attr(row, "message", lang)] for row in donors]
     )
     return ContentLocalePayload(
         rules_body=localized_attr(rules_content, 'body', lang),
@@ -1520,19 +1580,49 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
 @router.get("/donate", response_class=HTMLResponse)
 async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
     # Отдаем страницу донатов.
+    lang = get_lang(request.cookies.get("lang"))
     donation_links = (await db.scalars(select(DonationLink).where(DonationLink.is_active.is_(True)).order_by(DonationLink.sort_order, DonationLink.id))).all()
     donation_methods = (await db.scalars(select(DonationMethod).where(DonationMethod.is_active.is_(True)).order_by(DonationMethod.method_type, DonationMethod.sort_order, DonationMethod.id))).all()
     prize_pool_entries = (await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all()
     donors = (await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all()
+
+    donation_links_vm = [
+        {"url": item.url, "title_html": sanitize_content_html(localized_attr(item, "title", lang))}
+        for item in donation_links
+    ]
+    donation_methods_vm = [
+        {
+            "method_type": item.method_type,
+            "label_html": sanitize_content_html(localized_attr(item, "label", lang)),
+            "details_html": sanitize_content_html(localized_attr(item, "details", lang)),
+        }
+        for item in donation_methods
+    ]
+    prize_pool_entries_vm = [
+        {
+            "place_label_html": sanitize_content_html(localized_attr(item, "place_label", lang)),
+            "reward_html": sanitize_content_html(localized_attr(item, "reward", lang)),
+        }
+        for item in prize_pool_entries
+    ]
+    donors_vm = [
+        {
+            "name": donor.name,
+            "amount": donor.amount,
+            "message_html": sanitize_content_html(localized_attr(donor, "message", lang)),
+        }
+        for donor in donors
+    ]
+
     return templates.TemplateResponse(
         request,
         "donate.html",
         template_context(
             request,
-            donation_links=donation_links,
-            donation_methods=donation_methods,
-            prize_pool_entries=prize_pool_entries,
-            donors=donors,
+            donation_links=donation_links_vm,
+            donation_methods=donation_methods_vm,
+            prize_pool_entries=prize_pool_entries_vm,
+            donors=donors_vm,
         ),
     )
 
@@ -3034,9 +3124,8 @@ async def admin_save_donation_links(
 ):
     lang = get_lang(content_lang)
     existing_rows = list((await db.scalars(select(DonationLink).order_by(DonationLink.sort_order, DonationLink.id))).all())
-    lines = [item.strip() for item in items.splitlines() if item.strip()]
-    for idx, line in enumerate(lines):
-        parts = [part.strip() for part in line.split("|")]
+    rows = parse_visual_editor_rows(items)
+    for idx, parts in enumerate(rows):
         if len(parts) < 2:
             continue
         row = existing_rows[idx] if idx < len(existing_rows) else DonationLink()
@@ -3047,7 +3136,7 @@ async def admin_save_donation_links(
         if idx >= len(existing_rows):
             db.add(row)
 
-    for row in existing_rows[len(lines):]:
+    for row in existing_rows[len(rows):]:
         await db.delete(row)
 
     await db.commit()
@@ -3062,9 +3151,8 @@ async def admin_save_donation_methods(
 ):
     lang = get_lang(content_lang)
     existing_rows = list((await db.scalars(select(DonationMethod).order_by(DonationMethod.sort_order, DonationMethod.id))).all())
-    lines = [item.strip() for item in items.splitlines() if item.strip()]
-    for idx, line in enumerate(lines):
-        parts = [part.strip() for part in line.split("|")]
+    rows = parse_visual_editor_rows(items)
+    for idx, parts in enumerate(rows):
         if len(parts) < 3:
             continue
         row = existing_rows[idx] if idx < len(existing_rows) else DonationMethod()
@@ -3076,7 +3164,7 @@ async def admin_save_donation_methods(
         if idx >= len(existing_rows):
             db.add(row)
 
-    for row in existing_rows[len(lines):]:
+    for row in existing_rows[len(rows):]:
         await db.delete(row)
 
     await db.commit()
@@ -3091,9 +3179,8 @@ async def admin_save_prize_pool(
 ):
     lang = get_lang(content_lang)
     existing_rows = list((await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all())
-    lines = [item.strip() for item in items.splitlines() if item.strip()]
-    for idx, line in enumerate(lines):
-        parts = [part.strip() for part in line.split("|")]
+    rows = parse_visual_editor_rows(items)
+    for idx, parts in enumerate(rows):
         if len(parts) < 2:
             continue
         row = existing_rows[idx] if idx < len(existing_rows) else PrizePoolEntry()
@@ -3103,7 +3190,7 @@ async def admin_save_prize_pool(
         if idx >= len(existing_rows):
             db.add(row)
 
-    for row in existing_rows[len(lines):]:
+    for row in existing_rows[len(rows):]:
         await db.delete(row)
 
     await db.commit()
@@ -3118,9 +3205,8 @@ async def admin_save_donors(
 ):
     lang = get_lang(content_lang)
     existing_rows = list((await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all())
-    lines = [item.strip() for item in items.splitlines() if item.strip()]
-    for idx, line in enumerate(lines):
-        parts = [part.strip() for part in line.split("|")]
+    rows = parse_visual_editor_rows(items)
+    for idx, parts in enumerate(rows):
         if not parts:
             continue
         row = existing_rows[idx] if idx < len(existing_rows) else Donor()
@@ -3131,7 +3217,7 @@ async def admin_save_donors(
         if idx >= len(existing_rows):
             db.add(row)
 
-    for row in existing_rows[len(lines):]:
+    for row in existing_rows[len(rows):]:
         await db.delete(row)
 
     await db.commit()
