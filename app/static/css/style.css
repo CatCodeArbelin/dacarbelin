@@ -20,6 +20,32 @@ body {
   background-color: #ffffff;
 }
 .table-dark { --bs-table-color: #fff; }
+
+.nav-main-link {
+  color: #dfe9ff !important;
+  font-weight: 600;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease, text-shadow 0.15s ease;
+}
+
+.nav-main-link:hover,
+.nav-main-link:focus-visible {
+  color: #ffffff !important;
+  border-bottom-color: #00b7ff;
+  text-shadow: 0 0 10px rgba(0, 183, 255, 0.75);
+}
+
+.nav-main-link--twitch {
+  color: #d6b7ff !important;
+}
+
+.nav-main-link--twitch:hover,
+.nav-main-link--twitch:focus-visible {
+  color: #f4e9ff !important;
+  border-bottom-color: #9146ff;
+  text-shadow: 0 0 10px rgba(145, 70, 255, 0.85);
+}
+
 .list-group-item { color: #fff !important; }
 .neon-border-blue { border: 1px solid #00b7ff !important; box-shadow: 0 0 8px #00b7ff66; }
 .neon-border-red { border: 1px solid #ff2d55 !important; box-shadow: 0 0 8px #ff2d5566; }

@@ -26,6 +26,7 @@ def test_watch_page_renders_twitch_embed_from_config() -> None:
     assert "channel=mychannel" in response.text
     assert "parent=example.com" in response.text
     assert "parent=www.example.com" in response.text
+    assert "parent=dac.example.com" in response.text
 
 
 def test_watch_page_renders_interactive_embed_when_enabled() -> None:
@@ -39,7 +40,7 @@ def test_watch_page_renders_interactive_embed_when_enabled() -> None:
 
     try:
         with TestClient(app) as client:
-            response = client.get("/watch")
+            response = client.get("/watch", headers={"host": "embed.localhost"})
     finally:
         settings.twitch_embed_mode = original_mode
         settings.twitch_parent_domains = original_domains
@@ -49,4 +50,4 @@ def test_watch_page_renders_interactive_embed_when_enabled() -> None:
     assert "player.twitch.tv" in response.text
     assert "embed/v1.js" in response.text
     assert 'channel: "anotherchannel"' in response.text
-    assert 'parent: ["example.com"]' in response.text
+    assert 'parent: ["example.com", "embed.localhost"]' in response.text

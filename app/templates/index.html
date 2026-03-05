@@ -71,7 +71,8 @@
               </label>
             {% endfor %}
           </div>
-          <textarea class="form-control mb-2" name="message" maxlength="{{ chat_settings.max_length }}" placeholder="{{ tr('index_message') }}" required {% if not chat_settings.is_enabled %}disabled{% endif %}></textarea>
+          <textarea class="form-control mb-2" id="chat-message" name="message" maxlength="{{ chat_settings.max_length }}" placeholder="{{ tr('index_message') }}" required {% if not chat_settings.is_enabled %}disabled{% endif %}></textarea>
+          <div class="small text-contrast-muted mb-2">Осталось символов: <span id="chat-char-counter">{{ chat_settings.max_length }}</span></div>
           <button class="btn btn-primary" id="chat-send-btn" {% if not chat_settings.is_enabled %}disabled{% endif %}>{{ tr('index_connect_send') }}</button>
           <div class="chat-cooldown-timer mt-2" id="chat-cooldown-timer" hidden>
             <div class="chat-cooldown-timer__label"><span id="chat-cooldown-seconds">0</span> sec</div>
@@ -79,7 +80,6 @@
               <div class="chat-cooldown-timer__bar" id="chat-cooldown-bar"></div>
             </div>
           </div>
-          <div class="small text-contrast-muted">{{ tr('index_cooldown') }}: {{ chat_settings.cooldown_seconds }} sec · {{ tr('index_max_length') }}: {{ chat_settings.max_length }}</div>
         </form>
         <div id="chat-box" class="chat-box">
                     {% for msg in chat_messages %}
@@ -231,6 +231,21 @@
   }
 
   connectToStream();
+})();
+
+(() => {
+  const messageInput = document.getElementById("chat-message");
+  const counter = document.getElementById("chat-char-counter");
+  if (!messageInput || !counter) return;
+
+  const maxLength = Number(messageInput.getAttribute("maxlength") || 0);
+  const renderCounter = () => {
+    const remaining = Math.max(0, maxLength - messageInput.value.length);
+    counter.textContent = String(remaining);
+  };
+
+  messageInput.addEventListener("input", renderCounter);
+  renderCounter();
 })();
 
 (() => {

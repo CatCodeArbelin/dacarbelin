@@ -96,3 +96,20 @@ def test_index_stage_progress_uses_active_playoff_stage_highlight() -> None:
     assert "1 Stage (80%)" in response.text
     assert "2 Stage (32%)" in response.text
     assert 'text-contrast-neon">2 Stage (32%)' in response.text
+
+
+def test_index_stage_progress_does_not_highlight_stage_3_on_final() -> None:
+    fake_db = _FakeIndexDB(total_participants=100, stage_1_count=80, stage_2_count=32, stage_3_count=16, active_playoff_key="stage_final")
+
+    async def override_get_db():
+        yield fake_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            response = client.get("/")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert 'text-contrast-neon">3 Stage (16%)' not in response.text
