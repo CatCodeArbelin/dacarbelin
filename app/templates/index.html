@@ -49,7 +49,7 @@
         <div class="mb-2{% if current_stage_number == 2 %} text-contrast-neon{% endif %}">{{ tr('index_stage_2') }} ({{ stage_percentages.get(2, 0) }}%)</div>
         <div class="mb-2{% if current_stage_number == 3 %} text-contrast-neon{% endif %}">{{ tr('index_stage_3') }} ({{ stage_percentages.get(3, 0) }}%)</div>
         <div>
-          <a href="https://www.twitch.tv/loyrensss" target="_blank" rel="noopener noreferrer">{{ tr('index_stage_final_live') }}</a>
+          <a class="btn twitch-watch-btn" href="https://www.twitch.tv/loyrensss" target="_blank" rel="noopener noreferrer">{{ tr('index_stage_final_live') }}</a>
         </div>
       </div>
     </div>
@@ -60,7 +60,7 @@
           <h3 class="text-contrast-neon neon-text-outline mb-0">{{ tr('index_chat') }}</h3>
           <button type="button" class="btn btn-outline-light btn-sm" id="chat-refresh-btn">Refresh</button>
         </div>
-        <form action="/chat/send" method="post" class="mb-3" id="chat-form">
+        <form action="/chat/send" method="post" class="mb-3" id="chat-form" data-cooldown-seconds="{{ chat_settings.cooldown_seconds }}">
           {% if not chat_settings.is_enabled %}<div class="alert alert-warning">{{ tr('msg_chat_disabled_admin') }}</div>{% endif %}
           <input class="form-control mb-2" name="temp_nick" placeholder="{{ tr('index_temp_nick') }}" required>
           <div class="chat-color-picker mb-2" role="radiogroup" aria-label="{{ tr('index_temp_nick') }} color">
@@ -72,7 +72,13 @@
             {% endfor %}
           </div>
           <textarea class="form-control mb-2" name="message" maxlength="{{ chat_settings.max_length }}" placeholder="{{ tr('index_message') }}" required {% if not chat_settings.is_enabled %}disabled{% endif %}></textarea>
-          <button class="btn btn-primary" {% if not chat_settings.is_enabled %}disabled{% endif %}>{{ tr('index_connect_send') }}</button>
+          <button class="btn btn-primary" id="chat-send-btn" {% if not chat_settings.is_enabled %}disabled{% endif %}>{{ tr('index_connect_send') }}</button>
+          <div class="chat-cooldown-timer mt-2" id="chat-cooldown-timer" hidden>
+            <div class="chat-cooldown-timer__label"><span id="chat-cooldown-seconds">0</span> sec</div>
+            <div class="chat-cooldown-timer__track">
+              <div class="chat-cooldown-timer__bar" id="chat-cooldown-bar"></div>
+            </div>
+          </div>
           <div class="small text-contrast-muted">{{ tr('index_cooldown') }}: {{ chat_settings.cooldown_seconds }} sec · {{ tr('index_max_length') }}: {{ chat_settings.max_length }}</div>
         </form>
         <div id="chat-box" class="chat-box">
@@ -225,6 +231,67 @@
   }
 
   connectToStream();
+})();
+
+(() => {
+  const chatForm = document.getElementById("chat-form");
+  const sendButton = document.getElementById("chat-send-btn");
+  const timerWrapper = document.getElementById("chat-cooldown-timer");
+  const timerLabel = document.getElementById("chat-cooldown-seconds");
+  const timerBar = document.getElementById("chat-cooldown-bar");
+  if (!chatForm || !sendButton || !timerWrapper || !timerLabel || !timerBar) return;
+
+  const cooldownSeconds = Number(chatForm.dataset.cooldownSeconds || 0);
+  const storageKey = "chatCooldownUntil";
+  let timerId = null;
+
+  const stopTimer = () => {
+    if (timerId) {
+      clearInterval(timerId);
+      timerId = null;
+    }
+  };
+
+  const renderTimer = () => {
+    const cooldownUntil = Number(localStorage.getItem(storageKey) || 0);
+    const now = Date.now();
+    const remainingMs = cooldownUntil - now;
+
+    if (remainingMs <= 0 || cooldownSeconds <= 0) {
+      sendButton.disabled = {{ 'true' if not chat_settings.is_enabled else 'false' }};
+      timerWrapper.hidden = true;
+      timerBar.style.width = "0%";
+      timerLabel.textContent = "0";
+      localStorage.removeItem(storageKey);
+      stopTimer();
+      return;
+    }
+
+    const totalMs = cooldownSeconds * 1000;
+    const percent = Math.min(100, Math.max(0, (remainingMs / totalMs) * 100));
+    sendButton.disabled = true;
+    timerWrapper.hidden = false;
+    timerBar.style.width = `${percent}%`;
+    timerLabel.textContent = String(Math.ceil(remainingMs / 1000));
+  };
+
+  const startTimer = () => {
+    if (cooldownSeconds <= 0) return;
+    localStorage.setItem(storageKey, String(Date.now() + cooldownSeconds * 1000));
+    renderTimer();
+    if (!timerId) {
+      timerId = setInterval(renderTimer, 200);
+    }
+  };
+
+  chatForm.addEventListener("submit", () => {
+    startTimer();
+  });
+
+  renderTimer();
+  if (localStorage.getItem(storageKey) && !timerId) {
+    timerId = setInterval(renderTimer, 200);
+  }
 })();
 
 </script>
