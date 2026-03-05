@@ -5,7 +5,7 @@
 <h4>{{ tr('donate_links') }}</h4>
 <ul>
   {% for item in donation_links %}
-    <li><a href="{{ item.url|e }}" target="_blank" rel="noopener">{{ (item.title_ru if lang == "ru" else (item.title_en or item.title_ru))|e }}</a></li>
+    <li><a href="{{ item.url|e }}" target="_blank" rel="noopener">{{ item.title_html|safe }}</a></li>
   {% else %}
     <li>{{ tr('donate_no_links') }}</li>
   {% endfor %}
@@ -14,7 +14,7 @@
 <h4>{{ tr('donate_card_crypto') }}</h4>
 <ul>
   {% for item in donation_methods %}
-    <li><strong>{{ item.method_type|upper|e }}:</strong> {{ (item.label_ru if lang == "ru" else (item.label_en or item.label_ru))|e }} — {{ (item.details_ru if lang == "ru" else (item.details_en or item.details_ru))|e }}</li>
+    <li><strong>{{ item.method_type|upper|e }}:</strong> {{ item.label_html|safe }} — {{ item.details_html|safe }}</li>
   {% else %}
     <li>{{ tr('donate_no_methods') }}</li>
   {% endfor %}
@@ -23,7 +23,7 @@
 <h4>{{ tr('donate_prize_pool') }}</h4>
 <ul>
   {% for item in prize_pool_entries %}
-    <li>{{ (item.place_label_ru if lang == "ru" else (item.place_label_en or item.place_label_ru))|e }} — {{ (item.reward_ru if lang == "ru" else (item.reward_en or item.reward_ru))|e }}</li>
+    <li>{{ item.place_label_html|safe }} — {{ item.reward_html|safe }}</li>
   {% else %}
     <li>{{ tr('donate_no_prize_pool') }}</li>
   {% endfor %}
@@ -32,7 +32,7 @@
 <h4>{{ tr('donate_donors') }}</h4>
 <ul>
   {% for donor in donors %}
-    <li>{{ donor.name|e }}{% if donor.amount %} ({{ donor.amount|e }}){% endif %}{% if (donor.message_ru if lang == "ru" else (donor.message_en or donor.message_ru)) %}: {{ (donor.message_ru if lang == "ru" else (donor.message_en or donor.message_ru))|e }}{% endif %}</li>
+    <li>{{ donor.name|e }}{% if donor.amount %} ({{ donor.amount|e }}){% endif %}{% if donor.message_html %}: {{ donor.message_html|safe }}{% endif %}</li>
   {% else %}
     <li>{{ tr('donate_no_donors') }}</li>
   {% endfor %}

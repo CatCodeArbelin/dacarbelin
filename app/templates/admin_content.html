@@ -21,38 +21,42 @@
 
   <h5>{{ tr('admin_rules_content') }}</h5>
   <p class="small text-contrast-muted mb-2">{{ tr('admin_rules_html_hint') }}</p>
-  <form action="/admin/rules" method="post" class="mb-3" id="rules-content-form">
+  <form action="/admin/rules" method="post" class="mb-3 editor-form" id="rules-content-form">
     <input type="hidden" id="rules-content-lang" name="content_lang" value="{{ selected_content_lang }}">
-    <textarea class="form-control mb-2 d-none" id="rules-body" name="body" rows="8" placeholder="{{ tr('admin_rules_text') }}"></textarea>
-    <div id="rules-editor" class="form-control mb-2" style="min-height: 260px;"></div>
+    <textarea class="form-control mb-2 d-none editor-source" data-key="rules_body" name="body" rows="8"></textarea>
+    <div class="form-control mb-2 editor-root" data-key="rules_body" style="min-height: 260px;"></div>
     <button class="btn btn-primary">{{ tr('admin_save_rules') }}</button>
   </form>
 
-  <p class="small text-contrast-muted mb-2">{{ tr('donate_links') }}: <code>title|url|active(1/0)</code></p>
-  <form action="/admin/donation-links" method="post" class="mb-3">
+  <p class="small text-contrast-muted mb-2">{{ tr('donate_links') }} (HTML table: title | url | active)</p>
+  <form action="/admin/donation-links" method="post" class="mb-3 editor-form">
     <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
-    <textarea class="form-control localized-items" data-key="donation_links_items" name="items" rows="4"></textarea>
+    <textarea class="form-control d-none editor-source" data-key="donation_links_items" name="items" rows="4"></textarea>
+    <div class="form-control mb-2 editor-root" data-key="donation_links_items" style="min-height: 180px;"></div>
     <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_links') }}</button>
   </form>
 
-  <p class="small text-contrast-muted mb-2">{{ tr('admin_save_donation_methods') }}: <code>card/crypto|label|details|active(1/0)</code></p>
-  <form action="/admin/donation-methods" method="post" class="mb-3">
+  <p class="small text-contrast-muted mb-2">{{ tr('admin_save_donation_methods') }} (HTML table: type | label | details | active)</p>
+  <form action="/admin/donation-methods" method="post" class="mb-3 editor-form">
     <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
-    <textarea class="form-control localized-items" data-key="donation_methods_items" name="items" rows="4"></textarea>
+    <textarea class="form-control d-none editor-source" data-key="donation_methods_items" name="items" rows="4"></textarea>
+    <div class="form-control mb-2 editor-root" data-key="donation_methods_items" style="min-height: 180px;"></div>
     <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_methods') }}</button>
   </form>
 
-  <p class="small text-contrast-muted mb-2">{{ tr('donate_prize_pool') }}: <code>place|reward</code></p>
-  <form action="/admin/prize-pool" method="post" class="mb-3">
+  <p class="small text-contrast-muted mb-2">{{ tr('donate_prize_pool') }} (HTML table: place | reward)</p>
+  <form action="/admin/prize-pool" method="post" class="mb-3 editor-form">
     <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
-    <textarea class="form-control localized-items" data-key="prize_pool_items" name="items" rows="4"></textarea>
+    <textarea class="form-control d-none editor-source" data-key="prize_pool_items" name="items" rows="4"></textarea>
+    <div class="form-control mb-2 editor-root" data-key="prize_pool_items" style="min-height: 180px;"></div>
     <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_prize_pool') }}</button>
   </form>
 
-  <p class="small text-contrast-muted mb-2">{{ tr('donate_donors') }}: <code>name|amount|message</code></p>
-  <form action="/admin/donors" method="post" class="mb-3">
+  <p class="small text-contrast-muted mb-2">{{ tr('donate_donors') }} (HTML table: name | amount | message)</p>
+  <form action="/admin/donors" method="post" class="mb-3 editor-form">
     <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
-    <textarea class="form-control localized-items" data-key="donors_items" name="items" rows="4"></textarea>
+    <textarea class="form-control d-none editor-source" data-key="donors_items" name="items" rows="4"></textarea>
+    <div class="form-control mb-2 editor-root" data-key="donors_items" style="min-height: 180px;"></div>
     <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donors') }}</button>
   </form>
 </div></div>
@@ -63,35 +67,39 @@
     const langSelector = document.getElementById('content-lang-selector');
     const langInputs = Array.from(document.querySelectorAll('.content-lang-input'));
     const rulesLangInput = document.getElementById('rules-content-lang');
-    const localizedTextareas = Array.from(document.querySelectorAll('.localized-items'));
-    const source = document.getElementById('rules-body');
-    const editorRoot = document.getElementById('rules-editor');
-    const form = document.getElementById('rules-content-form');
+    const sourceByKey = new Map(Array.from(document.querySelectorAll('.editor-source')).map((el) => [el.dataset.key, el]));
+    const editorByKey = new Map();
+    const forms = Array.from(document.querySelectorAll('.editor-form'));
     const contentByLang = {{ content_by_lang|tojson }};
 
-    if (!langSelector || !source || !editorRoot || !form || !window.Quill) {
+    if (!langSelector || !window.Quill) {
       return;
     }
 
-    const quill = new Quill(editorRoot, {
-      theme: 'snow',
-      modules: {
-        toolbar: [
-          [{ header: [1, 2, 3, false] }],
-          ['bold', 'italic', 'underline', 'strike'],
-          [{ list: 'ordered' }, { list: 'bullet' }],
-          ['blockquote', 'code-block', 'link'],
-          ['clean']
-        ]
-      }
+    document.querySelectorAll('.editor-root').forEach((root) => {
+      editorByKey.set(root.dataset.key, new Quill(root, {
+        theme: 'snow',
+        modules: {
+          toolbar: [
+            [{ header: [1, 2, 3, false] }],
+            ['bold', 'italic', 'underline', 'strike'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            ['blockquote', 'code-block', 'link'],
+            ['clean']
+          ]
+        }
+      }));
     });
 
     function applyLang(lang) {
       const payload = contentByLang[lang] || contentByLang.ru || {};
-      source.value = payload.rules_body || '';
-      quill.root.innerHTML = source.value || '<p>{{ tr("admin_wysiwyg_placeholder") }}</p>';
-      localizedTextareas.forEach((el) => {
-        el.value = payload[el.dataset.key] || '';
+      sourceByKey.forEach((source, key) => {
+        const value = payload[key] || '';
+        source.value = value;
+        const editor = editorByKey.get(key);
+        if (editor) {
+          editor.root.innerHTML = value || '<p>{{ tr("admin_wysiwyg_placeholder") }}</p>';
+        }
       });
       langInputs.forEach((input) => {
         input.value = lang;
@@ -111,8 +119,15 @@
       applyLang(currentLang);
     });
 
-    form.addEventListener('submit', function () {
-      source.value = quill.root.innerHTML;
+    forms.forEach((form) => {
+      form.addEventListener('submit', function () {
+        sourceByKey.forEach((source, key) => {
+          const editor = editorByKey.get(key);
+          if (editor) {
+            source.value = editor.root.innerHTML;
+          }
+        });
+      });
     });
   })();
 </script>
