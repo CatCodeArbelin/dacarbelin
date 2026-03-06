@@ -36,14 +36,12 @@
     </div>
   </div>
   <div class="col-lg-4">
-    <div class="card bg-black neon-border-blue">
+    <div class="card bg-black neon-border-blue prize-pool-card">
       <div class="card-body">
-        <h3>{{ tr('index_stages') }}</h3>
-        <div class="mb-2{% if current_stage_number == 1 %} text-contrast-neon{% endif %}">{{ tr('index_stage_1') }} ({{ stage_percentages.get(1, 0) }}%)</div>
-        <div class="mb-2{% if current_stage_number == 2 %} text-contrast-neon{% endif %}">{{ tr('index_stage_2') }} ({{ stage_percentages.get(2, 0) }}%)</div>
-        <div class="mb-2{% if current_stage_number == 3 %} text-contrast-neon{% endif %}">{{ tr('index_stage_3') }} ({{ stage_percentages.get(3, 0) }}%)</div>
+        <h3>{{ tr('index_prize_pool') }}</h3>
+        <div class="prize-pool-amount">{{ total_sponsors_amount }} ₽</div>
         <div>
-          <a class="btn btn-outline-info" href="https://www.twitch.tv/loyrensss" target="_blank" rel="noopener noreferrer">{{ tr('index_stage_final_live') }}</a>
+          <a class="btn btn-outline-info prize-pool-twitch-btn" href="https://www.twitch.tv/loyrensss" target="_blank" rel="noopener noreferrer">{{ tr('index_watch_twitch') }}</a>
         </div>
       </div>
     </div>

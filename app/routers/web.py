@@ -10,6 +10,7 @@ from html import escape, unescape
 from html.parser import HTMLParser
 from urllib.parse import quote, unquote, urlencode
 from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Form, Query, Request
 from pydantic import BaseModel
@@ -117,16 +118,25 @@ EXPECTED_32_PLAYER_STAGE_ORDER_PAIRS = [
     (2, "stage_final"),
 ]
 
-HOME_STAGE_KEY_TO_NUMBER = {
-    "group_stage": 1,
-    "stage_2": 2,
-    "stage_1_4": 3,
-    "stage_final": None,
-}
 
 CHAT_NICK_COLORS = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff66c4", "#5ce1e6", "#f48c06", "#90be6d", "#4cc9f0"]
 FORBIDDEN_CHAT_NICKS = {"@admin"}
 CHAT_SENDER_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+def parse_donor_amount(amount_raw: str) -> Decimal:
+    cleaned = (amount_raw or "").replace("\xa0", " ").strip()
+    match = re.search(r"-?\d[\d\s.,]*", cleaned)
+    if not match:
+        return Decimal("0")
+    numeric = match.group(0).replace(" ", "").replace(",", ".")
+    if numeric.count(".") > 1:
+        integer, fractional = numeric.rsplit(".", 1)
+        numeric = integer.replace(".", "") + "." + fractional
+    try:
+        return Decimal(numeric)
+    except InvalidOperation:
+        return Decimal("0")
 
 
 class ChatEventBroker:
@@ -1078,69 +1088,6 @@ async def get_chat_settings(db: AsyncSession) -> ChatSetting:
     return ChatSetting(id=1, cooldown_seconds=10, max_length=1000, is_enabled=True)
 
 
-async def get_home_stage_progress(db: AsyncSession) -> tuple[int | None, dict[int, int]]:
-    total_participants = int(await db.scalar(select(func.count(User.id))) or 0)
-
-    stage_1_count = int(
-        await db.scalar(
-            select(func.count(func.distinct(GroupMember.user_id)))
-            .select_from(GroupMember)
-            .join(TournamentGroup, TournamentGroup.id == GroupMember.group_id)
-            .where(TournamentGroup.stage == "group_stage")
-        )
-        or 0
-    )
-
-    stage_2_count = int(
-        await db.scalar(
-            select(func.count(func.distinct(PlayoffParticipant.user_id)))
-            .select_from(PlayoffParticipant)
-            .join(PlayoffStage, PlayoffStage.id == PlayoffParticipant.stage_id)
-            .where(PlayoffStage.key == "stage_2")
-        )
-        or 0
-    )
-
-    stage_3_count = int(
-        await db.scalar(
-            select(func.count(func.distinct(PlayoffParticipant.user_id)))
-            .select_from(PlayoffParticipant)
-            .join(PlayoffStage, PlayoffStage.id == PlayoffParticipant.stage_id)
-            .where(PlayoffStage.key == "stage_1_4")
-        )
-        or 0
-    )
-
-    def _percent(count: int) -> int:
-        if total_participants <= 0:
-            return 0
-        return round((count / total_participants) * 100)
-
-    stage_percentages = {
-        1: _percent(stage_1_count),
-        2: _percent(stage_2_count),
-        3: _percent(stage_3_count),
-    }
-
-    active_playoff_key = await db.scalar(
-        select(PlayoffStage.key)
-        .where(PlayoffStage.is_started.is_(True))
-        .order_by(desc(PlayoffStage.stage_order))
-        .limit(1)
-    )
-    normalized_active_playoff_key = normalize_stage_key(str(active_playoff_key)) if active_playoff_key else ""
-    current_stage_number = HOME_STAGE_KEY_TO_NUMBER.get(normalized_active_playoff_key, None)
-    if current_stage_number is None and normalized_active_playoff_key != "stage_final":
-        if stage_3_count > 0:
-            current_stage_number = 3
-        elif stage_2_count > 0:
-            current_stage_number = 2
-        elif stage_1_count > 0:
-            current_stage_number = 1
-
-    return current_stage_number, stage_percentages
-
-
 async def get_or_create_chat_settings(db: AsyncSession) -> ChatSetting:
     row = await db.scalar(select(ChatSetting).where(ChatSetting.id == 1))
     if row:
@@ -1278,7 +1225,12 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
     registration_open = await get_registration_open(db)
     tournament_started = await get_tournament_started(db)
     chat_settings = await get_chat_settings(db)
-    current_stage_number, stage_percentages = await get_home_stage_progress(db)
+    donors = (await db.scalars(select(Donor.amount))).all()
+    total_sponsors_amount = parse_donor_amount("0")
+    for donor_amount in donors:
+        total_sponsors_amount += parse_donor_amount(str(donor_amount))
+
+    total_sponsors_amount_display = f"{int(total_sponsors_amount)}" if total_sponsors_amount == total_sponsors_amount.to_integral() else f"{total_sponsors_amount:.2f}"
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -1290,8 +1242,7 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
             registration_open=registration_open,
             tournament_started=tournament_started,
             chat_settings=chat_settings,
-            current_stage_number=current_stage_number,
-            stage_percentages=stage_percentages,
+            total_sponsors_amount=total_sponsors_amount_display,
             chat_saved_nick=unquote((request.cookies.get("chat_nick") or "")).strip()[:120],
         ),
     )

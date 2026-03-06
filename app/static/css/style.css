@@ -682,3 +682,30 @@ body {
   border-color: rgba(89, 249, 159, 0.75);
   box-shadow: inset 0 0 0 1px rgba(64, 208, 133, 0.2), 0 0 16px rgba(80, 255, 154, 0.2);
 }
+
+
+.prize-pool-card {
+  background: radial-gradient(circle at top right, rgba(0, 183, 255, 0.16), rgba(0, 0, 0, 0.95));
+}
+
+.prize-pool-amount {
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  margin: 10px 0 14px;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(0, 183, 255, 0.95), 0 0 28px rgba(0, 183, 255, 0.6);
+}
+
+.prize-pool-twitch-btn {
+  border-color: #00d4ff !important;
+  color: #b9f4ff !important;
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.28);
+}
+
+.prize-pool-twitch-btn:hover,
+.prize-pool-twitch-btn:focus-visible {
+  color: #ffffff !important;
+  background: rgba(0, 183, 255, 0.2) !important;
+  border-color: #74e7ff !important;
+}
