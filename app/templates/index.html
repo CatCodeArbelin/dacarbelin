@@ -78,7 +78,7 @@
           <div class="chat-color-picker mb-2" role="radiogroup" aria-label="{{ tr('index_temp_nick') }} color">
             {% for color in chat_nick_colors %}
               <label class="chat-color-swatch" style="--swatch-color: {{ color }};" title="{{ color }}">
-                <input type="radio" name="nick_color" value="{{ color }}" {% if loop.first %}checked{% endif %}>
+                <input type="radio" name="nick_color" value="{{ color }}" {% if color == chat_saved_nick_color %}checked{% endif %}>
                 <span aria-hidden="true"></span>
               </label>
             {% endfor %}

@@ -1147,6 +1147,13 @@ def normalize_chat_nick_color(color: str) -> str:
     return normalized
 
 
+def resolve_chat_nick_color(color_cookie: str | None) -> str:
+    try:
+        return normalize_chat_nick_color(color_cookie or "")
+    except ValueError:
+        return CHAT_NICK_COLORS[0]
+
+
 def generate_chat_sender_token() -> str:
     return uuid.uuid4().hex
 
@@ -1243,6 +1250,7 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
             total_sponsors_amount_rub=total_sponsors_amount_rub,
             total_sponsors_amount_usd=total_sponsors_amount_usd,
             chat_saved_nick=unquote((request.cookies.get("chat_nick") or "")).strip()[:120],
+            chat_saved_nick_color=resolve_chat_nick_color(request.cookies.get("chat_nick_color")),
         ),
     )
 
@@ -1383,6 +1391,7 @@ async def send_chat(
     await chat_event_broker.publish()
     redirect = RedirectResponse(url="/#chat", status_code=303)
     redirect.set_cookie("chat_nick", quote(safe_nick, safe=""), max_age=60 * 60 * 24 * 365, samesite="lax")
+    redirect.set_cookie("chat_nick_color", safe_color, max_age=60 * 60 * 24 * 365, samesite="lax")
     if should_set_chat_sender_cookie:
         redirect.set_cookie("chat_sender", chat_sender, max_age=60 * 60 * 24 * 365, samesite="lax")
     return redirect

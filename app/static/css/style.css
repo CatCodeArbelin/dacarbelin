@@ -836,3 +836,58 @@ body {
 .donate-sponsors-table thead th {
   color: #9ae7ff !important;
 }
+
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.site-footer {
+  border-top: 1px solid rgba(0, 183, 255, 0.45);
+  background: linear-gradient(180deg, rgba(8, 11, 19, 0.96), rgba(4, 6, 12, 0.98));
+  box-shadow: 0 -6px 24px rgba(0, 183, 255, 0.14);
+  padding: 14px 0;
+}
+
+.site-footer__inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.site-footer__author {
+  color: #d9f3ff !important;
+  text-decoration: none;
+  font-weight: 700;
+  text-shadow:
+    0 0 3px rgba(255, 255, 255, 0.9),
+    0 0 10px rgba(143, 229, 255, 0.95),
+    0 0 18px rgba(0, 183, 255, 0.7);
+}
+
+.site-footer__author:hover,
+.site-footer__author:focus-visible {
+  color: #ffffff !important;
+  text-shadow:
+    0 0 4px rgba(255, 255, 255, 1),
+    0 0 14px rgba(173, 238, 255, 1),
+    0 0 24px rgba(0, 199, 255, 0.85);
+}
+
+.donate-list a,
+.donate-link,
+.donate-list a:visited {
+  color: #ffffff !important;
+}
+
+.donate-list a:hover,
+.donate-link:hover,
+.donate-list a:focus-visible,
+.donate-link:focus-visible {
+  color: #ccefff !important;
+}
