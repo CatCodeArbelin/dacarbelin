@@ -21,44 +21,86 @@
 
   <h5>{{ tr('admin_rules_content') }}</h5>
   <p class="small text-contrast-muted mb-2">{{ tr('admin_rules_html_hint') }}</p>
-  <form action="/admin/rules" method="post" class="mb-3 editor-form" id="rules-content-form">
+  <form action="/admin/rules" method="post" class="mb-4" id="rules-content-form">
     <input type="hidden" id="rules-content-lang" name="content_lang" value="{{ selected_content_lang }}">
-    <textarea class="form-control mb-2 d-none editor-source" data-key="rules_body" name="body" rows="8"></textarea>
-    <div class="form-control mb-2 editor-root" data-key="rules_body" style="min-height: 260px;"></div>
+    <textarea class="form-control mb-2 d-none" id="rules-body-source" name="body" rows="8"></textarea>
+    <div class="form-control mb-2" id="rules-editor-root" style="min-height: 260px;"></div>
     <button class="btn btn-primary">{{ tr('admin_save_rules') }}</button>
   </form>
 
-  <p class="small text-contrast-muted mb-2">{{ tr('donate_links') }} (HTML table: title | url | active)</p>
-  <form action="/admin/donation-links" method="post" class="mb-3 editor-form">
+  <h5>Ссылки на донат</h5>
+  <form action="/admin/donation-links/create" method="post" class="mb-3 border rounded p-3">
     <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
-    <textarea class="form-control d-none editor-source" data-key="donation_links_items" name="items" rows="4"></textarea>
-    <div class="form-control mb-2 editor-root" data-key="donation_links_items" style="min-height: 180px;"></div>
-    <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_links') }}</button>
+    <div class="row g-2">
+      <div class="col-md-4"><input class="form-control" name="label" placeholder="Label" required></div>
+      <div class="col-md-5"><input class="form-control" name="url" placeholder="https://..." required></div>
+      <div class="col-md-2 form-check mt-2"><input class="form-check-input" type="checkbox" name="is_active" value="true" id="new-link-active" checked><label class="form-check-label" for="new-link-active">Active</label></div>
+      <div class="col-md-1"><button class="btn btn-sm btn-primary">+</button></div>
+    </div>
   </form>
+  {% for item in donation_links %}
+  <div class="mb-2 border rounded p-3">
+    <form action="/admin/donation-links/{{ item.id }}/update" method="post" class="row g-2 mb-2">
+      <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
+      <div class="col-md-3"><input class="form-control" name="label" value="{{ (item.title_ru if selected_content_lang == 'ru' else item.title_en)|e }}" required></div>
+      <div class="col-md-5"><input class="form-control" name="url" value="{{ item.url|e }}" required></div>
+      <div class="col-md-2 form-check mt-2"><input class="form-check-input" type="checkbox" name="is_active" value="true" id="link-active-{{ item.id }}" {% if item.is_active %}checked{% endif %}><label class="form-check-label" for="link-active-{{ item.id }}">Active</label></div>
+      <div class="col-md-2"><button class="btn btn-sm btn-primary">Save</button></div>
+    </form>
+    <form action="/admin/donation-links/{{ item.id }}/delete" method="post">
+      <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
+      <button class="btn btn-sm btn-outline-danger">Delete</button>
+    </form>
+  </div>
+  {% endfor %}
 
-  <p class="small text-contrast-muted mb-2">{{ tr('admin_save_donation_methods') }} (HTML table: type | label | details | active)</p>
-  <form action="/admin/donation-methods" method="post" class="mb-3 editor-form">
-    <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
-    <textarea class="form-control d-none editor-source" data-key="donation_methods_items" name="items" rows="4"></textarea>
-    <div class="form-control mb-2 editor-root" data-key="donation_methods_items" style="min-height: 180px;"></div>
-    <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donation_methods') }}</button>
+  <h5 class="mt-4">Криптокошельки</h5>
+  <form action="/admin/crypto-wallets" method="post" class="mb-3 border rounded p-3">
+    <div class="row g-2">
+      <div class="col-md-4"><input class="form-control" name="wallet_name" placeholder="Сеть / кошелек" required></div>
+      <div class="col-md-5"><input class="form-control" name="requisites" placeholder="Реквизит" required></div>
+      <div class="col-md-2 form-check mt-2"><input class="form-check-input" type="checkbox" name="is_active" value="true" id="new-wallet-active" checked><label class="form-check-label" for="new-wallet-active">Active</label></div>
+      <div class="col-md-1"><button class="btn btn-sm btn-primary">+</button></div>
+    </div>
   </form>
+  {% for wallet in crypto_wallets %}
+  <div class="mb-2 border rounded p-3">
+    <div class="row g-2">
+      <form action="/admin/crypto-wallets/{{ wallet.id }}/update" method="post" class="col-md-10 row g-2">
+        <div class="col-md-4"><input class="form-control" name="wallet_name" value="{{ wallet.wallet_name|e }}" required></div>
+        <div class="col-md-5"><input class="form-control" name="requisites" value="{{ wallet.requisites|e }}" required></div>
+        <div class="col-md-2 form-check mt-2"><input class="form-check-input" type="checkbox" name="is_active" value="true" id="wallet-active-{{ wallet.id }}" {% if wallet.is_active %}checked{% endif %}><label class="form-check-label" for="wallet-active-{{ wallet.id }}">Active</label></div>
+        <div class="col-md-1"><button class="btn btn-sm btn-primary">Save</button></div>
+      </form>
+      <form action="/admin/crypto-wallets/{{ wallet.id }}/delete" method="post" class="col-md-2">
+        <button class="btn btn-sm btn-outline-danger">Delete</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
 
-  <p class="small text-contrast-muted mb-2">{{ tr('donate_prize_pool') }} (HTML table: place | reward)</p>
-  <form action="/admin/prize-pool" method="post" class="mb-3 editor-form">
-    <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
-    <textarea class="form-control d-none editor-source" data-key="prize_pool_items" name="items" rows="4"></textarea>
-    <div class="form-control mb-2 editor-root" data-key="prize_pool_items" style="min-height: 180px;"></div>
-    <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_prize_pool') }}</button>
+  <h5 class="mt-4">Спонсоры</h5>
+  <form action="/admin/sponsors" method="post" class="mb-3 border rounded p-3">
+    <div class="row g-2">
+      <div class="col-md-5"><input class="form-control" name="name" placeholder="Имя" required></div>
+      <div class="col-md-5"><input class="form-control" type="number" min="0" name="amount" placeholder="Сумма" required></div>
+      <div class="col-md-2"><button class="btn btn-sm btn-primary">+</button></div>
+    </div>
   </form>
-
-  <p class="small text-contrast-muted mb-2">{{ tr('donate_donors') }} (HTML table: name | amount | message)</p>
-  <form action="/admin/donors" method="post" class="mb-3 editor-form">
-    <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
-    <textarea class="form-control d-none editor-source" data-key="donors_items" name="items" rows="4"></textarea>
-    <div class="form-control mb-2 editor-root" data-key="donors_items" style="min-height: 180px;"></div>
-    <button class="btn btn-sm btn-primary mt-2">{{ tr('admin_save_donors') }}</button>
-  </form>
+  {% for sponsor in sponsors %}
+  <div class="mb-2 border rounded p-3">
+    <div class="row g-2">
+      <form action="/admin/sponsors/{{ sponsor.id }}/update" method="post" class="col-md-10 row g-2">
+        <div class="col-md-6"><input class="form-control" name="name" value="{{ sponsor.name|e }}" required></div>
+        <div class="col-md-4"><input class="form-control" type="number" min="0" name="amount" value="{{ sponsor.amount }}" required></div>
+        <div class="col-md-2"><button class="btn btn-sm btn-primary">Save</button></div>
+      </form>
+      <form action="/admin/sponsors/{{ sponsor.id }}/delete" method="post" class="col-md-2">
+        <button class="btn btn-sm btn-outline-danger">Delete</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
 </div></div>
 <script src="https://cdn.tiny.cloud/1/{{ tiny_mce_api_key|e }}/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
@@ -66,77 +108,53 @@
     const langSelector = document.getElementById('content-lang-selector');
     const langInputs = Array.from(document.querySelectorAll('.content-lang-input'));
     const rulesLangInput = document.getElementById('rules-content-lang');
-    const sourceByKey = new Map(Array.from(document.querySelectorAll('.editor-source')).map((el) => [el.dataset.key, el]));
-    const editorByKey = new Map();
-    const forms = Array.from(document.querySelectorAll('.editor-form'));
+    const rulesSource = document.getElementById('rules-body-source');
     const contentByLang = {{ content_by_lang|tojson }};
 
-    if (!langSelector || !window.tinymce) {
-      return;
-    }
-
-    const toolbarItems = 'undo redo | styles | bold italic underline strikethrough forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table image media link blockquote hr | removeformat code';
-
-    const initPromises = Array.from(document.querySelectorAll('.editor-root')).map((root) => {
-      return tinymce.init({
-        target: root,
-        menubar: 'file edit view insert format table tools help',
-        plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount quickbars',
-        toolbar: toolbarItems,
-        toolbar_sticky: true,
-        min_height: Number(root.style.minHeight.replace('px', '')) || 180,
-        skin: 'oxide',
-        content_css: 'default',
-        content_style: 'body { color: #000000; background-color: #ffffff; font-size: 14px; }',
-        image_title: true,
-        automatic_uploads: false,
-        convert_urls: false,
-        branding: false,
-        setup(editor) {
-          editorByKey.set(root.dataset.key, editor);
-        }
-      });
-    });
+    if (!langSelector || !window.tinymce) return;
 
     function applyLang(lang) {
       const payload = contentByLang[lang] || contentByLang.ru || {};
-      sourceByKey.forEach((source, key) => {
-        const value = payload[key] || '';
-        source.value = value;
-        const editor = editorByKey.get(key);
-        if (editor) {
-          editor.setContent(value || '<p>{{ tr("admin_wysiwyg_placeholder") }}</p>');
-        }
-      });
-      langInputs.forEach((input) => {
-        input.value = lang;
-      });
-      if (rulesLangInput) {
-        rulesLangInput.value = lang;
+      const value = payload.rules_body || '';
+      rulesSource.value = value;
+      const editor = tinymce.get('rules-editor-root');
+      if (editor) {
+        editor.setContent(value || '<p>{{ tr("admin_wysiwyg_placeholder") }}</p>');
       }
+      langInputs.forEach((input) => { input.value = lang; });
+      if (rulesLangInput) rulesLangInput.value = lang;
     }
 
-    Promise.all(initPromises).then(() => {
-      applyLang(langSelector.value || 'ru');
+    tinymce.init({
+      selector: '#rules-editor-root',
+      menubar: 'file edit view insert format table tools help',
+      plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount quickbars',
+      toolbar: 'undo redo | styles | bold italic underline strikethrough forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table image media link blockquote hr | removeformat code',
+      toolbar_sticky: true,
+      min_height: 260,
+      skin: 'oxide',
+      content_css: 'default',
+      content_style: 'body { color: #000000; background-color: #ffffff; font-size: 14px; }',
+      image_title: true,
+      automatic_uploads: false,
+      convert_urls: false,
+      branding: false,
+      setup(editor) {
+        editor.on('init', () => applyLang(langSelector.value || 'ru'));
+      }
+    });
 
-      langSelector.addEventListener('change', function () {
-        const currentLang = langSelector.value || 'ru';
-        const params = new URLSearchParams(window.location.search);
-        params.set('content_lang', currentLang);
-        window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
-        applyLang(currentLang);
-      });
+    langSelector.addEventListener('change', function () {
+      const currentLang = langSelector.value || 'ru';
+      const params = new URLSearchParams(window.location.search);
+      params.set('content_lang', currentLang);
+      window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+      applyLang(currentLang);
+    });
 
-      forms.forEach((form) => {
-        form.addEventListener('submit', function () {
-          sourceByKey.forEach((source, key) => {
-            const editor = editorByKey.get(key);
-            if (editor) {
-              source.value = editor.getContent();
-            }
-          });
-        });
-      });
+    document.getElementById('rules-content-form').addEventListener('submit', function () {
+      const editor = tinymce.get('rules-editor-root');
+      if (editor) rulesSource.value = editor.getContent();
     });
   })();
 </script>

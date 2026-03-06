@@ -51,6 +51,16 @@ class DonationMethod(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class CryptoWallet(Base):
+    __tablename__ = "crypto_wallets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    wallet_name: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    requisites: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
 class PrizePoolEntry(Base):
     __tablename__ = "prize_pool_entries"
 
@@ -67,7 +77,7 @@ class Donor(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    amount: Mapped[str] = mapped_column(String(120), default="")
+    amount: Mapped[int] = mapped_column(Integer, default=0)
     message_ru: Mapped[str] = mapped_column(Text, default="")
     message_en: Mapped[str] = mapped_column(Text, default="")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)

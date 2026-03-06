@@ -13,8 +13,8 @@
 
 <h4>{{ tr('donate_card_crypto') }}</h4>
 <ul>
-  {% for item in donation_methods %}
-    <li><strong>{{ item.method_type|upper|e }}:</strong> {{ item.label_html|safe }} — {{ item.details_html|safe }}</li>
+  {% for item in crypto_wallets %}
+    <li><strong>{{ item.wallet_name|e }}:</strong> {{ item.requisites_html|safe }}</li>
   {% else %}
     <li>{{ tr('donate_no_methods') }}</li>
   {% endfor %}
