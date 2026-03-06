@@ -3,8 +3,8 @@ body {
   color: #ffffff;
   text-shadow: 0 0 4px rgba(255, 255, 255, 0.38);
 }
-.container, .card, .table, .alert, .form-control, .form-select, .form-check-label, .nav-link, .navbar-brand, h1, h2, h3, h4, h5, h6, label, small, strong {
-  color: #ffffff !important;
+.container, .form-check-label, .navbar-brand, h1, h2, h3, h4, h5, h6, label, small, strong {
+  color: #ffffff;
 }
 
 .navbar,
@@ -637,7 +637,7 @@ body {
 
 .tournament-tree-participant-promoted .tournament-tree-participant-name,
 .archive-tree-participant-promoted .archive-tree-participant-name {
-  color: #8dff91;
+  color: #8dff91 !important;
 }
 
 .tournament-tree-participant-promoted,
@@ -648,7 +648,7 @@ body {
 
 .tournament-tree-participant-eliminated .tournament-tree-participant-name,
 .archive-tree-participant-eliminated .archive-tree-participant-name {
-  color: #ff6b7f;
+  color: #ff6b7f !important;
 }
 
 .tournament-tree-participant-eliminated,
@@ -659,12 +659,12 @@ body {
 
 .tournament-tree-participant-final-qualified .tournament-tree-participant-name,
 .archive-tree-participant-final-qualified .archive-tree-participant-name {
-  color: #ffd166;
+  color: #ffd166 !important;
 }
 
 .tournament-tree-participant-gold .tournament-tree-participant-name,
 .archive-tree-participant-gold .archive-tree-participant-name {
-  color: #ffd166;
+  color: #ffd166 !important;
   font-weight: 700;
 }
 
@@ -676,7 +676,7 @@ body {
 
 .tournament-tree-participant-silver .tournament-tree-participant-name,
 .archive-tree-participant-silver .archive-tree-participant-name {
-  color: #d7e2f0;
+  color: #d7e2f0 !important;
   font-weight: 700;
 }
 
@@ -688,7 +688,7 @@ body {
 
 .tournament-tree-participant-bronze .tournament-tree-participant-name,
 .archive-tree-participant-bronze .archive-tree-participant-name {
-  color: #d89b65;
+  color: #d89b65 !important;
   font-weight: 700;
 }
 
@@ -712,13 +712,13 @@ body {
 
 .tournament-tree-participant-normal .tournament-tree-participant-name,
 .archive-tree-participant-normal .archive-tree-participant-name {
-  color: #ffffff;
+  color: #ffffff !important;
 }
 
 
 .tournament-tree-participant.tournament-winner-highlight .tournament-tree-participant-name,
 .archive-tree-participant.tournament-winner-highlight .archive-tree-participant-name {
-  color: #8dff91;
+  color: #8dff91 !important;
   font-weight: 700;
 }
 
