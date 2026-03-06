@@ -32,6 +32,9 @@
           <label class="form-label" for="registration-telegram">{{ tr('participants_telegram') }} {{ tr('participants_telegram_optional') }}</label>
           <input id="registration-telegram" class="form-control mb-2" name="telegram" placeholder="{{ tr('participants_telegram') }}" {% if not registration_open or tournament_started %}disabled{% endif %}>
 
+          <label class="form-label" for="registration-nickname">{{ tr('index_nickname') }}</label>
+          <input id="registration-nickname" class="form-control mb-2" name="nickname" placeholder="{{ tr('index_nickname') }}" required {% if not registration_open or tournament_started %}disabled{% endif %}>
+
           <div class="form-check mb-3">
             <input id="rules-ack" class="form-check-input" type="checkbox" name="rules_ack" value="1" {% if not registration_open or tournament_started %}disabled{% endif %}>
             <label class="form-check-label" for="rules-ack">
@@ -114,6 +117,7 @@
   const submitBtn = document.getElementById("register-submit");
   const message = document.getElementById("steam-preview-message");
   const rulesAck = document.getElementById("rules-ack");
+  const registrationNickname = document.getElementById("registration-nickname");
   const steamIdField = document.getElementById("preview-steam-id");
   const nicknameField = document.getElementById("preview-game-nickname");
   const currentRankField = document.getElementById("preview-current-rank");
@@ -121,7 +125,8 @@
   let previewOk = false;
 
   const updateSubmitState = () => {
-    submitBtn.disabled = !(registrationAllowed && previewOk && !!rulesAck?.checked);
+    const nicknameFilled = !!registrationNickname?.value?.trim();
+    submitBtn.disabled = !(registrationAllowed && previewOk && nicknameFilled && !!rulesAck?.checked);
   };
 
   const setPreview = (data) => {
@@ -145,6 +150,7 @@
   };
 
   steamInput?.addEventListener("input", resetPreview);
+  registrationNickname?.addEventListener("input", updateSubmitState);
   rulesAck?.addEventListener("change", updateSubmitState);
 
   previewBtn?.addEventListener("click", async () => {
