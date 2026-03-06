@@ -12,7 +12,7 @@
     <h4>{{ tr('donate_links') }}</h4>
     <ul class="donate-list">
       {% for item in donation_links %}
-        <li><a href="{{ item.url|e }}" target="_blank" rel="noopener">{{ item.title_html|safe }}</a></li>
+        <li><a href="{{ item.url|e }}" target="_blank" rel="noopener"><span class="content-html">{{ item.title_html|safe }}</span></a></li>
       {% else %}
         <li>{{ tr('donate_no_links') }}</li>
       {% endfor %}
@@ -23,7 +23,7 @@
     <h4>{{ tr('donate_card_crypto') }}</h4>
     <ul class="donate-list">
       {% for item in crypto_wallets %}
-        <li><strong>{{ item.wallet_name|e }}:</strong> {{ item.requisites_html|safe }}</li>
+        <li><strong>{{ item.wallet_name|e }}:</strong> <span class="content-html">{{ item.requisites_html|safe }}</span></li>
       {% else %}
         <li>{{ tr('donate_no_methods') }}</li>
       {% endfor %}
@@ -45,7 +45,7 @@
             <tr>
               <td>
                 {{ donor.name|e }}
-                {% if donor.message_html %}<div class="text-contrast-muted">{{ donor.message_html|safe }}</div>{% endif %}
+                {% if donor.message_html %}<div class="text-contrast-muted"><div class="content-html">{{ donor.message_html|safe }}</div></div>{% endif %}
               </td>
               <td>{{ donor.amount|e }}</td>
             </tr>
