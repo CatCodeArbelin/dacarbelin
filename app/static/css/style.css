@@ -16,6 +16,20 @@ body {
   color: #ffffff !important;
 }
 
+.admin-content-page .card .form-control,
+.admin-content-page .card .form-select,
+.admin-content-page .card input.form-control,
+.admin-content-page .card textarea.form-control,
+.admin-content-page .card select.form-select {
+  color: #000000 !important;
+  caret-color: #000000;
+}
+
+.admin-content-page .card .form-control:focus,
+.admin-content-page .card .form-select:focus {
+  color: #000000 !important;
+}
+
 .content-html,
 .content-html * {
   color: inherit;
@@ -831,6 +845,7 @@ body {
 .donate-sponsors-table td {
   background: rgba(20, 27, 40, 0.75);
   border-color: #3d4f72;
+  color: #ffffff !important;
 }
 
 .donate-sponsors-table thead th {
