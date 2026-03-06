@@ -3,8 +3,22 @@ body {
   color: #ffffff;
   text-shadow: 0 0 4px rgba(255, 255, 255, 0.38);
 }
-.container, .card, .table, .alert, .form-control, .form-select, .form-check-label, .nav-link, .navbar-brand, h1, h2, h3, h4, h5, h6, p, span, li, th, td, label, small, strong {
+.container, .card, .table, .alert, .form-control, .form-select, .form-check-label, .nav-link, .navbar-brand, h1, h2, h3, h4, h5, h6, label, small, strong {
   color: #ffffff !important;
+}
+
+.navbar,
+.navbar *,
+.admin-content-page .card,
+.admin-content-page .card *,
+.admin-content-page .table,
+.admin-content-page .table * {
+  color: #ffffff !important;
+}
+
+.content-html,
+.content-html * {
+  color: inherit;
 }
 .form-control, .form-select {
   background-color: #f9fbff;
