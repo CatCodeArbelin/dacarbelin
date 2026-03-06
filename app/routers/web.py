@@ -32,6 +32,7 @@ from app.models.chat import ChatMessage
 from app.models.settings import (
     ArchiveEntry,
     ChatSetting,
+    CryptoWallet,
     DonationLink,
     DonationMethod,
     Donor,
@@ -1155,10 +1156,6 @@ def _build_chat_messages_payload(chat_messages: list[ChatMessage]) -> list[dict[
 
 class ContentLocalePayload(BaseModel):
     rules_body: str
-    donation_links_items: str
-    donation_methods_items: str
-    prize_pool_items: str
-    donors_items: str
 
 
 def localized_attr(entity: object, base_name: str, lang: str) -> str:
@@ -1171,41 +1168,9 @@ def localized_attr(entity: object, base_name: str, lang: str) -> str:
 def dump_admin_content_for_lang(
     lang: str,
     rules_content: RulesContent,
-    donation_links: list[DonationLink],
-    donation_methods: list[DonationMethod],
-    prize_pool_entries: list[PrizePoolEntry],
-    donors: list[Donor],
 ) -> ContentLocalePayload:
-    def render_table(rows: list[list[str]]) -> str:
-        if not rows:
-            return ""
-        body = "".join(
-            "<tr>" + "".join(f"<td>{escape(cell)}</td>" for cell in row) + "</tr>"
-            for row in rows
-        )
-        return f"<table><tbody>{body}</tbody></table>"
-
-    donation_links_items = render_table(
-        [[localized_attr(row, "title", lang), row.url, "1" if row.is_active else "0"] for row in donation_links]
-    )
-    donation_methods_items = render_table(
-        [
-            [row.method_type, localized_attr(row, "label", lang), localized_attr(row, "details", lang), "1" if row.is_active else "0"]
-            for row in donation_methods
-        ]
-    )
-    prize_pool_items = render_table(
-        [[localized_attr(row, "place_label", lang), localized_attr(row, "reward", lang)] for row in prize_pool_entries]
-    )
-    donors_items = render_table(
-        [[row.name, row.amount, localized_attr(row, "message", lang)] for row in donors]
-    )
     return ContentLocalePayload(
-        rules_body=localized_attr(rules_content, 'body', lang),
-        donation_links_items=donation_links_items,
-        donation_methods_items=donation_methods_items,
-        prize_pool_items=prize_pool_items,
-        donors_items=donors_items,
+        rules_body=localized_attr(rules_content, "body", lang),
     )
 
 
@@ -1609,7 +1574,7 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
     # Отдаем страницу донатов.
     lang = get_lang(request.cookies.get("lang"))
     donation_links = (await db.scalars(select(DonationLink).where(DonationLink.is_active.is_(True)).order_by(DonationLink.sort_order, DonationLink.id))).all()
-    donation_methods = (await db.scalars(select(DonationMethod).where(DonationMethod.is_active.is_(True)).order_by(DonationMethod.method_type, DonationMethod.sort_order, DonationMethod.id))).all()
+    crypto_wallets = (await db.scalars(select(CryptoWallet).where(CryptoWallet.is_active.is_(True)).order_by(CryptoWallet.sort_order, CryptoWallet.id))).all()
     prize_pool_entries = (await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all()
     donors = (await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all()
 
@@ -1617,13 +1582,12 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
         {"url": item.url, "title_html": sanitize_content_html(localized_attr(item, "title", lang))}
         for item in donation_links
     ]
-    donation_methods_vm = [
+    crypto_wallets_vm = [
         {
-            "method_type": item.method_type,
-            "label_html": sanitize_content_html(localized_attr(item, "label", lang)),
-            "details_html": sanitize_content_html(localized_attr(item, "details", lang)),
+            "wallet_name": item.wallet_name,
+            "requisites_html": sanitize_content_html(item.requisites),
         }
-        for item in donation_methods
+        for item in crypto_wallets
     ]
     prize_pool_entries_vm = [
         {
@@ -1635,7 +1599,7 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
     donors_vm = [
         {
             "name": donor.name,
-            "amount": donor.amount,
+            "amount": str(donor.amount),
             "message_html": sanitize_content_html(localized_attr(donor, "message", lang)),
         }
         for donor in donors
@@ -1647,7 +1611,7 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
         template_context(
             request,
             donation_links=donation_links_vm,
-            donation_methods=donation_methods_vm,
+            crypto_wallets=crypto_wallets_vm,
             prize_pool_entries=prize_pool_entries_vm,
             donors=donors_vm,
         ),
@@ -2158,13 +2122,12 @@ async def admin_chat_page(request: Request, db: AsyncSession = Depends(get_db)):
 async def admin_content_page(request: Request, db: AsyncSession = Depends(get_db)):
     rules_content = await get_or_create_rules_content(db)
     donation_links = (await db.scalars(select(DonationLink).order_by(DonationLink.sort_order, DonationLink.id))).all()
-    donation_methods = (await db.scalars(select(DonationMethod).order_by(DonationMethod.sort_order, DonationMethod.id))).all()
-    prize_pool_entries = (await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all()
+    crypto_wallets = (await db.scalars(select(CryptoWallet).order_by(CryptoWallet.sort_order, CryptoWallet.id))).all()
     donors = (await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all()
     selected_lang = get_lang(request.query_params.get("content_lang") or request.cookies.get("lang"))
     content_by_lang = {
-        "ru": dump_admin_content_for_lang("ru", rules_content, donation_links, donation_methods, prize_pool_entries, donors).model_dump(),
-        "en": dump_admin_content_for_lang("en", rules_content, donation_links, donation_methods, prize_pool_entries, donors).model_dump(),
+        "ru": dump_admin_content_for_lang("ru", rules_content).model_dump(),
+        "en": dump_admin_content_for_lang("en", rules_content).model_dump(),
     }
     return templates.TemplateResponse(
         request,
@@ -2174,6 +2137,9 @@ async def admin_content_page(request: Request, db: AsyncSession = Depends(get_db
             selected_content_lang=selected_lang,
             content_by_lang=content_by_lang,
             tiny_mce_api_key=settings.tiny_mce_api_key,
+            donation_links=donation_links,
+            crypto_wallets=crypto_wallets,
+            sponsors=donors,
         ),
     )
 
@@ -3210,85 +3176,138 @@ async def admin_save_donation_links(
     return RedirectResponse(url=f"/admin/content?msg=msg_donation_links_saved&content_lang={lang}", status_code=303)
 
 
-@router.post("/admin/donation-methods")
-async def admin_save_donation_methods(
-    items: str = Form(default=""),
+@router.post("/admin/sponsors")
+async def admin_create_sponsor(
+    name: str = Form(...),
+    amount: int = Form(default=0),
+    db: AsyncSession = Depends(get_db),
+):
+    max_sort_order = await db.scalar(select(func.max(Donor.sort_order)))
+    db.add(Donor(name=(name or "").strip(), amount=max(0, amount), sort_order=(max_sort_order or -1) + 1))
+    await db.commit()
+    return RedirectResponse(url="/admin/content?msg=msg_donors_saved", status_code=303)
+
+
+@router.post("/admin/sponsors/{sponsor_id}/update")
+async def admin_update_sponsor(
+    sponsor_id: int,
+    name: str = Form(...),
+    amount: int = Form(default=0),
+    db: AsyncSession = Depends(get_db),
+):
+    sponsor = await db.get(Donor, sponsor_id)
+    if not sponsor:
+        return RedirectResponse(url="/admin/content?msg=msg_operation_failed", status_code=303)
+    sponsor.name = (name or "").strip()
+    sponsor.amount = max(0, amount)
+    await db.commit()
+    return RedirectResponse(url="/admin/content?msg=msg_donors_saved", status_code=303)
+
+
+@router.post("/admin/sponsors/{sponsor_id}/delete")
+async def admin_delete_sponsor(
+    sponsor_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    sponsor = await db.get(Donor, sponsor_id)
+    if sponsor:
+        await db.delete(sponsor)
+        await db.commit()
+    return RedirectResponse(url="/admin/content?msg=msg_donors_saved", status_code=303)
+
+
+@router.post("/admin/crypto-wallets")
+async def admin_create_crypto_wallet(
+    wallet_name: str = Form(...),
+    requisites: str = Form(default=""),
+    is_active: bool = Form(default=False),
+    db: AsyncSession = Depends(get_db),
+):
+    max_sort_order = await db.scalar(select(func.max(CryptoWallet.sort_order)))
+    db.add(CryptoWallet(wallet_name=(wallet_name or "").strip(), requisites=(requisites or "").strip(), is_active=is_active, sort_order=(max_sort_order or -1) + 1))
+    await db.commit()
+    return RedirectResponse(url="/admin/content?msg=msg_donation_methods_saved", status_code=303)
+
+
+@router.post("/admin/crypto-wallets/{wallet_id}/update")
+async def admin_update_crypto_wallet(
+    wallet_id: int,
+    wallet_name: str = Form(...),
+    requisites: str = Form(default=""),
+    is_active: bool = Form(default=False),
+    db: AsyncSession = Depends(get_db),
+):
+    wallet = await db.get(CryptoWallet, wallet_id)
+    if not wallet:
+        return RedirectResponse(url="/admin/content?msg=msg_operation_failed", status_code=303)
+    wallet.wallet_name = (wallet_name or "").strip()
+    wallet.requisites = (requisites or "").strip()
+    wallet.is_active = is_active
+    await db.commit()
+    return RedirectResponse(url="/admin/content?msg=msg_donation_methods_saved", status_code=303)
+
+
+@router.post("/admin/crypto-wallets/{wallet_id}/delete")
+async def admin_delete_crypto_wallet(
+    wallet_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    wallet = await db.get(CryptoWallet, wallet_id)
+    if wallet:
+        await db.delete(wallet)
+        await db.commit()
+    return RedirectResponse(url="/admin/content?msg=msg_donation_methods_saved", status_code=303)
+
+
+@router.post("/admin/donation-links/create")
+async def admin_create_donation_link(
+    label: str = Form(...),
+    url: str = Form(...),
+    is_active: bool = Form(default=False),
     content_lang: str = Form(default="ru"),
     db: AsyncSession = Depends(get_db),
 ):
     lang = get_lang(content_lang)
-    existing_rows = list((await db.scalars(select(DonationMethod).order_by(DonationMethod.sort_order, DonationMethod.id))).all())
-    rows = parse_visual_editor_rows(items)
-    for idx, parts in enumerate(rows):
-        if len(parts) < 3:
-            continue
-        row = existing_rows[idx] if idx < len(existing_rows) else DonationMethod()
-        row.sort_order = idx
-        row.method_type = parts[0]
-        row.is_active = (parts[3] != "0") if len(parts) > 3 else True
-        setattr(row, f"label_{lang}", parts[1])
-        setattr(row, f"details_{lang}", parts[2])
-        if idx >= len(existing_rows):
-            db.add(row)
-
-    for row in existing_rows[len(rows):]:
-        await db.delete(row)
-
+    max_sort_order = await db.scalar(select(func.max(DonationLink.sort_order)))
+    row = DonationLink(url=(url or "").strip(), is_active=is_active, sort_order=(max_sort_order or -1) + 1)
+    setattr(row, f"title_{lang}", (label or "").strip())
+    db.add(row)
     await db.commit()
-    return RedirectResponse(url=f"/admin/content?msg=msg_donation_methods_saved&content_lang={lang}", status_code=303)
+    return RedirectResponse(url=f"/admin/content?msg=msg_donation_links_saved&content_lang={lang}", status_code=303)
 
 
-@router.post("/admin/prize-pool")
-async def admin_save_prize_pool(
-    items: str = Form(default=""),
+@router.post("/admin/donation-links/{link_id}/update")
+async def admin_update_donation_link(
+    link_id: int,
+    label: str = Form(...),
+    url: str = Form(...),
+    is_active: bool = Form(default=False),
     content_lang: str = Form(default="ru"),
     db: AsyncSession = Depends(get_db),
 ):
     lang = get_lang(content_lang)
-    existing_rows = list((await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all())
-    rows = parse_visual_editor_rows(items)
-    for idx, parts in enumerate(rows):
-        if len(parts) < 2:
-            continue
-        row = existing_rows[idx] if idx < len(existing_rows) else PrizePoolEntry()
-        row.sort_order = idx
-        setattr(row, f"place_label_{lang}", parts[0])
-        setattr(row, f"reward_{lang}", parts[1])
-        if idx >= len(existing_rows):
-            db.add(row)
-
-    for row in existing_rows[len(rows):]:
-        await db.delete(row)
-
+    row = await db.get(DonationLink, link_id)
+    if not row:
+        return RedirectResponse(url=f"/admin/content?msg=msg_operation_failed&content_lang={lang}", status_code=303)
+    row.url = (url or "").strip()
+    row.is_active = is_active
+    setattr(row, f"title_{lang}", (label or "").strip())
     await db.commit()
-    return RedirectResponse(url=f"/admin/content?msg=msg_prize_pool_saved&content_lang={lang}", status_code=303)
+    return RedirectResponse(url=f"/admin/content?msg=msg_donation_links_saved&content_lang={lang}", status_code=303)
 
 
-@router.post("/admin/donors")
-async def admin_save_donors(
-    items: str = Form(default=""),
+@router.post("/admin/donation-links/{link_id}/delete")
+async def admin_delete_donation_link(
+    link_id: int,
     content_lang: str = Form(default="ru"),
     db: AsyncSession = Depends(get_db),
 ):
     lang = get_lang(content_lang)
-    existing_rows = list((await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all())
-    rows = parse_visual_editor_rows(items)
-    for idx, parts in enumerate(rows):
-        if not parts:
-            continue
-        row = existing_rows[idx] if idx < len(existing_rows) else Donor()
-        row.sort_order = idx
-        row.name = parts[0]
-        row.amount = parts[1] if len(parts) > 1 else ""
-        setattr(row, f"message_{lang}", parts[2] if len(parts) > 2 else "")
-        if idx >= len(existing_rows):
-            db.add(row)
-
-    for row in existing_rows[len(rows):]:
+    row = await db.get(DonationLink, link_id)
+    if row:
         await db.delete(row)
-
-    await db.commit()
-    return RedirectResponse(url=f"/admin/content?msg=msg_donors_saved&content_lang={lang}", status_code=303)
+        await db.commit()
+    return RedirectResponse(url=f"/admin/content?msg=msg_donation_links_saved&content_lang={lang}", status_code=303)
 
 
 @router.post("/admin/rules")
