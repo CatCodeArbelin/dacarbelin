@@ -1398,13 +1398,34 @@ async def participants(
     db: AsyncSession = Depends(get_db),
 ):
     # Показываем участников по паре корзин: основной состав + резерв.
-    basket_pairs = [
-        (Basket.QUEEN.value, Basket.QUEEN_RESERVE.value),
-        (Basket.KING.value, Basket.KING_RESERVE.value),
-        (Basket.ROOK.value, Basket.ROOK_RESERVE.value),
-        (Basket.BISHOP.value, Basket.BISHOP_RESERVE.value),
-        (Basket.LOW_RANK.value, Basket.LOW_RANK_RESERVE.value),
+    basket_tabs = [
+        {
+            "main_basket": Basket.QUEEN.value,
+            "reserve_basket": Basket.QUEEN_RESERVE.value,
+            "label": "Queen",
+        },
+        {
+            "main_basket": Basket.KING.value,
+            "reserve_basket": Basket.KING_RESERVE.value,
+            "label": "King",
+        },
+        {
+            "main_basket": Basket.ROOK.value,
+            "reserve_basket": Basket.ROOK_RESERVE.value,
+            "label": "Rook",
+        },
+        {
+            "main_basket": Basket.BISHOP.value,
+            "reserve_basket": Basket.BISHOP_RESERVE.value,
+            "label": "Bishop",
+        },
+        {
+            "main_basket": Basket.LOW_RANK.value,
+            "reserve_basket": Basket.LOW_RANK_RESERVE.value,
+            "label": "Low Rank",
+        },
     ]
+    basket_pairs = [(tab["main_basket"], tab["reserve_basket"]) for tab in basket_tabs]
     basket_to_pair = {basket_name: pair for pair in basket_pairs for basket_name in pair}
     selected_pair = basket_to_pair.get(basket, basket_pairs[0])
     main_basket, reserve_basket = selected_pair
@@ -1448,6 +1469,7 @@ async def participants(
             basket=main_basket,
             view=view,
             basket_pairs=basket_pairs,
+            basket_tabs=basket_tabs,
             main_users=main_users,
             reserve_users=reserve_users,
             direct_invite_users=direct_invite_users,
