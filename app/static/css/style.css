@@ -654,6 +654,18 @@ body {
   font-weight: 700;
 }
 
+.archive-tree-participant-gold {
+  border-left-color: rgba(255, 209, 102, 0.95);
+}
+
+.archive-tree-participant-silver {
+  border-left-color: rgba(215, 226, 240, 0.95);
+}
+
+.archive-tree-participant-bronze {
+  border-left-color: rgba(216, 155, 101, 0.95);
+}
+
 .tournament-tree-participant-normal .tournament-tree-participant-name,
 .archive-tree-participant-normal .archive-tree-participant-name {
   color: #ffffff;
