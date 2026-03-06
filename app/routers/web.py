@@ -1300,10 +1300,8 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
 @router.post("/register")
 async def register(
     request: Request,
-    nickname: str = Form(...),
     steam_input: str = Form(...),
     telegram: str = Form(default=""),
-    discord: str = Form(default=""),
     db: AsyncSession = Depends(get_db),
 ):
     """Регистрирует пользователя, если по steam_id запись в БД отсутствует."""
@@ -1334,14 +1332,13 @@ async def register(
     basket = allocate_basket(target_basket=target_basket, basket_counts=basket_counts)
 
     user = User(
-        nickname=nickname,
+        nickname=profile["game_nickname"] or steam_id,
         steam_input=steam_input,
         steam_id=steam_id,
         game_nickname=profile["game_nickname"],
         current_rank=profile["current_rank"],
         highest_rank=profile["highest_rank"],
         telegram=telegram or None,
-        discord=discord or None,
         basket=basket,
         extra_data=json.dumps(profile["raw"], ensure_ascii=False),
     )
