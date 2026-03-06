@@ -28,6 +28,7 @@
             <th>Ручные очки</th>
             <th>Direct invite</th>
             <th>{{ tr('admin_save') }}</th>
+            <th>{{ tr('admin_delete') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -64,10 +65,16 @@
               </form>
               <button class="btn btn-sm btn-outline-info" form="user-update-{{ user.id }}">{{ tr('admin_save') }}</button>
             </td>
+            <td>
+              <form action="/admin/user/delete" method="post" class="d-inline" onsubmit="return confirm('{{ tr('admin_confirm_delete_user')|e }}');">
+                <input type="hidden" name="user_id" value="{{ user.id }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit">{{ tr('admin_delete') }}</button>
+              </form>
+            </td>
           </tr>
           {% endfor %}
           {% if section.users|length == 0 %}
-          <tr><td colspan="9" class="text-muted">Нет участников</td></tr>
+          <tr><td colspan="10" class="text-muted">Нет участников</td></tr>
           {% endif %}
         </tbody>
       </table>

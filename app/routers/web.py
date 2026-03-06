@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, Form, Query, Request
 from pydantic import BaseModel
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import delete, desc, func, select
+from sqlalchemy import delete, desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -40,7 +40,16 @@ from app.models.settings import (
     SiteSetting,
     TournamentStage,
 )
-from app.models.tournament import EmergencyOperationLog, GroupGameResult, GroupMember, PlayoffMatch, PlayoffParticipant, PlayoffStage, TournamentGroup
+from app.models.tournament import (
+    EmergencyOperationLog,
+    GroupGameResult,
+    GroupManualTieBreak,
+    GroupMember,
+    PlayoffMatch,
+    PlayoffParticipant,
+    PlayoffStage,
+    TournamentGroup,
+)
 from app.models.tournament_archive import TournamentArchive
 from app.models.user import Basket, User
 from app.services.basket_allocator import allocate_basket
@@ -2100,6 +2109,34 @@ async def _update_user_allowed_fields(
     return redirect_with_admin_users_msg("msg_status_ok")
 
 
+async def _delete_user_with_dependencies(db: AsyncSession, *, user: User) -> None:
+    """Удаляет пользователя и связанные записи явными запросами для надежности между СУБД."""
+    user_id = user.id
+
+    await db.execute(delete(GroupGameResult).where(GroupGameResult.user_id == user_id))
+    await db.execute(delete(GroupManualTieBreak).where(GroupManualTieBreak.user_id == user_id))
+    await db.execute(delete(GroupMember).where(GroupMember.user_id == user_id))
+    await db.execute(delete(PlayoffParticipant).where(PlayoffParticipant.user_id == user_id))
+
+    await db.execute(
+        update(PlayoffMatch)
+        .where(PlayoffMatch.winner_user_id == user_id)
+        .values(winner_user_id=None)
+    )
+    await db.execute(
+        update(PlayoffMatch)
+        .where(PlayoffMatch.manual_winner_user_id == user_id)
+        .values(manual_winner_user_id=None)
+    )
+    await db.execute(
+        update(PlayoffStage)
+        .where(PlayoffStage.final_candidate_user_id == user_id)
+        .values(final_candidate_user_id=None)
+    )
+
+    await db.delete(user)
+
+
 @router.get("/admin/chat", response_class=HTMLResponse)
 async def admin_chat_page(request: Request, db: AsyncSession = Depends(get_db)):
     chat_settings = await get_or_create_chat_settings(db)
@@ -2184,6 +2221,26 @@ async def admin_update_user_basket(
         direct_invite_stage=user.direct_invite_stage,
         manual_points=None,
     )
+
+
+@router.post("/admin/user/delete")
+async def admin_delete_user(
+    user_id: int = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await db.get(User, user_id)
+    if not user:
+        return redirect_with_admin_users_msg("msg_user_delete_not_found")
+
+    try:
+        await _delete_user_with_dependencies(db, user=user)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        logger.exception("Failed to delete user %s from admin panel", user_id)
+        return redirect_with_admin_users_msg("msg_user_delete_failed")
+
+    return redirect_with_admin_users_msg("msg_user_deleted")
 
 
 @router.post("/admin/stage")
