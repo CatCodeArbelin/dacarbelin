@@ -1199,6 +1199,7 @@ async def set_lang(lang: str):
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request, db: AsyncSession = Depends(get_db)):
     # Рендерим главную страницу с формой и чатом.
+    lang = get_lang(request.cookies.get("lang"))
     chat_messages = (await db.scalars(select(ChatMessage).order_by(desc(ChatMessage.id)).limit(20))).all()
     registration_open = await get_registration_open(db)
     tournament_started = await get_tournament_started(db)
@@ -1208,19 +1209,24 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
     for donor_amount in donors:
         total_sponsors_amount += parse_donor_amount(str(donor_amount))
 
-    total_sponsors_amount_display = f"{int(total_sponsors_amount)}" if total_sponsors_amount == total_sponsors_amount.to_integral() else f"{total_sponsors_amount:.2f}"
+    usd_amount = total_sponsors_amount / Decimal("79")
+
+    total_sponsors_amount_rub = f"{int(total_sponsors_amount)}" if total_sponsors_amount == total_sponsors_amount.to_integral() else f"{total_sponsors_amount:.2f}"
+    total_sponsors_amount_usd = f"{int(usd_amount)}" if usd_amount == usd_amount.to_integral() else f"{usd_amount:.2f}"
     return templates.TemplateResponse(
         request,
         "index.html",
         template_context(
             request,
+            lang=lang,
             chat_messages=list(reversed(chat_messages)),
             chat_messages_payload=_build_chat_messages_payload(list(reversed(chat_messages))),
             chat_nick_colors=CHAT_NICK_COLORS,
             registration_open=registration_open,
             tournament_started=tournament_started,
             chat_settings=chat_settings,
-            total_sponsors_amount=total_sponsors_amount_display,
+            total_sponsors_amount_rub=total_sponsors_amount_rub,
+            total_sponsors_amount_usd=total_sponsors_amount_usd,
             chat_saved_nick=unquote((request.cookies.get("chat_nick") or "")).strip()[:120],
         ),
     )
