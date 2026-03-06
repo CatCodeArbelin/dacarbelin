@@ -50,6 +50,8 @@ def test_admin_users_template_has_group_sections() -> None:
     assert "{% for section in group_sections %}" in template
     assert "{% for user in section.users %}" in template
     assert "Группы отображаются, потому что жеребьевка применена и турнир запущен." in template
+    assert "/admin/user/delete" in template
+    assert "admin_confirm_delete_user" in template
 
 
 def test_tournament_template_has_empty_active_stage_alert() -> None:
