@@ -15,8 +15,8 @@
           </div>
           <div class="alert alert-warning small py-2" role="note">{{ tr('index_steam_nickname_warning') }}</div>
 
-          <label class="form-label" for="preview-steam-id">{{ tr('index_steam_id') }}</label>
-          <input id="preview-steam-id" class="form-control mb-2" placeholder="{{ tr('index_steam_id') }}" readonly>
+          <label class="form-label" for="registration-nickname">{{ tr('index_nickname') }}</label>
+          <input id="registration-nickname" class="form-control mb-2" name="nickname" placeholder="{{ tr('index_nickname') }}" required {% if not registration_open or tournament_started %}disabled{% endif %}>
 
           <label class="form-label" for="preview-game-nickname">{{ tr('index_game_nickname') }}</label>
           <input id="preview-game-nickname" class="form-control mb-2" placeholder="{{ tr('index_game_nickname') }}" readonly>
@@ -27,13 +27,13 @@
           <label class="form-label" for="preview-highest-rank">{{ tr('index_highest_rank') }}</label>
           <input id="preview-highest-rank" class="form-control mb-2" placeholder="{{ tr('index_highest_rank') }}" readonly>
 
+          <label class="form-label" for="preview-steam-id">{{ tr('index_steam_id') }}</label>
+          <input id="preview-steam-id" class="form-control mb-2" placeholder="{{ tr('index_steam_id') }}" readonly>
+
           <div id="steam-preview-message" class="small mb-2"></div>
 
           <label class="form-label" for="registration-telegram">{{ tr('participants_telegram') }} {{ tr('participants_telegram_optional') }}</label>
           <input id="registration-telegram" class="form-control mb-2" name="telegram" placeholder="{{ tr('participants_telegram') }}" {% if not registration_open or tournament_started %}disabled{% endif %}>
-
-          <label class="form-label" for="registration-nickname">{{ tr('index_nickname') }}</label>
-          <input id="registration-nickname" class="form-control mb-2" name="nickname" placeholder="{{ tr('index_nickname') }}" required {% if not registration_open or tournament_started %}disabled{% endif %}>
 
           <div class="form-check mb-3">
             <input id="rules-ack" class="form-check-input" type="checkbox" name="rules_ack" value="1" {% if not registration_open or tournament_started %}disabled{% endif %}>
