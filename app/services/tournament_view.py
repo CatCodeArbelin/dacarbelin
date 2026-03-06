@@ -169,6 +169,13 @@ def _apply_stage_highlight_rules(stage_key: str, participants: list[BracketParti
     if not participants:
         return participants
 
+    has_played_games = any((participant.get("points") or 0) > 0 for participant in participants)
+    if not has_played_games:
+        for participant in participants:
+            participant["is_promoted_highlight"] = False
+            participant.pop("highlight_color", None)
+        return participants
+
     normalized_stage_key = normalize_stage_key(stage_key)
 
     if normalized_stage_key == "stage_final":
