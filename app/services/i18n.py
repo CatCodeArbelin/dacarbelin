@@ -562,7 +562,7 @@ TRANSLATIONS = {
         "index_stages": "Этапы",
         "index_prize_pool": "Призовой Пул",
         "index_watch_twitch": "Смотреть Twitch",
-        "index_steam_nickname_warning": "Перед отправкой убедитесь, что поле Ник совпадает с реальным, согласно правил турнира.",
+        "index_steam_nickname_warning": "Перед отправкой убедитесь, что поле Ник совпадает с реальным, согласно правилам турнира.",
         "index_rules_ack_prefix": "С",
         "index_rules_link_text": "Правилами",
         "index_rules_ack_suffix": "ознакомлен",
