@@ -873,10 +873,14 @@ def _validate_user_update_payload(nickname: str, basket: str, direct_invite_stag
 def _display_nickname(user: User | None, fallback: str) -> str:
     if not user:
         return fallback
+
+    fallback_name = (fallback or "").strip() or "-"
     game_nickname = (user.game_nickname or "").strip()
-    if game_nickname:
-        return f"{user.nickname}({game_nickname})"
-    return user.nickname
+    profile_nickname = (user.nickname or "").strip()
+    base_name = game_nickname or profile_nickname or fallback_name
+
+    current_rank = (user.current_rank or "").strip() or "-"
+    return f"{base_name} ({current_rank})"
 
 
 def template_context(request: Request, **extra):
