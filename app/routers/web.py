@@ -90,6 +90,7 @@ from app.services.tournament import (
     reset_tournament_cycle_after_finish,
 )
 from app.services.tournament_view import (
+    _apply_stage_highlight_rules,
     build_bracket_columns,
     build_tournament_tree_vm,
     resolve_current_stage_label,
@@ -495,8 +496,14 @@ def _build_archive_bracket_columns(payload: str | None) -> tuple[list[dict[str, 
 
 
 def _apply_archive_stage_highlight(stage_key: str, participants: list[dict[str, object]]) -> list[dict[str, object]]:
-    if not participants:
-        return participants
+    if stage_key == "stage_1":
+        stage_key = "group_stage"
+    elif stage_key == "stage_3":
+        stage_key = "stage_1_4"
+
+    normalized_stage_key = normalize_stage_key(stage_key)
+    for participant in participants:
+        participant["is_tournament_winner"] = bool(participant.get("is_winner"))
 
     ranked_participants = sorted(
         participants,
@@ -504,28 +511,7 @@ def _apply_archive_stage_highlight(stage_key: str, participants: list[dict[str, 
         reverse=True,
     )
 
-    if stage_key == "stage_final":
-        winner = next((participant for participant in participants if bool(participant.get("is_winner"))), None)
-        for participant in ranked_participants:
-            if participant is winner:
-                participant["highlight_color"] = "promoted"
-                participant["highlight_color"] = "gold"
-                participant["is_tournament_winner"] = True
-            else:
-                participant["is_tournament_winner"] = False
-                participant["highlight_color"] = "normal"
-
-        finalists_without_winner = [participant for participant in ranked_participants if participant is not winner]
-        if finalists_without_winner:
-            finalists_without_winner[0]["highlight_color"] = "silver"
-        if len(finalists_without_winner) > 1:
-            finalists_without_winner[1]["highlight_color"] = "bronze"
-        return ranked_participants
-
-    promote_top_n = 3 if stage_key == "group_stage" else 4 if stage_key in {"stage_2", "stage_1_4"} else 0
-    for idx, participant in enumerate(ranked_participants, start=1):
-        participant["highlight_color"] = "promoted" if promote_top_n and idx <= promote_top_n else "eliminated"
-    return ranked_participants
+    return _apply_stage_highlight_rules(normalized_stage_key, ranked_participants)
 
 def _build_archive_tree_vm(columns: list[dict[str, object]]) -> dict[str, object]:
     stage_keys = ["group_stage", "stage_2", "stage_1_4", "stage_final"]
@@ -1734,6 +1720,13 @@ async def archive_page(request: Request, db: AsyncSession = Depends(get_db)):
     )
 
 
+@router.get("/freak", response_class=HTMLResponse)
+async def freak_page(request: Request):
+    return templates.TemplateResponse(request, "freak.html", template_context(request))
+
+
+
+
 @router.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
     if is_admin_session(request.cookies.get(ADMIN_SESSION_COOKIE)):
@@ -2280,6 +2273,41 @@ async def admin_delete_user(
         return redirect_with_admin_users_msg("msg_user_delete_failed")
 
     return redirect_with_admin_users_msg("msg_user_deleted")
+
+
+
+@router.post("/admin/users/refresh-ranks")
+async def admin_refresh_users_ranks(db: AsyncSession = Depends(get_db)):
+    users = (
+        await db.scalars(
+            select(User)
+            .where(User.steam_id.is_not(None), User.steam_id != "")
+            .order_by(User.id.asc())
+        )
+    ).all()
+
+    updated_count = 0
+    failed_count = 0
+    for index, user in enumerate(users):
+        try:
+            profile = await fetch_autochess_data(user.steam_id)
+            user.current_rank = profile["current_rank"]
+            user.highest_rank = profile["highest_rank"]
+            updated_count += 1
+        except Exception:
+            failed_count += 1
+            logger.exception("Failed to refresh ranks for user_id=%s steam_id=%s", user.id, user.steam_id)
+
+        if index < len(users) - 1:
+            await asyncio.sleep(1.5)
+
+    await db.commit()
+    return redirect_with_admin_users_msg(
+        "msg_status_ok",
+        details=f"ranks_refreshed:{updated_count};failed:{failed_count}",
+    )
+
+
 
 
 @router.post("/admin/stage")
