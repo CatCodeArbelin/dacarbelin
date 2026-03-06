@@ -50,7 +50,13 @@
     <div class="card bg-black neon-border-blue prize-pool-card">
       <div class="card-body">
         <h3>{{ tr('index_prize_pool') }}</h3>
-        <div class="prize-pool-amount">{{ total_sponsors_amount }} ₽</div>
+        <div class="prize-pool-amount">
+          {% if lang == 'en' %}
+            $ {{ total_sponsors_amount_usd }}
+          {% else %}
+            {{ total_sponsors_amount_rub }} ₽
+          {% endif %}
+        </div>
         <div>
           <a class="btn btn-outline-info prize-pool-twitch-btn" href="https://www.twitch.tv/loyrensss" target="_blank" rel="noopener noreferrer">{{ tr('index_watch_twitch') }}</a>
         </div>
