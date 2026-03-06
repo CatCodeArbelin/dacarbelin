@@ -709,3 +709,49 @@ body {
   background: rgba(0, 183, 255, 0.2) !important;
   border-color: #74e7ff !important;
 }
+
+.donate-page {
+  display: grid;
+  gap: 16px;
+}
+
+.donate-section {
+  background: linear-gradient(180deg, rgba(14, 19, 29, 0.95), rgba(10, 13, 22, 0.92));
+  border: 1px solid #2f436b;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.donate-section h4 {
+  margin-bottom: 12px;
+  color: #8ddfff !important;
+}
+
+.donate-section--highlight {
+  border-color: #00b7ff;
+  box-shadow: 0 0 14px rgba(0, 183, 255, 0.25);
+}
+
+.donate-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.donate-list li + li {
+  margin-top: 8px;
+}
+
+.donate-sponsors-table {
+  margin-bottom: 0;
+  border-color: #3d4f72;
+}
+
+.donate-sponsors-table th,
+.donate-sponsors-table td {
+  background: rgba(20, 27, 40, 0.75);
+  border-color: #3d4f72;
+}
+
+.donate-sponsors-table thead th {
+  color: #9ae7ff !important;
+}

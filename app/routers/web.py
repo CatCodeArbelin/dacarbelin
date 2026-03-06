@@ -1579,8 +1579,15 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
     lang = get_lang(request.cookies.get("lang"))
     donation_links = (await db.scalars(select(DonationLink).where(DonationLink.is_active.is_(True)).order_by(DonationLink.sort_order, DonationLink.id))).all()
     crypto_wallets = (await db.scalars(select(CryptoWallet).where(CryptoWallet.is_active.is_(True)).order_by(CryptoWallet.sort_order, CryptoWallet.id))).all()
-    prize_pool_entries = (await db.scalars(select(PrizePoolEntry).order_by(PrizePoolEntry.sort_order, PrizePoolEntry.id))).all()
     donors = (await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all()
+    total_sponsors_amount = parse_donor_amount("0")
+    for donor in donors:
+        total_sponsors_amount += parse_donor_amount(str(donor.amount))
+    total_sponsors_amount_display = (
+        f"{int(total_sponsors_amount)}"
+        if total_sponsors_amount == total_sponsors_amount.to_integral()
+        else f"{total_sponsors_amount:.2f}"
+    )
 
     donation_links_vm = [
         {"url": item.url, "title_html": sanitize_content_html(localized_attr(item, "title", lang))}
@@ -1592,13 +1599,6 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
             "requisites_html": sanitize_content_html(item.requisites),
         }
         for item in crypto_wallets
-    ]
-    prize_pool_entries_vm = [
-        {
-            "place_label_html": sanitize_content_html(localized_attr(item, "place_label", lang)),
-            "reward_html": sanitize_content_html(localized_attr(item, "reward", lang)),
-        }
-        for item in prize_pool_entries
     ]
     donors_vm = [
         {
@@ -1614,9 +1614,9 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
         "donate.html",
         template_context(
             request,
+            total_sponsors_amount=total_sponsors_amount_display,
             donation_links=donation_links_vm,
             crypto_wallets=crypto_wallets_vm,
-            prize_pool_entries=prize_pool_entries_vm,
             donors=donors_vm,
         ),
     )
