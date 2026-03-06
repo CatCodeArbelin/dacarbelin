@@ -35,6 +35,7 @@ class User(Base):
     current_rank: Mapped[str] = mapped_column(String(120), nullable=False)
     highest_rank: Mapped[str] = mapped_column(String(120), nullable=False)
     telegram: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Legacy field: kept in schema for backward compatibility, no longer populated in public registration.
     discord: Mapped[str | None] = mapped_column(String(255), nullable=True)
     basket: Mapped[str] = mapped_column(String(50), default=Basket.LOW_RANK.value, index=True)
     direct_invite_stage: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)

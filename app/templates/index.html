@@ -8,9 +8,6 @@
         <h2>{{ tr('register') }}</h2>
         {% if tournament_started %}<div class="alert alert-warning">{{ tr('registration_closed') }}</div>{% elif not registration_open %}<div class="alert alert-warning">{{ tr('registration_closed') }}</div>{% endif %}
         <form id="registration-form" action="/register" method="post">
-          <label class="form-label" for="registration-nickname">{{ tr('index_nickname') }}</label>
-          <input id="registration-nickname" class="form-control mb-2" name="nickname" placeholder="{{ tr('index_nickname') }}" required {% if not registration_open or tournament_started %}disabled{% endif %}>
-
           <label class="form-label" for="steam-input">{{ tr('index_steam_id_or_url') }}</label>
           <div class="input-group mb-2">
             <input id="steam-input" class="form-control" name="steam_input" placeholder="{{ tr('index_steam_id_or_url') }}" required {% if not registration_open or tournament_started %}disabled{% endif %}>
@@ -31,11 +28,8 @@
 
           <div id="steam-preview-message" class="small mb-2"></div>
 
-          <label class="form-label" for="registration-telegram">{{ tr('participants_telegram') }}</label>
+          <label class="form-label" for="registration-telegram">{{ tr('participants_telegram') }} {{ tr('participants_telegram_optional') }}</label>
           <input id="registration-telegram" class="form-control mb-2" name="telegram" placeholder="{{ tr('participants_telegram') }}" {% if not registration_open or tournament_started %}disabled{% endif %}>
-
-          <label class="form-label" for="registration-discord">{{ tr('participants_discord') }}</label>
-          <input id="registration-discord" class="form-control mb-2" name="discord" placeholder="{{ tr('participants_discord') }}" {% if not registration_open or tournament_started %}disabled{% endif %}>
           <button id="register-submit" class="btn btn-danger" disabled>{{ tr('submit') }}</button>
         </form>
       </div>
