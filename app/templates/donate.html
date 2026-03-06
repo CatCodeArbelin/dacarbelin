@@ -1,40 +1,61 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>{{ tr('donate_title') }}</h2>
+<div class="donate-page">
+  <h2>{{ tr('donate_title') }}</h2>
 
-<h4>{{ tr('donate_links') }}</h4>
-<ul>
-  {% for item in donation_links %}
-    <li><a href="{{ item.url|e }}" target="_blank" rel="noopener">{{ item.title_html|safe }}</a></li>
-  {% else %}
-    <li>{{ tr('donate_no_links') }}</li>
-  {% endfor %}
-</ul>
+  <section class="donate-section donate-section--highlight">
+    <h4>{{ tr('donate_prize_pool') }} {{ total_sponsors_amount }}</h4>
+  </section>
 
-<h4>{{ tr('donate_card_crypto') }}</h4>
-<ul>
-  {% for item in crypto_wallets %}
-    <li><strong>{{ item.wallet_name|e }}:</strong> {{ item.requisites_html|safe }}</li>
-  {% else %}
-    <li>{{ tr('donate_no_methods') }}</li>
-  {% endfor %}
-</ul>
+  <section class="donate-section">
+    <h4>{{ tr('donate_links') }}</h4>
+    <ul class="donate-list">
+      {% for item in donation_links %}
+        <li><a href="{{ item.url|e }}" target="_blank" rel="noopener">{{ item.title_html|safe }}</a></li>
+      {% else %}
+        <li>{{ tr('donate_no_links') }}</li>
+      {% endfor %}
+    </ul>
+  </section>
 
-<h4>{{ tr('donate_prize_pool') }}</h4>
-<ul>
-  {% for item in prize_pool_entries %}
-    <li>{{ item.place_label_html|safe }} — {{ item.reward_html|safe }}</li>
-  {% else %}
-    <li>{{ tr('donate_no_prize_pool') }}</li>
-  {% endfor %}
-</ul>
+  <section class="donate-section">
+    <h4>{{ tr('donate_card_crypto') }}</h4>
+    <ul class="donate-list">
+      {% for item in crypto_wallets %}
+        <li><strong>{{ item.wallet_name|e }}:</strong> {{ item.requisites_html|safe }}</li>
+      {% else %}
+        <li>{{ tr('donate_no_methods') }}</li>
+      {% endfor %}
+    </ul>
+  </section>
 
-<h4>{{ tr('donate_donors') }}</h4>
-<ul>
-  {% for donor in donors %}
-    <li>{{ donor.name|e }}{% if donor.amount %} ({{ donor.amount|e }}){% endif %}{% if donor.message_html %}: {{ donor.message_html|safe }}{% endif %}</li>
-  {% else %}
-    <li>{{ tr('donate_no_donors') }}</li>
-  {% endfor %}
-</ul>
+  <section class="donate-section">
+    <h4>{{ tr('donate_donors') }}</h4>
+    <div class="table-responsive">
+      <table class="table donate-sponsors-table">
+        <thead>
+          <tr>
+            <th>{{ tr('donate_sponsor_name') }}</th>
+            <th>{{ tr('donate_sponsor_amount') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for donor in donors %}
+            <tr>
+              <td>
+                {{ donor.name|e }}
+                {% if donor.message_html %}<div class="text-contrast-muted">{{ donor.message_html|safe }}</div>{% endif %}
+              </td>
+              <td>{{ donor.amount|e }}</td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="2">{{ tr('donate_no_donors') }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
 {% endblock %}
