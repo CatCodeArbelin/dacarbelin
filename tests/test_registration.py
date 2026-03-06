@@ -30,7 +30,7 @@ class _FakeRegisterDB:
         self.committed = True
 
 
-def test_register_sets_nickname_from_game_profile(monkeypatch):
+def test_register_uses_input_nickname(monkeypatch):
     fake_db = _FakeRegisterDB()
 
     async def override_get_db():
@@ -68,6 +68,8 @@ def test_register_sets_nickname_from_game_profile(monkeypatch):
                 data={
                     "steam_input": "https://steamcommunity.com/profiles/76561198000000000/",
                     "telegram": "@telegram",
+                    "nickname": "ManualNick",
+                    "rules_ack": "1",
                 },
                 follow_redirects=False,
             )
@@ -79,13 +81,13 @@ def test_register_sets_nickname_from_game_profile(monkeypatch):
     assert len(fake_db.added) == 1
 
     user = fake_db.added[0]
-    assert user.nickname == "AutoNick"
+    assert user.nickname == "ManualNick"
     assert user.discord is None
     assert user.telegram == "@telegram"
     assert json.loads(user.extra_data) == {"source": "test"}
 
 
-def test_register_falls_back_to_steam_id_when_game_nickname_empty(monkeypatch):
+def test_register_requires_nickname(monkeypatch):
     fake_db = _FakeRegisterDB()
 
     async def override_get_db():
@@ -102,7 +104,7 @@ def test_register_falls_back_to_steam_id_when_game_nickname_empty(monkeypatch):
 
     async def fake_fetch_autochess_data(steam_id):
         return {
-            "game_nickname": "",
+            "game_nickname": "AutoNick",
             "current_rank": "Pawn",
             "highest_rank": "Pawn",
             "raw": {},
@@ -126,6 +128,96 @@ def test_register_falls_back_to_steam_id_when_game_nickname_empty(monkeypatch):
     finally:
         app.dependency_overrides.pop(get_db, None)
 
+    assert response.status_code == 422
+
+
+def test_register_rejects_blank_nickname(monkeypatch):
+    fake_db = _FakeRegisterDB()
+
+    async def override_get_db():
+        yield fake_db
+
+    async def fake_tournament_started(db):
+        return False
+
+    async def fake_registration_open(db):
+        return True
+
+    async def fake_normalize_steam_id(steam_input):
+        return "76561198000000000"
+
+    async def fake_fetch_autochess_data(steam_id):
+        return {
+            "game_nickname": "AutoNick",
+            "current_rank": "Pawn",
+            "highest_rank": "Pawn",
+            "raw": {},
+        }
+
+    monkeypatch.setattr(web, "get_tournament_started", fake_tournament_started)
+    monkeypatch.setattr(web, "get_registration_open", fake_registration_open)
+    monkeypatch.setattr(web, "normalize_steam_id", fake_normalize_steam_id)
+    monkeypatch.setattr(web, "fetch_autochess_data", fake_fetch_autochess_data)
+    monkeypatch.setattr(web, "pick_basket", lambda *args, **kwargs: "new")
+    monkeypatch.setattr(web, "allocate_basket", lambda *args, **kwargs: "new")
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/register",
+                data={"steam_input": "76561198000000000", "nickname": "   ", "rules_ack": "1"},
+                follow_redirects=False,
+            )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
     assert response.status_code == 303
-    user = fake_db.added[0]
-    assert user.nickname == "76561198000000000"
+    assert response.headers["location"].endswith("msg=msg_invalid_request")
+    assert not fake_db.added
+
+
+def test_register_rejects_too_long_nickname(monkeypatch):
+    fake_db = _FakeRegisterDB()
+
+    async def override_get_db():
+        yield fake_db
+
+    async def fake_tournament_started(db):
+        return False
+
+    async def fake_registration_open(db):
+        return True
+
+    async def fake_normalize_steam_id(steam_input):
+        return "76561198000000000"
+
+    async def fake_fetch_autochess_data(steam_id):
+        return {
+            "game_nickname": "AutoNick",
+            "current_rank": "Pawn",
+            "highest_rank": "Pawn",
+            "raw": {},
+        }
+
+    monkeypatch.setattr(web, "get_tournament_started", fake_tournament_started)
+    monkeypatch.setattr(web, "get_registration_open", fake_registration_open)
+    monkeypatch.setattr(web, "normalize_steam_id", fake_normalize_steam_id)
+    monkeypatch.setattr(web, "fetch_autochess_data", fake_fetch_autochess_data)
+    monkeypatch.setattr(web, "pick_basket", lambda *args, **kwargs: "new")
+    monkeypatch.setattr(web, "allocate_basket", lambda *args, **kwargs: "new")
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/register",
+                data={"steam_input": "76561198000000000", "nickname": "N" * 121, "rules_ack": "1"},
+                follow_redirects=False,
+            )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 303
+    assert response.headers["location"].endswith("msg=msg_invalid_request")
+    assert not fake_db.added

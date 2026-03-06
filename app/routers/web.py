@@ -1236,6 +1236,7 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
 async def register(
     request: Request,
     steam_input: str = Form(...),
+    nickname: str = Form(...),
     telegram: str = Form(default=""),
     rules_ack: str | None = Form(default=None),
     db: AsyncSession = Depends(get_db),
@@ -1249,6 +1250,10 @@ async def register(
 
     if rules_ack not in {"1", "on", "true"}:
         return redirect_with_msg("/", "msg_rules_ack_required")
+
+    cleaned_nickname = nickname.strip()
+    if not cleaned_nickname or len(cleaned_nickname) > 120:
+        return redirect_with_msg("/", "msg_invalid_request")
 
     steam_id = await normalize_steam_id(steam_input)
     if not steam_id:
@@ -1271,7 +1276,7 @@ async def register(
     basket = allocate_basket(target_basket=target_basket, basket_counts=basket_counts)
 
     user = User(
-        nickname=profile["game_nickname"] or steam_id,
+        nickname=cleaned_nickname,
         steam_input=steam_input,
         steam_id=steam_id,
         game_nickname=profile["game_nickname"],
