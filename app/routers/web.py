@@ -117,6 +117,8 @@ from app.services.tournament_stage_config import (
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
+DONATE_HIGHLIGHT_AMOUNT_SETTING_KEY = "donate_highlight_amount"
+
 
 ALLOWED_USER_UPDATE_FIELDS = {"nickname", "basket", "direct_invite_stage"}
 ALLOWED_DIRECT_INVITE_STAGES = {None, *get_playoff_stage_sequence_keys()}
@@ -1637,6 +1639,10 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
         if total_sponsors_amount == total_sponsors_amount.to_integral()
         else f"{total_sponsors_amount:.2f}"
     )
+    highlight_amount_setting = await db.scalar(
+        select(SiteSetting).where(SiteSetting.key == DONATE_HIGHLIGHT_AMOUNT_SETTING_KEY)
+    )
+    highlight_amount = (highlight_amount_setting.value or "").strip() if highlight_amount_setting else ""
 
     donation_links_vm = [
         {"url": item.url, "title_html": sanitize_content_html(localized_attr(item, "title", lang))}
@@ -1663,7 +1669,7 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
         "donate.html",
         template_context(
             request,
-            total_sponsors_amount=total_sponsors_amount_display,
+            total_sponsors_amount=highlight_amount or total_sponsors_amount_display,
             donation_links=donation_links_vm,
             crypto_wallets=crypto_wallets_vm,
             donors=donors_vm,
@@ -2177,6 +2183,9 @@ async def admin_content_page(request: Request, db: AsyncSession = Depends(get_db
     donation_links = (await db.scalars(select(DonationLink).order_by(DonationLink.sort_order, DonationLink.id))).all()
     crypto_wallets = (await db.scalars(select(CryptoWallet).order_by(CryptoWallet.sort_order, CryptoWallet.id))).all()
     donors = (await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all()
+    donate_highlight_amount_setting = await db.scalar(
+        select(SiteSetting).where(SiteSetting.key == DONATE_HIGHLIGHT_AMOUNT_SETTING_KEY)
+    )
     selected_lang = get_lang(request.query_params.get("content_lang") or request.cookies.get("lang"))
     content_by_lang = {
         "ru": dump_admin_content_for_lang("ru", rules_content).model_dump(),
@@ -2193,6 +2202,7 @@ async def admin_content_page(request: Request, db: AsyncSession = Depends(get_db
             donation_links=donation_links,
             crypto_wallets=crypto_wallets,
             sponsors=donors,
+            donate_highlight_amount=(donate_highlight_amount_setting.value if donate_highlight_amount_setting else ""),
         ),
     )
 
@@ -3267,6 +3277,22 @@ async def admin_delete_sponsor(
         await db.delete(sponsor)
         await db.commit()
     return RedirectResponse(url="/admin/content?msg=msg_donors_saved", status_code=303)
+
+
+@router.post("/admin/donate-highlight-amount")
+async def admin_update_donate_highlight_amount(
+    amount: str = Form(default=""),
+    db: AsyncSession = Depends(get_db),
+):
+    row = await db.scalar(select(SiteSetting).where(SiteSetting.key == DONATE_HIGHLIGHT_AMOUNT_SETTING_KEY))
+    normalized_amount = (amount or "").strip()
+    if not row:
+        row = SiteSetting(key=DONATE_HIGHLIGHT_AMOUNT_SETTING_KEY, value=normalized_amount)
+        db.add(row)
+    else:
+        row.value = normalized_amount
+    await db.commit()
+    return RedirectResponse(url="/admin/content?msg=msg_prize_pool_saved", status_code=303)
 
 
 @router.post("/admin/crypto-wallets")

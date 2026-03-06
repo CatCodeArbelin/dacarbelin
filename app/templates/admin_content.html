@@ -79,6 +79,18 @@
   </div>
   {% endfor %}
 
+  <h5 class="mt-4">Выделенный призовой</h5>
+  <form action="/admin/donate-highlight-amount" method="post" class="mb-3 border rounded p-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-10">
+        <label class="form-label" for="donate-highlight-amount-input">Сумма для highlight-блока на странице /donate</label>
+        <input id="donate-highlight-amount-input" class="form-control" name="amount" value="{{ donate_highlight_amount|e }}" placeholder="Например: 3123">
+        <div class="form-text text-contrast-muted">Оставьте пустым, чтобы автоматически использовать сумму спонсоров.</div>
+      </div>
+      <div class="col-md-2"><button class="btn btn-sm btn-primary w-100">Save</button></div>
+    </div>
+  </form>
+
   <h5 class="mt-4">Спонсоры</h5>
   <form action="/admin/sponsors" method="post" class="mb-3 border rounded p-3">
     <div class="row g-2">
