@@ -626,9 +626,21 @@ body {
   color: #8dff91;
 }
 
+.tournament-tree-participant-promoted,
+.archive-tree-participant-promoted {
+  border-left-color: rgba(96, 255, 150, 0.9);
+  background: linear-gradient(90deg, rgba(32, 123, 75, 0.55), rgba(14, 46, 34, 0.55));
+}
+
 .tournament-tree-participant-eliminated .tournament-tree-participant-name,
 .archive-tree-participant-eliminated .archive-tree-participant-name {
   color: #ff6b7f;
+}
+
+.tournament-tree-participant-eliminated,
+.archive-tree-participant-eliminated {
+  border-left-color: rgba(255, 107, 127, 0.9);
+  background: linear-gradient(90deg, rgba(110, 31, 48, 0.58), rgba(48, 13, 23, 0.58));
 }
 
 .tournament-tree-participant-final-qualified .tournament-tree-participant-name,
@@ -642,16 +654,34 @@ body {
   font-weight: 700;
 }
 
+.tournament-tree-participant-gold,
+.archive-tree-participant-gold {
+  border-left-color: rgba(255, 209, 102, 0.95);
+  background: linear-gradient(90deg, rgba(122, 88, 20, 0.56), rgba(66, 47, 12, 0.56));
+}
+
 .tournament-tree-participant-silver .tournament-tree-participant-name,
 .archive-tree-participant-silver .archive-tree-participant-name {
   color: #d7e2f0;
   font-weight: 700;
 }
 
+.tournament-tree-participant-silver,
+.archive-tree-participant-silver {
+  border-left-color: rgba(215, 226, 240, 0.95);
+  background: linear-gradient(90deg, rgba(107, 124, 145, 0.55), rgba(53, 64, 80, 0.55));
+}
+
 .tournament-tree-participant-bronze .tournament-tree-participant-name,
 .archive-tree-participant-bronze .archive-tree-participant-name {
   color: #d89b65;
   font-weight: 700;
+}
+
+.tournament-tree-participant-bronze,
+.archive-tree-participant-bronze {
+  border-left-color: rgba(216, 155, 101, 0.95);
+  background: linear-gradient(90deg, rgba(120, 74, 40, 0.55), rgba(68, 40, 22, 0.55));
 }
 
 .archive-tree-participant-gold {
