@@ -31,7 +31,7 @@ def test_stage_3_highlights_top_4() -> None:
 def test_final_legacy_key_uses_podium_colors() -> None:
     rows = _apply_stage_highlight_rules("stage_4", _participants([30, 24, 22, 21, 18, 12, 6, 0]))
     colors = [row.get("highlight_color") for row in rows]
-    assert colors == ["gold", "silver", "bronze", "eliminated", "eliminated", "eliminated", "eliminated", "eliminated"]
+    assert colors == ["purple", "purple", "purple", "eliminated", "eliminated", "eliminated", "eliminated", "eliminated"]
 
 
 def test_stage_2_sets_highlight_colors() -> None:
@@ -43,7 +43,9 @@ def test_stage_2_sets_highlight_colors() -> None:
 def test_final_sets_podium_highlight_colors_without_winner() -> None:
     rows = _apply_stage_highlight_rules("stage_final", _participants([30, 24, 22, 21, 18, 12, 6, 0]))
     colors = [row.get("highlight_color") for row in rows]
-    assert colors == ["gold", "silver", "bronze", "eliminated", "eliminated", "eliminated", "eliminated", "eliminated"]
+    promoted = [row.get("is_promoted_highlight", False) for row in rows]
+    assert colors == ["purple", "purple", "purple", "eliminated", "eliminated", "eliminated", "eliminated", "eliminated"]
+    assert promoted == [False, False, False, False, False, False, False, False]
 
 
 def test_final_winner_gets_gold_before_points_ranking() -> None:
@@ -51,7 +53,9 @@ def test_final_winner_gets_gold_before_points_ranking() -> None:
     rows[2]["is_tournament_winner"] = True
     rows = _apply_stage_highlight_rules("stage_final", rows)
     colors = [row.get("highlight_color") for row in rows]
+    promoted = [row.get("is_promoted_highlight", False) for row in rows]
     assert colors == ["silver", "bronze", "gold", "eliminated"]
+    assert promoted == [False, False, True, False]
 
 
 def test_stage_highlights_disabled_until_first_game_played() -> None:
