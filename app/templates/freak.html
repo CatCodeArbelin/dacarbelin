@@ -22,9 +22,20 @@
     </style>
   </head>
   <body>
-    <img class="freak-screen" src="/static/FREAKEgg.png" alt="Freak easter egg" />
-    <audio autoplay loop>
+    <img class="freak-screen" src="/static/OLEGFREAK.png" alt="Freak easter egg" />
+    <audio id="freak-audio" autoplay loop>
       <source src="/static/Shaman King.mp3" type="audio/mpeg" />
     </audio>
+    <script>
+      const freakAudio = document.getElementById('freak-audio');
+      if (freakAudio) {
+        const tryPlay = () => {
+          void freakAudio.play().catch(() => {});
+        };
+        tryPlay();
+        document.addEventListener('click', tryPlay, { once: true });
+        document.addEventListener('keydown', tryPlay, { once: true });
+      }
+    </script>
   </body>
 </html>
