@@ -179,25 +179,38 @@ def _apply_stage_highlight_rules(stage_key: str, participants: list[BracketParti
     normalized_stage_key = normalize_stage_key(stage_key)
 
     if normalized_stage_key == "stage_final":
-        winner_id = next(
-            (participant.get("user_id") for participant in participants if participant.get("is_tournament_winner")),
-            None,
-        )
-        indexed_participants = list(enumerate(participants))
-        ranking = sorted(
-            indexed_participants,
-            key=lambda item: (
-                0 if winner_id is not None and item[1].get("user_id") == winner_id else 1,
-                item[0],
-            ),
-        )
-        ranking_by_user_id = {participant.get("user_id"): idx for idx, (_, participant) in enumerate(ranking, start=1)}
+        winner_participant = next((participant for participant in participants if participant.get("is_tournament_winner")), None)
+
         for participant in participants:
-            rank = ranking_by_user_id.get(participant.get("user_id"), 99)
-            participant["is_promoted_highlight"] = rank <= 3
-            participant["highlight_color"] = (
-                "gold" if rank == 1 else "silver" if rank == 2 else "bronze" if rank == 3 else "eliminated"
-            )
+            participant["is_promoted_highlight"] = False
+            participant["highlight_color"] = "purple" if (participant.get("points") or 0) >= 22 else "eliminated"
+
+        if winner_participant is None:
+            return participants
+
+        winner_participant["is_promoted_highlight"] = True
+        winner_participant["highlight_color"] = "gold"
+
+        remaining_participants = [participant for participant in participants if participant is not winner_participant]
+        ranked_remaining = sorted(
+            enumerate(remaining_participants),
+            key=lambda item: (
+                item[1].get("points") or 0,
+                item[1].get("wins") or 0,
+                item[1].get("top4_finishes") or 0,
+                item[1].get("top8_finishes") or 0,
+                -(item[1].get("last_place") or 0),
+                -(item[1].get("user_id") or 0),
+                -(item[1].get("seed") or 0),
+                -item[0],
+            ),
+            reverse=True,
+        )
+        if ranked_remaining:
+            ranked_remaining[0][1]["highlight_color"] = "silver"
+        if len(ranked_remaining) > 1:
+            ranked_remaining[1][1]["highlight_color"] = "bronze"
+
         return participants
 
     if normalized_stage_key == "group_stage":
@@ -239,6 +252,11 @@ def _participants_for_playoff_members(
                     "user_id": participant.user_id,
                     "nickname": _display_nickname(user, str(participant.user_id)),
                     "points": participant.points or 0,
+                    "wins": participant.wins or 0,
+                    "top4_finishes": participant.top4_finishes or 0,
+                    "top8_finishes": participant.top8_finishes or 0,
+                    "last_place": participant.last_place or 0,
+                    "seed": participant.seed,
                     "is_direct_invite_preview": False,
                 }
             )
