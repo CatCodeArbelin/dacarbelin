@@ -52,3 +52,19 @@ def test_final_winner_gets_gold_before_points_ranking() -> None:
     rows = _apply_stage_highlight_rules("stage_final", rows)
     colors = [row.get("highlight_color") for row in rows]
     assert colors == ["silver", "bronze", "gold", "eliminated"]
+
+
+def test_stage_highlights_disabled_until_first_game_played() -> None:
+    rows = _apply_stage_highlight_rules("group_stage", _participants([0, 0, 0, 0]))
+    highlighted = [row.get("is_promoted_highlight", False) for row in rows]
+    colors = [row.get("highlight_color") for row in rows]
+    assert highlighted == [False, False, False, False]
+    assert colors == [None, None, None, None]
+
+
+def test_stage_2_highlights_disabled_until_first_game_played() -> None:
+    rows = _apply_stage_highlight_rules("stage_2", _participants([0, 0, 0, 0]))
+    highlighted = [row.get("is_promoted_highlight", False) for row in rows]
+    colors = [row.get("highlight_color") for row in rows]
+    assert highlighted == [False, False, False, False]
+    assert colors == [None, None, None, None]
