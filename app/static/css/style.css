@@ -636,6 +636,24 @@ body {
   color: #ffd166;
 }
 
+.tournament-tree-participant-gold .tournament-tree-participant-name,
+.archive-tree-participant-gold .archive-tree-participant-name {
+  color: #ffd166;
+  font-weight: 700;
+}
+
+.tournament-tree-participant-silver .tournament-tree-participant-name,
+.archive-tree-participant-silver .archive-tree-participant-name {
+  color: #d7e2f0;
+  font-weight: 700;
+}
+
+.tournament-tree-participant-bronze .tournament-tree-participant-name,
+.archive-tree-participant-bronze .archive-tree-participant-name {
+  color: #d89b65;
+  font-weight: 700;
+}
+
 .tournament-tree-participant-normal .tournament-tree-participant-name,
 .archive-tree-participant-normal .archive-tree-participant-name {
   color: #ffffff;

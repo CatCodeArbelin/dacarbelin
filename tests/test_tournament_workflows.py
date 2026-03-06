@@ -696,6 +696,42 @@ def test_build_tournament_tree_vm_marks_final_winner() -> None:
     winner_rows = [p for p in final_stage["matches"][0]["participants"] if p.get("is_tournament_winner")]
     assert len(winner_rows) == 1
     assert winner_rows[0]["user_id"] == 1
+    assert winner_rows[0]["highlight_color"] == "gold"
+
+
+def test_build_tournament_tree_vm_prefers_manual_final_winner() -> None:
+    stage_final = SimpleNamespace(
+        key="stage_final",
+        stage_size=8,
+        participants=[
+            SimpleNamespace(user_id=1, seed=1, points=24, wins=1, top4_finishes=1, top8_finishes=1, last_place=2),
+            SimpleNamespace(user_id=2, seed=2, points=20, wins=0, top4_finishes=1, top8_finishes=1, last_place=4),
+            SimpleNamespace(user_id=3, seed=3, points=18, wins=0, top4_finishes=1, top8_finishes=1, last_place=5),
+        ],
+        matches=[
+            SimpleNamespace(
+                group_number=1,
+                game_number=1,
+                schedule_text="today",
+                lobby_password="pw",
+                state="finished",
+                winner_user_id=1,
+                manual_winner_user_id=2,
+            )
+        ],
+    )
+    tree = build_tournament_tree_vm(
+        groups=[],
+        playoff_stages=[stage_final],
+        user_by_id={},
+        direct_invite_ids=[],
+    )
+
+    final_stage = next(stage for stage in tree["stages"] if stage["key"] == "stage_final")
+    participants = final_stage["matches"][0]["participants"]
+    winner = next(p for p in participants if p.get("is_tournament_winner"))
+    assert winner["user_id"] == 2
+    assert winner["highlight_color"] == "gold"
 
 
 def test_build_tournament_tree_vm_stage_order_is_stable() -> None:

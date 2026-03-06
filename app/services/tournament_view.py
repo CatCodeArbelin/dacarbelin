@@ -172,10 +172,25 @@ def _apply_stage_highlight_rules(stage_key: str, participants: list[BracketParti
     normalized_stage_key = normalize_stage_key(stage_key)
 
     if normalized_stage_key == "stage_final":
+        winner_id = next(
+            (participant.get("user_id") for participant in participants if participant.get("is_tournament_winner")),
+            None,
+        )
+        indexed_participants = list(enumerate(participants))
+        ranking = sorted(
+            indexed_participants,
+            key=lambda item: (
+                0 if winner_id is not None and item[1].get("user_id") == winner_id else 1,
+                item[0],
+            ),
+        )
+        ranking_by_user_id = {participant.get("user_id"): idx for idx, (_, participant) in enumerate(ranking, start=1)}
         for participant in participants:
-            has_22_plus = int(participant.get("points", 0) or 0) >= 22
-            participant["is_promoted_highlight"] = has_22_plus
-            participant["highlight_color"] = "final-qualified" if has_22_plus else "normal"
+            rank = ranking_by_user_id.get(participant.get("user_id"), 99)
+            participant["is_promoted_highlight"] = rank <= 3
+            participant["highlight_color"] = (
+                "gold" if rank == 1 else "silver" if rank == 2 else "bronze" if rank == 3 else "eliminated"
+            )
         return participants
 
     if normalized_stage_key == "group_stage":
@@ -344,24 +359,17 @@ def build_bracket_columns(
                 )
                 continue
 
-            participant_rows = participants_by_group.get(match.group_number, [])
-            participant_rows = _apply_stage_highlight_rules(stage.key, participant_rows)
+            participant_rows = [dict(participant) for participant in participants_by_group.get(match.group_number, [])]
             is_final_match = stage.key == "stage_final"
             winner_applied = False
             if is_final_match and final_match_winner_user_id:
-                participant_rows = []
-                for participant in _apply_stage_highlight_rules(stage.key, participants_by_group.get(match.group_number, [])):
+                for participant in participant_rows:
                     is_winner = participant["user_id"] == final_match_winner_user_id and not winner_applied
                     if is_winner:
                         winner_applied = True
-                    participant_rows.append(
-                        {
-                            **participant,
-                            "is_tournament_winner": is_winner,
-                            "highlight_color": "promoted" if is_winner else participant.get("highlight_color", "normal"),
-                            "winner_label_key": "tournament_winner" if is_winner else None,
-                        }
-                    )
+                    participant["is_tournament_winner"] = is_winner
+                    participant["winner_label_key"] = "tournament_winner" if is_winner else None
+            participant_rows = _apply_stage_highlight_rules(stage.key, participant_rows)
 
             matches_vm.append(
                 {
