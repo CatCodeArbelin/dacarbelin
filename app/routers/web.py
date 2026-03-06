@@ -1227,6 +1227,7 @@ async def register(
     request: Request,
     steam_input: str = Form(...),
     telegram: str = Form(default=""),
+    rules_ack: str | None = Form(default=None),
     db: AsyncSession = Depends(get_db),
 ):
     """Регистрирует пользователя, если по steam_id запись в БД отсутствует."""
@@ -1235,6 +1236,9 @@ async def register(
 
     if not await get_registration_open(db):
         return redirect_with_msg("/", "registration_closed")
+
+    if rules_ack not in {"1", "on", "true"}:
+        return redirect_with_msg("/", "msg_rules_ack_required")
 
     steam_id = await normalize_steam_id(steam_input)
     if not steam_id:
