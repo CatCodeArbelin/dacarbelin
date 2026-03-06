@@ -2,7 +2,7 @@
 {% block content %}
 {% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}</div>{% endif %}
 <div class="row g-4">
-  <div class="col-lg-8">
+  <div class="col-lg-7">
     <div class="card bg-black neon-border-red">
       <div class="card-body">
         <h2>{{ tr('register') }}</h2>
@@ -49,7 +49,7 @@
       </div>
     </div>
   </div>
-  <div class="col-lg-4">
+  <div class="col-lg-5">
     <div class="card bg-black neon-border-blue prize-pool-card">
       <div class="card-body">
         <h3>{{ tr('index_prize_pool') }}</h3>
@@ -98,7 +98,7 @@
             {% set nick_color = msg.nick_color or chat_nick_colors[0] %}
             {% set is_admin_message = msg.temp_nick == '@Admin' %}
             <div>
-              <strong class="chat-nick{% if is_admin_message %} chat-nick-admin{% endif %}" style="--nick-color: {{ nick_color }};">{{ msg.temp_nick }}</strong>: {{ msg.message }}
+              <strong class="chat-nick{% if is_admin_message %} chat-nick-admin{% endif %}" style="--nick-color: {{ nick_color }};">{{ msg.temp_nick }}</strong><span class="chat-timestamp"> ({{ msg.created_at.strftime('%d.%m.%y %H:%M:%S') }})</span>: {{ msg.message }}
             </div>
           {% endfor %}
         </div>
@@ -207,10 +207,21 @@
   let eventSource = null;
   let reconnectTimer = null;
 
+  const escapeHtml = (value) => {
+    const el = document.createElement("div");
+    el.textContent = value ?? "";
+    return el.innerHTML;
+  };
+
+  const scrollToBottom = () => {
+    chatBox.scrollTop = chatBox.scrollHeight;
+  };
+
   const render = (messages) => {
     chatBox.innerHTML = messages.map((msg) => `
-      <div><strong class="chat-nick${msg.is_admin ? " chat-nick-admin" : ""}" style="--nick-color: ${msg.nick_color || "#00d4ff"};">${msg.temp_nick}</strong>: ${msg.message}</div>
+      <div><strong class="chat-nick${msg.is_admin ? " chat-nick-admin" : ""}" style="--nick-color: ${escapeHtml(msg.nick_color || "#00d4ff")};">${escapeHtml(msg.temp_nick)}</strong><span class="chat-timestamp"> (${escapeHtml(msg.created_at_display || "")})</span>: ${escapeHtml(msg.message)}</div>
     `).join("");
+    scrollToBottom();
   };
 
   const refresh = async () => {
@@ -257,6 +268,7 @@
   }
 
   connectToStream();
+  scrollToBottom();
 })();
 
 (() => {

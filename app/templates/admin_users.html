@@ -27,6 +27,7 @@
             <th>{{ tr('tournament_pts') }}</th>
             <th>Ручные очки</th>
             <th>Direct invite</th>
+            <th>{{ tr('participants_telegram') }}</th>
             <th>{{ tr('admin_save') }}</th>
             <th>{{ tr('admin_delete') }}</th>
           </tr>
@@ -59,6 +60,7 @@
                 {% endfor %}
               </select>
             </td>
+            <td>{{ user.telegram or 'None' }}</td>
             <td>
               <form id="user-update-{{ user.id }}" action="/admin/user/update" method="post" class="d-inline">
                 <input type="hidden" name="user_id" value="{{ user.id }}">
@@ -74,7 +76,7 @@
           </tr>
           {% endfor %}
           {% if section.users|length == 0 %}
-          <tr><td colspan="10" class="text-muted">Нет участников</td></tr>
+          <tr><td colspan="11" class="text-muted">Нет участников</td></tr>
           {% endif %}
         </tbody>
       </table>

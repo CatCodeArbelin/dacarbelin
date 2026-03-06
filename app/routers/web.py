@@ -1158,7 +1158,7 @@ def resolve_chat_sender_token(chat_sender_cookie: str | None) -> tuple[str, bool
     return generate_chat_sender_token(), True
 
 
-def _build_chat_messages_payload(chat_messages: list[ChatMessage]) -> list[dict[str, str]]:
+def _build_chat_messages_payload(chat_messages: list[ChatMessage]) -> list[dict[str, str | int | bool]]:
     default_nick_color = CHAT_NICK_COLORS[0]
     return [
         {
@@ -1167,6 +1167,7 @@ def _build_chat_messages_payload(chat_messages: list[ChatMessage]) -> list[dict[
             "message": msg.message,
             "nick_color": msg.nick_color or default_nick_color,
             "is_admin": msg.temp_nick == "@Admin",
+            "created_at_display": msg.created_at.strftime("%d.%m.%y %H:%M:%S"),
         }
         for msg in chat_messages
     ]

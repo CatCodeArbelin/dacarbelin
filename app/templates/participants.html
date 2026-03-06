@@ -19,18 +19,18 @@
 {% elif view == 'direct_invites' %}
 <h4>{{ tr('participants_direct_invites_title') }}</h4>
 <table class="table table-dark table-striped">
-<tr><th>{{ tr('participants_nick') }}</th><th>{{ tr('participants_steam_id') }}</th><th>{{ tr('participants_game') }}</th><th>{{ tr('participants_current') }}</th><th>{{ tr('participants_highest') }}</th><th>{{ tr('participants_telegram') }}</th></tr>
+<tr><th>{{ tr('participants_nick') }}</th><th>{{ tr('participants_steam_id') }}</th><th>{{ tr('participants_game') }}</th><th>{{ tr('participants_current') }}</th><th>{{ tr('participants_highest') }}</th></tr>
 {% for u in direct_invite_users %}
-<tr><td>{{u.nickname}}</td><td>{{u.steam_id}}</td><td>{{u.game_nickname}}</td><td>{{u.current_rank}}</td><td>{{u.highest_rank}}</td><td>{{u.telegram or ''}}</td></tr>
+<tr><td>{{u.nickname}}</td><td>{{u.steam_id}}</td><td>{{u.game_nickname}}</td><td>{{u.current_rank}}</td><td>{{u.highest_rank}}</td></tr>
 {% endfor %}
 </table>
 {% else %}
 <h4>{{ tr('participants_main_roster_title') }}</h4>
 {% if main_users %}
 <table class="table table-dark table-striped">
-<tr><th>{{ tr('participants_nick') }}</th><th>{{ tr('participants_steam_id') }}</th><th>{{ tr('participants_game') }}</th><th>{{ tr('participants_current') }}</th><th>{{ tr('participants_highest') }}</th><th>{{ tr('participants_telegram') }}</th></tr>
+<tr><th>{{ tr('participants_nick') }}</th><th>{{ tr('participants_steam_id') }}</th><th>{{ tr('participants_game') }}</th><th>{{ tr('participants_current') }}</th><th>{{ tr('participants_highest') }}</th></tr>
 {% for u in main_users %}
-<tr><td>{{u.nickname}}</td><td>{{u.steam_id}}</td><td>{{u.game_nickname}}</td><td>{{u.current_rank}}</td><td>{{u.highest_rank}}</td><td>{{u.telegram or ''}}</td></tr>
+<tr><td>{{u.nickname}}</td><td>{{u.steam_id}}</td><td>{{u.game_nickname}}</td><td>{{u.current_rank}}</td><td>{{u.highest_rank}}</td></tr>
 {% endfor %}
 </table>
 {% else %}
@@ -40,9 +40,9 @@
 <h4>{{ tr('participants_reserve_roster_title') }}</h4>
 {% if reserve_users %}
 <table class="table table-dark table-striped">
-<tr><th>{{ tr('participants_nick') }}</th><th>{{ tr('participants_steam_id') }}</th><th>{{ tr('participants_game') }}</th><th>{{ tr('participants_current') }}</th><th>{{ tr('participants_highest') }}</th><th>{{ tr('participants_telegram') }}</th></tr>
+<tr><th>{{ tr('participants_nick') }}</th><th>{{ tr('participants_steam_id') }}</th><th>{{ tr('participants_game') }}</th><th>{{ tr('participants_current') }}</th><th>{{ tr('participants_highest') }}</th></tr>
 {% for u in reserve_users %}
-<tr><td>{{u.nickname}}</td><td>{{u.steam_id}}</td><td>{{u.game_nickname}}</td><td>{{u.current_rank}}</td><td>{{u.highest_rank}}</td><td>{{u.telegram or ''}}</td></tr>
+<tr><td>{{u.nickname}}</td><td>{{u.steam_id}}</td><td>{{u.game_nickname}}</td><td>{{u.current_rank}}</td><td>{{u.highest_rank}}</td></tr>
 {% endfor %}
 </table>
 {% else %}

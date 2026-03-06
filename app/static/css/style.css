@@ -54,8 +54,15 @@ body {
 .neon-border-blue { border: 1px solid #00b7ff !important; box-shadow: 0 0 8px #00b7ff66; }
 .neon-border-red { border: 1px solid #ff2d55 !important; box-shadow: 0 0 8px #ff2d5566; }
 .card { border-radius: 12px; }
-.chat-box { max-height: 260px; overflow-y: auto; border-top: 1px dashed #555; padding-top: 8px; color: #f5f8ff; }
+.chat-box { max-height: 340px; min-height: 300px; overflow-y: auto; border-top: 1px dashed #555; padding-top: 8px; color: #f5f8ff; font-size: 0.97rem; }
 .chat-box strong { color: #ffffff; }
+
+.chat-timestamp {
+  color: #9fb1d4;
+  font-size: 0.82rem;
+  margin-left: 0.2rem;
+}
+
 .neon-text-outline {
   color: #ffffff !important;
   text-shadow:
