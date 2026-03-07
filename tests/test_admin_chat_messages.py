@@ -163,6 +163,72 @@ def test_send_chat_with_cyrillic_temp_nick_sets_ascii_sender_token(monkeypatch) 
     assert web.CHAT_SENDER_TOKEN_RE.fullmatch(cookie_token)
 
 
+def test_send_chat_rejects_reserved_nicks(monkeypatch) -> None:
+    """Проверяет, что обычный пользователь не может использовать служебные ники."""
+
+    class _FakeSendChatSettings:
+        is_enabled = True
+        max_length = 100
+        cooldown_seconds = 0
+
+    async def fake_get_chat_settings(db):
+        return _FakeSendChatSettings()
+
+    monkeypatch.setattr(web, "get_chat_settings", fake_get_chat_settings)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/chat/send",
+            data={"temp_nick": "@arbelin", "nick_color": "#00d4ff", "message": "hello"},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/?msg=msg_chat_nick_reserved"
+
+
+def test_admin_send_chat_uses_selected_sender_and_sets_cookie(monkeypatch) -> None:
+    """Проверяет отправку админ-сообщения от выбранного имени и сохранение выбора в cookie."""
+
+    class _FakeSendChatSettings:
+        max_length = 100
+
+    state = {"published": False, "saved_message": None}
+
+    async def fake_get_chat_settings(db):
+        return _FakeSendChatSettings()
+
+    def fake_add(self, instance):
+        state["saved_message"] = instance
+
+    async def fake_commit(self):
+        return None
+
+    async def fake_publish():
+        state["published"] = True
+
+    monkeypatch.setattr(web, "get_chat_settings", fake_get_chat_settings)
+    monkeypatch.setattr(web.AsyncSession, "add", fake_add, raising=False)
+    monkeypatch.setattr(web.AsyncSession, "commit", fake_commit, raising=False)
+    monkeypatch.setattr(web.chat_event_broker, "publish", fake_publish)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/chat/send",
+            data={"message": "admin hello", "sender_nick": "@loyrensss"},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_admin_chat_message_saved"
+    assert state["published"] is True
+    assert state["saved_message"] is not None
+    assert state["saved_message"].temp_nick == "@Loyrensss"
+    assert state["saved_message"].nick_color == "#b084ff"
+    assert "admin_chat_sender=%40Loyrensss" in response.headers["set-cookie"]
+
+
 def test_send_chat_publishes_stream_event(monkeypatch) -> None:
     """Проверяет публикацию SSE-события после пользовательского сообщения."""
 

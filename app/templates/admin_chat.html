@@ -17,6 +17,14 @@
   <hr>
   <h5>{{ tr('admin_chat_send_as_admin') }}</h5>
   <form action="/admin/chat/send" method="post" class="row g-2">
+    <div class="col-12">
+      <label class="form-label" for="admin-chat-sender">От имени</label>
+      <select id="admin-chat-sender" class="form-select" name="sender_nick">
+        {% for sender_nick in admin_chat_senders %}
+          <option value="{{ sender_nick }}" {% if sender_nick == admin_selected_sender %}selected{% endif %}>{{ sender_nick }}</option>
+        {% endfor %}
+      </select>
+    </div>
     <div class="col-12"><textarea class="form-control" name="message" rows="3" maxlength="{{ chat_settings.max_length }}" placeholder="{{ tr('admin_chat_admin_message_placeholder') }}" required></textarea></div>
     <div class="col-12"><button class="btn btn-outline-warning">{{ tr('admin_chat_send') }}</button></div>
   </form>

@@ -142,7 +142,13 @@ EXPECTED_32_PLAYER_STAGE_ORDER_PAIRS = [
 
 
 CHAT_NICK_COLORS = ["#00d4ff", "#ff7a59", "#b084ff", "#2dd36f", "#ffd166", "#ff66c4", "#5ce1e6", "#f48c06", "#90be6d", "#4cc9f0"]
-FORBIDDEN_CHAT_NICKS = {"@admin"}
+RESERVED_CHAT_NICKS = {"@admin", "@arbelin", "@loyrensss"}
+ADMIN_CHAT_SENDERS = {
+    "@Admin": "#ff0000",
+    "@Arbelin": "#00d4ff",
+    "@Loyrensss": "#b084ff",
+}
+ADMIN_CHAT_SENDER_COOKIE = "admin_chat_sender"
 CHAT_SENDER_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
 
 
@@ -1150,9 +1156,17 @@ def normalize_chat_nick(temp_nick: str) -> str:
     cleaned = (temp_nick or "").strip()[:120]
     if not cleaned:
         raise ValueError("msg_operation_failed")
-    if cleaned.lower() in FORBIDDEN_CHAT_NICKS:
+    if cleaned.lower() in RESERVED_CHAT_NICKS:
         raise ValueError("msg_chat_nick_reserved")
     return cleaned
+
+
+def normalize_admin_chat_sender(sender_nick: str | None) -> str:
+    normalized = (sender_nick or "").strip().lower()
+    for allowed_sender in ADMIN_CHAT_SENDERS:
+        if allowed_sender.lower() == normalized:
+            return allowed_sender
+    return "@Admin"
 
 
 def normalize_chat_nick_color(color: str) -> str:
@@ -2380,6 +2394,17 @@ async def admin_chat_page(request: Request, db: AsyncSession = Depends(get_db)):
     chat_messages = (
         await db.scalars(select(ChatMessage).order_by(desc(ChatMessage.id)).limit(100))
     ).all()
+    admin_ip = request.client.host if request.client else "admin"
+    selected_sender = normalize_admin_chat_sender(request.cookies.get(ADMIN_CHAT_SENDER_COOKIE))
+    if selected_sender == "@Admin" and not request.cookies.get(ADMIN_CHAT_SENDER_COOKIE):
+        last_sender_message = await db.scalar(
+            select(ChatMessage)
+            .where(ChatMessage.ip_address == admin_ip)
+            .order_by(desc(ChatMessage.created_at))
+            .limit(1)
+        )
+        selected_sender = normalize_admin_chat_sender(last_sender_message.temp_nick if last_sender_message else None)
+
     return templates.TemplateResponse(
         request,
         "admin_chat.html",
@@ -2387,6 +2412,8 @@ async def admin_chat_page(request: Request, db: AsyncSession = Depends(get_db)):
             request,
             chat_settings=chat_settings,
             chat_messages=chat_messages,
+            admin_chat_senders=list(ADMIN_CHAT_SENDERS.keys()),
+            admin_selected_sender=selected_sender,
         ),
     )
 
@@ -3920,6 +3947,7 @@ async def admin_save_chat_settings(
 async def admin_send_chat_message(
     request: Request,
     message: str = Form(...),
+    sender_nick: str = Form(default="@Admin"),
     db: AsyncSession = Depends(get_db),
 ):
     if not is_admin_session(request.cookies.get(ADMIN_SESSION_COOKIE)):
@@ -3931,10 +3959,27 @@ async def admin_send_chat_message(
     except ValueError as exc:
         return redirect_with_admin_msg(str(exc))
 
-    db.add(ChatMessage(temp_nick="@Admin", nick_color="#ff0000", message=message, ip_address="admin", sender_token="admin"))
+    safe_sender_nick = normalize_admin_chat_sender(sender_nick)
+    admin_ip = request.client.host if request.client else "admin"
+    db.add(
+        ChatMessage(
+            temp_nick=safe_sender_nick,
+            nick_color=ADMIN_CHAT_SENDERS[safe_sender_nick],
+            message=message,
+            ip_address=admin_ip,
+            sender_token="admin",
+        )
+    )
     await db.commit()
     await chat_event_broker.publish()
-    return redirect_with_admin_msg("msg_admin_chat_message_saved")
+    redirect = redirect_with_admin_msg("msg_admin_chat_message_saved")
+    redirect.set_cookie(
+        ADMIN_CHAT_SENDER_COOKIE,
+        quote(safe_sender_nick, safe=""),
+        max_age=60 * 60 * 24 * 365,
+        samesite="lax",
+    )
+    return redirect
 
 
 @router.post("/admin/chat/message/update")
