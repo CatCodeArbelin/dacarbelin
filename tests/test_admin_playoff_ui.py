@@ -52,6 +52,10 @@ def test_admin_users_template_has_group_sections() -> None:
     assert "Группы отображаются, потому что жеребьевка применена и турнир запущен." in template
     assert "/admin/user/delete" in template
     assert "admin_confirm_delete_user" in template
+    assert 'name="nickname"' not in template
+    assert "user-reassign-" not in template
+    assert "replace_from_user_id" not in template
+    assert 'colspan="11"' in template
 
 
 def test_tournament_template_has_empty_active_stage_alert() -> None:

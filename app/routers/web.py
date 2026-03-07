@@ -123,7 +123,7 @@ DONATE_SUPPORT_AUTHOR_VISIBLE_SETTING_KEY = "donate_support_author_visible"
 RUB_PER_USD_RATE = Decimal("79")
 
 
-ALLOWED_USER_UPDATE_FIELDS = {"nickname", "basket", "direct_invite_stage"}
+ALLOWED_USER_UPDATE_FIELDS = {"basket", "direct_invite_stage"}
 ALLOWED_DIRECT_INVITE_STAGES = {None, *get_playoff_stage_sequence_keys()}
 TOURNAMENT_STAGE_KEYS_ORDER = get_public_stage_display_sequence()
 PLAYOFF_STAGE_KEYS_ORDER = TOURNAMENT_STAGE_KEYS_ORDER[1:]
@@ -875,18 +875,13 @@ def _normalize_direct_invite_stage(raw_value: str | None) -> str | None:
     return value
 
 
-def _validate_user_update_payload(nickname: str, basket: str, direct_invite_stage: str | None) -> dict[str, str | None]:
-    cleaned_nickname = nickname.strip()
-    if not cleaned_nickname or len(cleaned_nickname) > 120:
-        raise ValueError("invalid nickname")
-
+def _validate_user_update_payload(basket: str, direct_invite_stage: str | None) -> dict[str, str | None]:
     allowed_baskets = {item.value for item in Basket}
     if basket not in allowed_baskets:
         raise ValueError("invalid basket")
 
     normalized_stage = _normalize_direct_invite_stage(direct_invite_stage)
     return {
-        "nickname": cleaned_nickname,
         "basket": basket,
         "direct_invite_stage": normalized_stage,
     }
@@ -2276,7 +2271,6 @@ async def _update_user_allowed_fields(
     db: AsyncSession,
     *,
     user_id: int,
-    nickname: str,
     basket: str,
     direct_invite_stage: str | None,
     manual_points: int | None = None,
@@ -2287,7 +2281,6 @@ async def _update_user_allowed_fields(
 
     try:
         validated_data = _validate_user_update_payload(
-            nickname=nickname,
             basket=basket,
             direct_invite_stage=direct_invite_stage,
         )
@@ -2298,6 +2291,9 @@ async def _update_user_allowed_fields(
         if field_name not in ALLOWED_USER_UPDATE_FIELDS:
             continue
         setattr(user, field_name, field_value)
+
+    if user.direct_invite_stage is None:
+        user.direct_invite_group_number = None
 
     if manual_points is not None:
         normalized_points = max(0, int(manual_points))
@@ -2403,19 +2399,22 @@ async def admin_emergency_page(request: Request, db: AsyncSession = Depends(get_
 @router.post("/admin/user/update")
 async def admin_update_user(
     user_id: int = Form(...),
-    nickname: str = Form(...),
     basket: str = Form(...),
     direct_invite_stage: str | None = Form(default=None),
     manual_points: int | None = Form(default=None),
     db: AsyncSession = Depends(get_db),
 ):
     # Атомарно обновляем разрешенные поля пользователя из админ-панели.
+    user = await db.get(User, user_id)
+    if not user:
+        return redirect_with_admin_users_msg("msg_operation_failed")
+
+    resolved_direct_invite_stage = user.direct_invite_stage if direct_invite_stage is None else direct_invite_stage
     return await _update_user_allowed_fields(
         db,
         user_id=user_id,
-        nickname=nickname,
         basket=basket,
-        direct_invite_stage=direct_invite_stage,
+        direct_invite_stage=resolved_direct_invite_stage,
         manual_points=manual_points,
     )
 
@@ -2433,7 +2432,6 @@ async def admin_update_user_basket(
     return await _update_user_allowed_fields(
         db,
         user_id=user_id,
-        nickname=user.nickname,
         basket=basket,
         direct_invite_stage=user.direct_invite_stage,
         manual_points=None,
