@@ -31,6 +31,7 @@
   <h5>Ссылки на донат</h5>
   <form action="/admin/donation-links/create" method="post" class="mb-3 border rounded p-3">
     <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
+    <input type="hidden" name="category" value="general">
     <div class="row g-2">
       <div class="col-md-4"><input class="form-control" name="label" placeholder="Label" required></div>
       <div class="col-md-5"><input class="form-control" name="url" placeholder="https://..." required></div>
@@ -38,10 +39,11 @@
       <div class="col-md-1"><button class="btn btn-sm btn-primary">+</button></div>
     </div>
   </form>
-  {% for item in donation_links %}
+  {% for item in donation_links if (item.category or 'general') == 'general' %}
   <div class="mb-2 border rounded p-3">
     <form action="/admin/donation-links/{{ item.id }}/update" method="post" class="row g-2 mb-2">
       <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
+      <input type="hidden" name="category" value="general">
       <div class="col-md-3"><input class="form-control" name="label" value="{{ (item.title_ru if selected_content_lang == 'ru' else item.title_en)|e }}" required></div>
       <div class="col-md-5"><input class="form-control" name="url" value="{{ item.url|e }}" required></div>
       <div class="col-md-2 form-check mt-2"><input class="form-check-input" type="checkbox" name="is_active" value="true" id="link-active-{{ item.id }}" {% if item.is_active %}checked{% endif %}><label class="form-check-label" for="link-active-{{ item.id }}">Active</label></div>
@@ -49,6 +51,66 @@
     </form>
     <form action="/admin/donation-links/{{ item.id }}/delete" method="post">
       <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
+      <input type="hidden" name="category" value="general">
+      <button class="btn btn-sm btn-outline-danger">Delete</button>
+    </form>
+  </div>
+  {% endfor %}
+
+
+  <h5 class="mt-4">Банковские карты</h5>
+  <form action="/admin/donation-links/create" method="post" class="mb-3 border rounded p-3">
+    <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
+    <input type="hidden" name="category" value="bank_cards">
+    <div class="row g-2">
+      <div class="col-md-4"><input class="form-control" name="label" placeholder="Label" required></div>
+      <div class="col-md-5"><input class="form-control" name="url" placeholder="https://..." required></div>
+      <div class="col-md-2 form-check mt-2"><input class="form-check-input" type="checkbox" name="is_active" value="true" id="new-card-active" checked><label class="form-check-label" for="new-card-active">Active</label></div>
+      <div class="col-md-1"><button class="btn btn-sm btn-primary">+</button></div>
+    </div>
+  </form>
+  {% for item in donation_links if (item.category or 'general') == 'bank_cards' %}
+  <div class="mb-2 border rounded p-3">
+    <form action="/admin/donation-links/{{ item.id }}/update" method="post" class="row g-2 mb-2">
+      <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
+      <input type="hidden" name="category" value="bank_cards">
+      <div class="col-md-3"><input class="form-control" name="label" value="{{ (item.title_ru if selected_content_lang == 'ru' else item.title_en)|e }}" required></div>
+      <div class="col-md-5"><input class="form-control" name="url" value="{{ item.url|e }}" required></div>
+      <div class="col-md-2 form-check mt-2"><input class="form-check-input" type="checkbox" name="is_active" value="true" id="card-active-{{ item.id }}" {% if item.is_active %}checked{% endif %}><label class="form-check-label" for="card-active-{{ item.id }}">Active</label></div>
+      <div class="col-md-2"><button class="btn btn-sm btn-primary">Save</button></div>
+    </form>
+    <form action="/admin/donation-links/{{ item.id }}/delete" method="post">
+      <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
+      <input type="hidden" name="category" value="bank_cards">
+      <button class="btn btn-sm btn-outline-danger">Delete</button>
+    </form>
+  </div>
+  {% endfor %}
+
+  <h5 class="mt-4">Поддержать Автора Сайта</h5>
+  <form action="/admin/donation-links/create" method="post" class="mb-3 border rounded p-3">
+    <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
+    <input type="hidden" name="category" value="support_author">
+    <div class="row g-2">
+      <div class="col-md-4"><input class="form-control" name="label" placeholder="Label" required></div>
+      <div class="col-md-5"><input class="form-control" name="url" placeholder="https://..." required></div>
+      <div class="col-md-2 form-check mt-2"><input class="form-check-input" type="checkbox" name="is_active" value="true" id="new-author-active" checked><label class="form-check-label" for="new-author-active">Active</label></div>
+      <div class="col-md-1"><button class="btn btn-sm btn-primary">+</button></div>
+    </div>
+  </form>
+  {% for item in donation_links if (item.category or 'general') == 'support_author' %}
+  <div class="mb-2 border rounded p-3">
+    <form action="/admin/donation-links/{{ item.id }}/update" method="post" class="row g-2 mb-2">
+      <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
+      <input type="hidden" name="category" value="support_author">
+      <div class="col-md-3"><input class="form-control" name="label" value="{{ (item.title_ru if selected_content_lang == 'ru' else item.title_en)|e }}" required></div>
+      <div class="col-md-5"><input class="form-control" name="url" value="{{ item.url|e }}" required></div>
+      <div class="col-md-2 form-check mt-2"><input class="form-check-input" type="checkbox" name="is_active" value="true" id="author-active-{{ item.id }}" {% if item.is_active %}checked{% endif %}><label class="form-check-label" for="author-active-{{ item.id }}">Active</label></div>
+      <div class="col-md-2"><button class="btn btn-sm btn-primary">Save</button></div>
+    </form>
+    <form action="/admin/donation-links/{{ item.id }}/delete" method="post">
+      <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
+      <input type="hidden" name="category" value="support_author">
       <button class="btn btn-sm btn-outline-danger">Delete</button>
     </form>
   </div>

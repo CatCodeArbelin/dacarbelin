@@ -117,8 +117,8 @@ def _display_nickname(user: User | None, fallback: str) -> str:
     profile_nickname = (user.nickname or "").strip()
     base_name = game_nickname or profile_nickname or fallback_name
 
-    current_rank = (user.current_rank or "").strip() or "-"
-    return f"{base_name} ({current_rank})"
+    highest_rank = (user.highest_rank or "").strip() or "-"
+    return f"{base_name} ({highest_rank})"
 
 
 def _normalize_schedule(value: str | None) -> str:

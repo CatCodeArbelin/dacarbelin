@@ -879,8 +879,8 @@ def _display_nickname(user: User | None, fallback: str) -> str:
     profile_nickname = (user.nickname or "").strip()
     base_name = game_nickname or profile_nickname or fallback_name
 
-    current_rank = (user.current_rank or "").strip() or "-"
-    return f"{base_name} ({current_rank})"
+    highest_rank = (user.highest_rank or "").strip() or "-"
+    return f"{base_name} ({highest_rank})"
 
 
 def template_context(request: Request, **extra):
@@ -1643,6 +1643,17 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
     donation_links_vm = [
         {"url": item.url, "title_html": sanitize_content_html(localized_attr(item, "title", lang))}
         for item in donation_links
+        if (item.category or "general") == "general"
+    ]
+    bank_cards_vm = [
+        {"url": item.url, "title_html": sanitize_content_html(localized_attr(item, "title", lang))}
+        for item in donation_links
+        if (item.category or "general") == "bank_cards"
+    ]
+    support_author_vm = [
+        {"url": item.url, "title_html": sanitize_content_html(localized_attr(item, "title", lang))}
+        for item in donation_links
+        if (item.category or "general") == "support_author"
     ]
     crypto_wallets_vm = [
         {
@@ -1667,6 +1678,8 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
             request,
             total_sponsors_amount=highlight_amount or total_sponsors_amount_display,
             donation_links=donation_links_vm,
+            bank_cards_links=bank_cards_vm,
+            support_author_links=support_author_vm,
             crypto_wallets=crypto_wallets_vm,
             donors=donors_vm,
         ),
@@ -3265,6 +3278,7 @@ async def admin_save_donation_links(
         row = existing_rows[idx] if idx < len(existing_rows) else DonationLink()
         row.sort_order = idx
         row.url = parts[1]
+        row.category = "general"
         row.is_active = (parts[2] != "0") if len(parts) > 2 else True
         setattr(row, f"title_{lang}", parts[0])
         if idx >= len(existing_rows):
@@ -3382,11 +3396,13 @@ async def admin_create_donation_link(
     url: str = Form(...),
     is_active: bool = Form(default=False),
     content_lang: str = Form(default="ru"),
+    category: str = Form(default="general"),
     db: AsyncSession = Depends(get_db),
 ):
     lang = get_lang(content_lang)
     max_sort_order = await db.scalar(select(func.max(DonationLink.sort_order)))
-    row = DonationLink(url=(url or "").strip(), is_active=is_active, sort_order=(max_sort_order or -1) + 1)
+    normalized_category = category if category in {"general", "bank_cards", "support_author"} else "general"
+    row = DonationLink(url=(url or "").strip(), category=normalized_category, is_active=is_active, sort_order=(max_sort_order or -1) + 1)
     setattr(row, f"title_{lang}", (label or "").strip())
     db.add(row)
     await db.commit()
@@ -3400,6 +3416,7 @@ async def admin_update_donation_link(
     url: str = Form(...),
     is_active: bool = Form(default=False),
     content_lang: str = Form(default="ru"),
+    category: str = Form(default="general"),
     db: AsyncSession = Depends(get_db),
 ):
     lang = get_lang(content_lang)
@@ -3407,6 +3424,7 @@ async def admin_update_donation_link(
     if not row:
         return RedirectResponse(url=f"/admin/content?msg=msg_operation_failed&content_lang={lang}", status_code=303)
     row.url = (url or "").strip()
+    row.category = category if category in {"general", "bank_cards", "support_author"} else "general"
     row.is_active = is_active
     setattr(row, f"title_{lang}", (label or "").strip())
     await db.commit()
@@ -3417,6 +3435,7 @@ async def admin_update_donation_link(
 async def admin_delete_donation_link(
     link_id: int,
     content_lang: str = Form(default="ru"),
+    category: str = Form(default="general"),
     db: AsyncSession = Depends(get_db),
 ):
     lang = get_lang(content_lang)
