@@ -1258,6 +1258,69 @@ class ContentLocalePayload(BaseModel):
     rules_body: str
 
 
+DEFAULT_RULES_BODY_RU = """<p><strong>Перед участием внимательно ознакомьтесь с полными правилами.</strong> Регистрируясь, вы подтверждаете согласие с регламентом и решениями организаторов.</p>
+<h2>Вводный блок</h2>
+<p>Турнир проходит онлайн. Все расписание публикуется заранее, а актуальные объявления размещаются в официальных каналах проекта.</p>
+<h2>Расписание этапов</h2>
+<ul>
+  <li><strong>I этап:</strong> групповой формат, отбор в следующий раунд по итогам очков.</li>
+  <li><strong>II этап:</strong> усиленный групповой этап с direct invite участниками.</li>
+  <li><strong>III этап:</strong> финальный групповой этап перед решающими матчами.</li>
+  <li><strong>Финал:</strong> матчи за итоговые места турнира.</li>
+</ul>
+<h2>Участники и инвайты</h2>
+<p>Участники распределяются по корзинам и этапам согласно турнирной сетке. Для direct invite слотов используются отдельные правила допуска.</p>
+<h2>Система очков</h2>
+<p>Очки начисляются за занятые места и итог матчей. При равенстве очков применяются тай-брейки из раздела ниже.</p>
+<h2>Структура турнира</h2>
+<p>Каждый этап имеет фиксированное число групп и проходных мест. Состав следующего этапа формируется автоматически по итоговой таблице.</p>
+<h2>Правила матчей</h2>
+<ol>
+  <li>Все матчи играются в указанные администрацией временные окна.</li>
+  <li>Спорные ситуации рассматриваются только при наличии подтверждений.</li>
+  <li>Организаторы вправе назначить переигровку при технических сбоях.</li>
+</ol>
+<h2>Тай-брейки</h2>
+<ul>
+  <li>Сначала учитывается количество очков.</li>
+  <li>Далее — результаты личных встреч и дополнительные критерии этапа.</li>
+  <li>При необходимости применяется решение судейской панели.</li>
+</ul>
+<h2>Запасные игроки</h2>
+<p>Запасные участники могут быть добавлены в турнир при освобождении слотов до начала соответствующего этапа.</p>"""
+
+DEFAULT_RULES_BODY_EN = """<p><strong>Please review the full rules before participating.</strong> By registering, you confirm acceptance of the tournament regulations and organizer decisions.</p>
+<h2>Introduction</h2>
+<p>The tournament is played online. The schedule is published in advance, and all updates are posted in official project channels.</p>
+<h2>Stage schedule</h2>
+<ul>
+  <li><strong>Stage I:</strong> group format with qualification based on total points.</li>
+  <li><strong>Stage II:</strong> advanced group stage including direct invite participants.</li>
+  <li><strong>Stage III:</strong> final group stage before decisive matches.</li>
+  <li><strong>Final:</strong> matches for final tournament placement.</li>
+</ul>
+<h2>Participants and invites</h2>
+<p>Participants are assigned to baskets and stages according to the tournament bracket. Direct invite slots follow dedicated admission rules.</p>
+<h2>Scoring system</h2>
+<p>Points are awarded for placement and match outcomes. If points are tied, tie-breakers from the section below are applied.</p>
+<h2>Tournament structure</h2>
+<p>Each stage has a fixed number of groups and qualification slots. The next stage lineup is generated automatically from standings.</p>
+<h2>Match rules</h2>
+<ol>
+  <li>All matches must be played within administration-approved time windows.</li>
+  <li>Disputes are reviewed only when supporting evidence is provided.</li>
+  <li>Organizers may assign a rematch in case of confirmed technical issues.</li>
+</ol>
+<h2>Tie-breakers</h2>
+<ul>
+  <li>Total points are considered first.</li>
+  <li>Then head-to-head results and additional stage criteria are used.</li>
+  <li>If required, a final ruling is made by the judging panel.</li>
+</ul>
+<h2>Substitute players</h2>
+<p>Substitute participants may be added when slots become available before the corresponding stage begins.</p>"""
+
+
 def localized_attr(entity: object, base_name: str, lang: str) -> str:
     value = getattr(entity, f"{base_name}_{lang}", "") or ""
     if value:
@@ -1277,8 +1340,17 @@ def dump_admin_content_for_lang(
 async def get_or_create_rules_content(db: AsyncSession) -> RulesContent:
     row = await db.scalar(select(RulesContent).where(RulesContent.id == 1))
     if row:
+        has_updates = False
+        if not (row.body_ru or "").strip():
+            row.body_ru = DEFAULT_RULES_BODY_RU
+            has_updates = True
+        if not (row.body_en or "").strip():
+            row.body_en = DEFAULT_RULES_BODY_EN
+            has_updates = True
+        if has_updates:
+            await db.flush()
         return row
-    row = RulesContent(id=1, body_ru="", body_en="")
+    row = RulesContent(id=1, body_ru=DEFAULT_RULES_BODY_RU, body_en=DEFAULT_RULES_BODY_EN)
     db.add(row)
     await db.flush()
     return row
