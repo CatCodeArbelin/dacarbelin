@@ -148,6 +148,30 @@ async def test_admin_reassign_user_quick_move_works_without_selected_stage(quick
     assert user.basket == expected_basket
 
 
+@pytest.mark.asyncio
+async def test_admin_reassign_user_returns_no_changes_when_stage_and_group_same() -> None:
+    user = User(id=91, nickname="same", basket=Basket.ROOK.value)
+    target_stage = PlayoffStage(id=34, key="stage_2", title="Stage 2", stage_size=32, stage_order=1)
+    membership = PlayoffParticipant(stage_id=34, user_id=91, seed=10)
+    db = _FakeDB(user=user, stage=target_stage, memberships=[membership])
+
+    response = await web.admin_reassign_user(
+        user_id=91,
+        target_stage_id="34",
+        target_group_number="2",
+        replace_from_user_id="",
+        quick_move=None,
+        reassign_action="move_stage",
+        db=db,
+    )
+
+    assert response.status_code == 303
+    assert "msg_status_ok" in response.headers["location"]
+    assert "details=no_changes" in response.headers["location"]
+    assert db.rollback.await_count == 1
+    assert db.commit.await_count == 0
+
+
 def test_admin_users_page_fetches_all_users_without_limit(monkeypatch) -> None:
     captured = {}
 

@@ -871,6 +871,7 @@ def get_playoff_stage_integrity_alert(playoff_stages: list[PlayoffStage]) -> str
 
 
 def _normalize_direct_invite_stage(raw_value: str | None) -> str | None:
+    """Нормализует direct-invite флаг (не используется как универсальный перенос между стадиями)."""
     value = (raw_value or "").strip() or None
     if value not in ALLOWED_DIRECT_INVITE_STAGES:
         raise ValueError("invalid direct invite stage")
@@ -2252,6 +2253,7 @@ async def admin_reassign_user(
     target_group_number: str | None = Form(default=None),
     replace_from_user_id: str | None = Form(default=None),
     quick_move: str | None = Form(default=None),
+    reassign_action: str | None = Form(default=None),
     db: AsyncSession = Depends(get_db),
 ):
     try:
@@ -2266,8 +2268,10 @@ async def admin_reassign_user(
         return redirect_with_admin_users_msg("msg_operation_failed", details="user_not_found")
 
     next_basket = _resolve_basket_quick_move(user.basket, quick_move)
+    basket_changed = False
     if next_basket and next_basket != user.basket:
         user.basket = next_basket
+        basket_changed = True
 
     if not normalized_target_stage_id:
         if quick_move in {"to_main", "to_reserve"}:
@@ -2289,6 +2293,17 @@ async def admin_reassign_user(
     if len(existing_memberships) > 1:
         return redirect_with_admin_users_msg("msg_operation_failed", details="duplicate_membership")
     current_membership = existing_memberships[0] if existing_memberships else None
+
+    current_stage_id = current_membership.stage_id if current_membership else None
+    current_group_number = get_stage_group_number_by_seed(current_membership.seed) if current_membership else None
+    stage_unchanged = current_stage_id == normalized_target_stage_id
+    group_unchanged = normalized_target_group_number is None or normalized_target_group_number == current_group_number
+    if reassign_action == "move_stage" and stage_unchanged and group_unchanged:
+        if basket_changed:
+            await db.commit()
+            return redirect_with_admin_users_msg("msg_status_ok")
+        await db.rollback()
+        return redirect_with_admin_users_msg("msg_status_ok", details="no_changes")
 
     try:
         if current_membership and current_membership.stage_id != normalized_target_stage_id:
@@ -2323,6 +2338,9 @@ async def admin_reassign_user(
                 stage_size=int(target_stage.stage_size or 0),
             )
 
+        if target_membership.stage_id != normalized_target_stage_id:
+            target_membership.stage_id = normalized_target_stage_id
+
         await db.commit()
         return redirect_with_admin_users_msg("msg_player_moved")
     except ValueError as exc:
@@ -2344,6 +2362,7 @@ async def _update_user_allowed_fields(
     direct_invite_stage: str | None,
     manual_points: int | None = None,
 ) -> RedirectResponse:
+    """Обычное редактирование профиля участника без явного переноса по playoff-сетке."""
     user = await db.get(User, user_id)
     if not user:
         return redirect_with_admin_users_msg("msg_operation_failed")
