@@ -66,7 +66,7 @@ async def test_admin_reassign_user_moves_player_between_stages(monkeypatch) -> N
 
     response = await web.admin_reassign_user(
         user_id=55,
-        target_stage_id=20,
+        target_stage_id="20",
         target_group_number=None,
         replace_from_user_id=None,
         quick_move=None,
@@ -76,6 +76,55 @@ async def test_admin_reassign_user_moves_player_between_stages(monkeypatch) -> N
     assert response.status_code == 303
     assert "msg_player_moved" in response.headers["location"]
     assert any(member.stage_id == 20 and member.user_id == 55 for member in db.memberships)
+
+
+@pytest.mark.asyncio
+async def test_admin_reassign_user_accepts_empty_string_stage_and_group_without_422() -> None:
+    user = User(id=88, nickname="quick", basket=Basket.BISHOP.value)
+    target_stage = PlayoffStage(id=31, key="stage_2", title="Stage 2", stage_size=16, stage_order=1)
+    db = _FakeDB(user=user, stage=target_stage, memberships=[])
+
+    response = await web.admin_reassign_user(
+        user_id=88,
+        target_stage_id="",
+        target_group_number="",
+        replace_from_user_id="",
+        quick_move="to_reserve",
+        db=db,
+    )
+
+    assert response.status_code == 303
+    assert "msg_status_ok" in response.headers["location"]
+    assert db.commit.await_count == 1
+    assert user.basket == Basket.BISHOP_RESERVE.value
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("quick_move", "expected_basket"),
+    [
+        ("to_main", Basket.ROOK.value),
+        ("to_reserve", Basket.ROOK_RESERVE.value),
+    ],
+)
+async def test_admin_reassign_user_quick_move_works_without_selected_stage(quick_move: str, expected_basket: str) -> None:
+    user = User(id=89, nickname="quick2", basket=Basket.ROOK_RESERVE.value)
+    target_stage = PlayoffStage(id=32, key="stage_2", title="Stage 2", stage_size=16, stage_order=1)
+    db = _FakeDB(user=user, stage=target_stage, memberships=[])
+
+    response = await web.admin_reassign_user(
+        user_id=89,
+        target_stage_id="",
+        target_group_number="",
+        replace_from_user_id="",
+        quick_move=quick_move,
+        db=db,
+    )
+
+    assert response.status_code == 303
+    assert "msg_status_ok" in response.headers["location"]
+    assert db.commit.await_count == 1
+    assert user.basket == expected_basket
 
 
 def test_admin_users_page_fetches_all_users_without_limit(monkeypatch) -> None:
