@@ -115,7 +115,8 @@ def _display_nickname(user: User | None, fallback: str) -> str:
     fallback_name = (fallback or "").strip() or "-"
     game_nickname = (user.game_nickname or "").strip()
     profile_nickname = (user.nickname or "").strip()
-    base_name = game_nickname or profile_nickname or fallback_name
+    # Для турнирной таблицы приоритет отдаём нику, который участник ввёл вручную.
+    base_name = profile_nickname or game_nickname or fallback_name
 
     highest_rank = (user.highest_rank or "").strip() or "-"
     return f"{base_name} ({highest_rank})"
