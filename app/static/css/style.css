@@ -779,12 +779,118 @@ body {
 }
 
 
+.page-content-shell {
+  position: relative;
+}
+
+.page-content-shell__main {
+  position: relative;
+  z-index: 2;
+}
+
+.page-content-shell__decor {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: min(15vw, 220px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.page-content-shell__decor--left {
+  left: 0;
+}
+
+.page-content-shell__decor--right {
+  right: 0;
+}
+
+.matrix-rain {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(2, 10, 8, 0.12), rgba(3, 12, 9, 0.4));
+  backdrop-filter: blur(1.2px);
+}
+
+.matrix-rain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(0, 255, 133, 0.1), rgba(0, 0, 0, 0.12) 65%);
+  opacity: 0.75;
+}
+
+.matrix-rain__column {
+  position: absolute;
+  top: -135%;
+  transform: translateX(-50%);
+  color: rgba(157, 255, 87, 0.95);
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: 0.14em;
+  text-shadow: 0 0 8px rgba(0, 255, 133, 0.55);
+  white-space: pre;
+  animation-name: matrix-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.matrix-rain--reduced {
+  background: linear-gradient(180deg, rgba(2, 10, 8, 0.05), rgba(3, 12, 9, 0.18));
+}
+
+.matrix-rain--reduced .matrix-rain__column {
+  animation: none;
+  opacity: 0.08 !important;
+}
+
+@keyframes matrix-fall {
+  0% {
+    transform: translate(-50%, -100%);
+  }
+  100% {
+    transform: translate(-50%, 220%);
+  }
+}
+
+@media (max-width: 1199.98px) {
+  .page-content-shell__decor {
+    width: min(11vw, 140px);
+  }
+}
+
+@media (max-width: 991.98px) {
+  .page-content-shell__decor {
+    display: none;
+  }
+}
+
+
+
 
 
 .home-right-column {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.home-right-column > :not(.matrix-rain) {
+  position: relative;
+  z-index: 2;
+}
+
+.home-right-column .matrix-rain {
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(2, 10, 8, 0.2), rgba(3, 12, 9, 0.5));
+  box-shadow: inset 0 0 0 1px rgba(0, 255, 133, 0.14);
 }
 
 .home-right-column .prize-pool-card,
@@ -1535,4 +1641,14 @@ textarea:focus {
 .site-footer__author {
   color: var(--matrix-lime);
   text-shadow: 0 0 8px rgba(157, 255, 87, 0.75);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .matrix-rain {
+    backdrop-filter: none;
+  }
+
+  .matrix-rain__column {
+    animation: none !important;
+  }
 }
