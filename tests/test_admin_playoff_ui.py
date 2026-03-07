@@ -84,6 +84,10 @@ def test_admin_emergency_template_uses_stage_bound_replace_participants() -> Non
     assert 'id="emergency-from-user-id"' in template
     assert "membersByStage" in template
     assert "Нет участников на этом этапе" in template
+    assert '/admin/emergency/update-player' in template
+    assert 'name="nickname"' in template
+    assert 'name="steam_input"' in template
+    assert "admin_emergency_update_player_identity" in router
     assert "emergency_stages_payload" in router
     assert "emergency_stage_members" in router
 

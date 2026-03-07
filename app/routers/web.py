@@ -2792,6 +2792,37 @@ async def admin_invite_user(
     return redirect_with_admin_emergency_msg("msg_invited_added")
 
 
+@router.post("/admin/emergency/update-player")
+async def admin_emergency_update_player_identity(
+    user_id: int = Form(...),
+    nickname: str = Form(...),
+    steam_input: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await db.get(User, user_id)
+    if not user:
+        return redirect_with_admin_emergency_msg("msg_operation_failed", details="user_not_found")
+
+    normalized_nickname = nickname.strip()
+    if not normalized_nickname:
+        return redirect_with_admin_emergency_msg("msg_operation_failed", details="empty_nickname")
+
+    steam_id = await normalize_steam_id(steam_input)
+    if not steam_id:
+        return redirect_with_admin_emergency_msg("msg_invalid_steam_id")
+
+    existing_user = await db.scalar(select(User).where(User.steam_id == steam_id, User.id != user_id))
+    if existing_user:
+        return redirect_with_admin_emergency_msg("msg_user_exists")
+
+    user.nickname = normalized_nickname
+    user.steam_input = steam_input.strip()
+    user.steam_id = steam_id
+
+    await db.commit()
+    return redirect_with_admin_emergency_msg("msg_status_ok")
+
+
 @router.post("/admin/draw/auto")
 async def admin_auto_draw(db: AsyncSession = Depends(get_db)):
     # Запускаем автоматическую жеребьевку группового этапа.
