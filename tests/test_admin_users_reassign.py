@@ -230,6 +230,29 @@ async def test_admin_reassign_user_rolls_back_stage_change_if_group_assignment_f
     assert db.rollback.await_count == 1
 
 
+@pytest.mark.asyncio
+async def test_admin_reassign_user_does_not_start_target_stage_automatically() -> None:
+    user = User(id=93, nickname="manual_stage2", basket=Basket.ROOK.value)
+    target_stage = PlayoffStage(id=37, key="stage_2", title="Stage 2", stage_size=16, stage_order=1, is_started=False)
+    db = _FakeDB(user=user, stage=target_stage, memberships=[])
+
+    response = await web.admin_reassign_user(
+        user_id=93,
+        target_stage_id="37",
+        target_group_number="2",
+        replace_from_user_id="",
+        quick_move=None,
+        reassign_action="move_stage",
+        db=db,
+    )
+
+    assert response.status_code == 303
+    assert "msg_player_moved" in response.headers["location"]
+    assert target_stage.is_started is False
+    moved_member = next(member for member in db.memberships if member.user_id == 93 and member.stage_id == 37)
+    assert web.get_stage_group_number_by_seed(moved_member.seed) == 2
+
+
 def test_admin_users_page_fetches_all_users_without_limit(monkeypatch) -> None:
     captured = {}
 
