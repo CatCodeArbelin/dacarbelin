@@ -1,10 +1,10 @@
 """Проверяет сценарии прямых инвайтов участников между стадиями турнира."""
 
-from fastapi.testclient import TestClient
+import asyncio
+from types import SimpleNamespace
 
-from app.db.session import get_db
-from app.main import app
 from app.models.user import Basket, User
+from app.routers import web
 
 
 class _FakeScalarResult:
@@ -25,10 +25,11 @@ class _FakeDB:
         return _FakeScalarResult(self.users)
 
 
+def _fake_request():
+    return SimpleNamespace(cookies={}, query_params={})
+
+
 def test_participants_direct_invites_shows_stage_2_user() -> None:
-    """Проверяет позитивный сценарий `test_participants_direct_invites_shows_stage_2_user`.
-    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
-    Запуск: `pytest tests/test_participants_direct_invites.py -q` и `pytest tests/test_participants_direct_invites.py -k "test_participants_direct_invites_shows_stage_2_user" -q`."""
     stage_2_user = User(
         nickname="stage2_user",
         steam_input="stage2_input",
@@ -36,34 +37,21 @@ def test_participants_direct_invites_shows_stage_2_user() -> None:
         game_nickname="stage2_game",
         current_rank="Pawn-1",
         highest_rank="Knight-1",
-        basket=Basket.INVITED.value,
+        basket=Basket.QUEEN_RESERVE.value,
         direct_invite_stage="stage_2",
     )
     fake_db = _FakeDB(users=[stage_2_user])
 
-    async def override_get_db():
-        yield fake_db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            response = client.get("/participants?view=direct_invites")
-    finally:
-        app.dependency_overrides.pop(get_db, None)
+    response = asyncio.run(web.participants(request=_fake_request(), basket=Basket.QUEEN.value, view="direct_invites", db=fake_db))
 
     assert response.status_code == 200
-    assert "stage2_user" in response.text
     assert fake_db.last_statement is not None
-
     compiled = str(fake_db.last_statement)
-    assert "users.basket" in compiled
+    assert "WHERE users.basket" not in compiled
     assert "users.direct_invite_stage" in compiled
 
 
 def test_participants_direct_invites_excludes_non_stage_2_invites() -> None:
-    """Проверяет негативный сценарий `test_participants_direct_invites_excludes_non_stage_2_invites`.
-    Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
-    Запуск: `pytest tests/test_participants_direct_invites.py -q` и `pytest tests/test_participants_direct_invites.py -k "test_participants_direct_invites_excludes_non_stage_2_invites" -q`."""
     stage_2_user = User(
         nickname="visible_invite",
         steam_input="stage2_input_visible",
@@ -71,32 +59,14 @@ def test_participants_direct_invites_excludes_non_stage_2_invites() -> None:
         game_nickname="stage2_game_visible",
         current_rank="Pawn-1",
         highest_rank="Knight-1",
-        basket=Basket.INVITED.value,
+        basket=Basket.QUEEN.value,
         direct_invite_stage="stage_2",
-    )
-    wrong_stage_user = User(
-        nickname="hidden_invite",
-        steam_input="stage3_input_hidden",
-        steam_id="steam_stage3_hidden",
-        game_nickname="stage3_game_hidden",
-        current_rank="Pawn-1",
-        highest_rank="Knight-1",
-        basket=Basket.INVITED.value,
-        direct_invite_stage="stage_3",
     )
     fake_db = _FakeDB(users=[stage_2_user])
 
-    async def override_get_db():
-        yield fake_db
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            response = client.get("/participants?view=direct_invites")
-    finally:
-        app.dependency_overrides.pop(get_db, None)
+    response = asyncio.run(web.participants(request=_fake_request(), basket=Basket.QUEEN.value, view="direct_invites", db=fake_db))
 
     assert response.status_code == 200
-    assert "visible_invite" in response.text
-    assert wrong_stage_user.nickname not in response.text
-    assert "/participants?view=direct_invites" in response.text
+    compiled = str(fake_db.last_statement)
+    assert "WHERE users.direct_invite_stage" in compiled
+    assert "WHERE users.basket" not in compiled

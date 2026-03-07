@@ -33,6 +33,7 @@
             <th>Ручные очки</th>
             <th>Direct invite</th>
             <th>{{ tr('participants_telegram') }}</th>
+            <th>Reassign</th>
             <th>{{ tr('admin_save') }}</th>
             <th>{{ tr('admin_delete') }}</th>
           </tr>
@@ -67,6 +68,32 @@
             </td>
             <td>{{ user.telegram or 'None' }}</td>
             <td>
+              {% set playoff_state = user_playoff_state.get(user.id) %}
+              <form id="user-reassign-{{ user.id }}" action="/admin/user/reassign" method="post" class="d-flex flex-column gap-1">
+                <input type="hidden" name="user_id" value="{{ user.id }}">
+                <select class="form-select form-select-sm" name="target_stage_id">
+                  <option value="">- stage -</option>
+                  {% for stage in playoff_stages %}
+                  <option value="{{ stage.id }}" {% if playoff_state and playoff_state.stage_id == stage.id %}selected{% endif %}>{{ stage.title }} ({{ stage.key }})</option>
+                  {% endfor %}
+                </select>
+                <select class="form-select form-select-sm" name="target_group_number">
+                  <option value="">- group -</option>
+                  {% for stage in playoff_stages %}
+                    {% for group_number in stage_group_options.get(stage.id, []) %}
+                    <option value="{{ group_number }}" {% if playoff_state and playoff_state.stage_id == stage.id and playoff_state.group_number == group_number %}selected{% endif %}>{{ stage.key }} / G{{ group_number }}</option>
+                    {% endfor %}
+                  {% endfor %}
+                </select>
+                <input class="form-control form-control-sm" type="number" min="1" name="replace_from_user_id" placeholder="replace user id (opt)">
+                <div class="btn-group btn-group-sm" role="group">
+                  <button class="btn btn-outline-secondary" type="submit" name="quick_move" value="to_main">→ Main</button>
+                  <button class="btn btn-outline-secondary" type="submit" name="quick_move" value="to_reserve">→ Reserve</button>
+                </div>
+                <button class="btn btn-sm btn-outline-warning" type="submit">Move</button>
+              </form>
+            </td>
+            <td>
               <form id="user-update-{{ user.id }}" action="/admin/user/update" method="post" class="d-inline">
                 <input type="hidden" name="user_id" value="{{ user.id }}">
               </form>
@@ -81,7 +108,7 @@
           </tr>
           {% endfor %}
           {% if section.users|length == 0 %}
-          <tr><td colspan="11" class="text-muted">Нет участников</td></tr>
+          <tr><td colspan="12" class="text-muted">Нет участников</td></tr>
           {% endif %}
         </tbody>
       </table>
