@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="donate-page">
-  <h2>{{ tr('donate_title') }}</h2>
+  <h2 class="page-title-neon">{{ tr('donate_title') }}</h2>
 
   <section class="donate-section donate-section--highlight prize-pool-card">
     <h4>{{ tr('donate_prize_pool') }}</h4>
@@ -12,7 +12,7 @@
     <h4>{{ tr('donate_links') }}</h4>
     <ul class="donate-list">
       {% for item in donation_links %}
-        <li><a class="donate-link" href="{{ item.url|e }}" target="_blank" rel="noopener"><span class="content-html">{{ item.title_html|safe }}</span></a></li>
+        <li>{% if item.url %}<a class="donate-link" href="{{ item.url|e }}" target="_blank" rel="noopener"><span class="content-html">{{ item.title_html|safe }}</span></a>{% else %}<span class="content-html">{{ item.title_html|safe }}</span>{% endif %}</li>
       {% else %}
         <li>{{ tr('donate_no_links') }}</li>
       {% endfor %}
@@ -24,7 +24,7 @@
     <h4>{{ tr('donate_bank_cards') }}</h4>
     <ul class="donate-list">
       {% for item in bank_cards_links %}
-        <li><a class="donate-link" href="{{ item.url|e }}" target="_blank" rel="noopener"><span class="content-html">{{ item.title_html|safe }}</span></a></li>
+        <li>{% if item.url %}<a class="donate-link" href="{{ item.url|e }}" target="_blank" rel="noopener"><span class="content-html">{{ item.title_html|safe }}</span></a>{% else %}<span class="content-html">{{ item.title_html|safe }}</span>{% endif %}</li>
       {% else %}
         <li>{{ tr('donate_no_links') }}</li>
       {% endfor %}
@@ -46,7 +46,7 @@
     <h4>{{ tr('donate_support_author') }}</h4>
     <ul class="donate-list">
       {% for item in support_author_links %}
-        <li><a class="donate-link" href="{{ item.url|e }}" target="_blank" rel="noopener"><span class="content-html">{{ item.title_html|safe }}</span></a></li>
+        <li>{% if item.url %}<a class="donate-link" href="{{ item.url|e }}" target="_blank" rel="noopener"><span class="content-html">{{ item.title_html|safe }}</span></a>{% else %}<span class="content-html">{{ item.title_html|safe }}</span>{% endif %}</li>
       {% else %}
         <li>{{ tr('donate_no_links') }}</li>
       {% endfor %}

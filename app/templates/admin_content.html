@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="admin-content-page">
-<h2>Блоки контента</h2>
+<h2 class="page-title-neon">Блоки контента</h2>
 {% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}{% if request.query_params.get('details') %}: <span class="small">{{ request.query_params.get('details') }}</span>{% endif %}</div>{% endif %}
 <div class="d-flex justify-content-end align-items-center gap-2 mb-3">
   <a class="btn btn-sm btn-outline-secondary" href="/admin">{{ tr('admin_back_to_panel') }}</a>
@@ -59,12 +59,13 @@
 
 
   <h5 class="mt-4">Банковские карты</h5>
+  <p class="small text-contrast-muted mb-2">Для банковских карт поле URL можно оставить пустым — тогда на странице Призовой будет показан обычный текст.</p>
   <form action="/admin/donation-links/create" method="post" class="mb-3 border rounded p-3">
     <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
     <input type="hidden" name="category" value="bank_cards">
     <div class="row g-2">
       <div class="col-md-4"><input class="form-control" name="label" placeholder="Label" required></div>
-      <div class="col-md-5"><input class="form-control" name="url" placeholder="https://..." required></div>
+      <div class="col-md-5"><input class="form-control" name="url" placeholder="https://... (необязательно)"></div>
       <div class="col-md-2 form-check mt-2"><input class="form-check-input" type="checkbox" name="is_active" value="true" id="new-card-active" checked><label class="form-check-label" for="new-card-active">Active</label></div>
       <div class="col-md-1"><button class="btn btn-sm btn-primary">+</button></div>
     </div>
@@ -75,7 +76,7 @@
       <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
       <input type="hidden" name="category" value="bank_cards">
       <div class="col-md-3"><input class="form-control" name="label" value="{{ (item.title_ru if selected_content_lang == 'ru' else item.title_en)|e }}" required></div>
-      <div class="col-md-5"><input class="form-control" name="url" value="{{ item.url|e }}" required></div>
+      <div class="col-md-5"><input class="form-control" name="url" value="{{ item.url|e }}" placeholder="https://... (необязательно)"></div>
       <div class="col-md-2 form-check mt-2"><input class="form-check-input" type="checkbox" name="is_active" value="true" id="card-active-{{ item.id }}" {% if item.is_active %}checked{% endif %}><label class="form-check-label" for="card-active-{{ item.id }}">Active</label></div>
       <div class="col-md-2"><button class="btn btn-sm btn-primary">Save</button></div>
     </form>

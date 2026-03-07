@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>{{ tr('participants_title') }}</h2>
+<h2 class="page-title-neon">{{ tr('participants_title') }}</h2>
 <div class="mb-3 d-flex flex-wrap gap-2">
 <a class="btn btn-sm {% if view == 'baskets' %}btn-danger{% else %}btn-outline-light{% endif %}" href="/participants?view=baskets&basket={{ basket }}">{{ tr('participants_baskets_filter') }}</a>
 <a class="btn btn-sm {% if view == 'direct_invites' %}btn-danger{% else %}btn-outline-light{% endif %}" href="/participants?view=direct_invites">{{ tr('participants_direct_invites_filter') }}</a>

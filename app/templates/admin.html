@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "includes/tournament_stage_macros.html" as stage_macros with context %}
 {% block content %}
-<h2>{{ tr('admin_title') }}</h2>
+<h2 class="page-title-neon">{{ tr('admin_title') }}</h2>
 {% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}{% if request.query_params.get('details') %}: <span class="small">{{ tr(request.query_params.get('details')) }}</span>{% endif %}</div>{% endif %}
 {% if playoff_empty_active_stage_alert %}<div class="alert alert-warning">{{ playoff_empty_active_stage_alert }}</div>{% endif %}
 {% if playoff_stage_integrity_alert %}<div class="alert alert-warning">{{ playoff_stage_integrity_alert }}</div>{% endif %}
