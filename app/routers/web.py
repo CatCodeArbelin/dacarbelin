@@ -975,6 +975,7 @@ async def _render_admin_emergency_page(
     if judge_login_token:
         judge_login_url = str(request.url_for("admin_page")).rstrip("/") + f"?judge_token={judge_login_token}"
     registration_open = await get_registration_open(db)
+    technical_works_enabled = await get_technical_works_enabled(db)
 
     manual_draw_users = (
         await db.scalars(
@@ -998,6 +999,7 @@ async def _render_admin_emergency_page(
             preview_title=preview_title,
             preview_payload=preview_payload,
             registration_open=registration_open,
+            technical_works_enabled=technical_works_enabled,
             judge_login_url=judge_login_url,
         ),
     )
@@ -1016,6 +1018,11 @@ async def get_registration_open(db: AsyncSession) -> bool:
     # Получаем флаг доступности регистрации из настроек.
     record = await db.scalar(select(SiteSetting).where(SiteSetting.key == "registration_open"))
     return (record.value == "1") if record else True
+
+
+async def get_technical_works_enabled(db: AsyncSession) -> bool:
+    record = await db.scalar(select(SiteSetting).where(SiteSetting.key == "technical_works_enabled"))
+    return bool(record and record.value == "1")
 
 
 async def get_tournament_started(db: AsyncSession) -> bool:
@@ -1733,6 +1740,11 @@ async def archive_page(request: Request, db: AsyncSession = Depends(get_db)):
     )
 
 
+@router.get("/technical-works", response_class=HTMLResponse)
+async def technical_works_page(request: Request):
+    return templates.TemplateResponse(request, "technical_works.html", template_context(request))
+
+
 @router.get("/freak", response_class=HTMLResponse)
 async def freak_page(request: Request):
     return templates.TemplateResponse(request, "freak.html", template_context(request))
@@ -2360,6 +2372,20 @@ async def admin_registration_toggle(
     return redirect_with_admin_emergency_msg("msg_status_ok")
 
 
+
+
+@router.post("/admin/technical-works")
+async def admin_technical_works_toggle(
+    technical_works_enabled: bool = Form(default=False),
+    db: AsyncSession = Depends(get_db),
+):
+    row = await db.scalar(select(SiteSetting).where(SiteSetting.key == "technical_works_enabled"))
+    if not row:
+        row = SiteSetting(key="technical_works_enabled", value="0")
+        db.add(row)
+    row.value = "1" if technical_works_enabled else "0"
+    await db.commit()
+    return redirect_with_admin_emergency_msg("msg_status_ok")
 
 
 @router.post("/admin/tournament/profile")

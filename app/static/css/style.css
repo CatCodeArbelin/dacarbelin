@@ -906,3 +906,64 @@ body {
 .donate-link:focus-visible {
   color: #ccefff !important;
 }
+
+
+.visual-draw-card .fw-semibold {
+  color: #ffffff !important;
+  text-shadow: none;
+}
+
+.visual-draw-card .text-contrast-muted {
+  color: #d6e7ff !important;
+}
+
+.technical-works-screen {
+  min-height: calc(100vh - 180px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 0.75rem;
+}
+
+.technical-works-title,
+.technical-works-subtitle {
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  animation: technical-neon 2.2s ease-in-out infinite alternate;
+}
+
+.technical-works-title {
+  font-size: clamp(1.9rem, 5vw, 4rem);
+}
+
+.technical-works-subtitle {
+  font-size: clamp(1.1rem, 2.4vw, 1.8rem);
+  animation-duration: 2.8s;
+}
+
+@keyframes technical-neon {
+  0% {
+    color: #e8fbff;
+    text-shadow:
+      0 0 6px rgba(255, 255, 255, 0.95),
+      0 0 16px rgba(0, 183, 255, 0.85),
+      0 0 28px rgba(0, 183, 255, 0.6);
+  }
+  50% {
+    color: #fff1ff;
+    text-shadow:
+      0 0 8px rgba(255, 255, 255, 0.95),
+      0 0 18px rgba(255, 45, 85, 0.85),
+      0 0 30px rgba(255, 45, 85, 0.6);
+  }
+  100% {
+    color: #f1fff5;
+    text-shadow:
+      0 0 8px rgba(255, 255, 255, 0.95),
+      0 0 18px rgba(94, 255, 158, 0.8),
+      0 0 30px rgba(94, 255, 158, 0.6);
+  }
+}

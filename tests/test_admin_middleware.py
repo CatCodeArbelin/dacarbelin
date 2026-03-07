@@ -63,3 +63,32 @@ def test_judge_token_auth_works_once_then_fails(monkeypatch) -> None:
     replay_response = client.get("/admin?judge_token=judge-token", follow_redirects=False)
     assert replay_response.status_code == 303
     assert replay_response.headers["location"] == "/admin/login?msg=msg_admin_login_failed"
+
+
+def test_technical_works_redirects_public_pages(monkeypatch) -> None:
+    client = TestClient(app)
+
+    async def fake_enabled() -> bool:
+        return True
+
+    monkeypatch.setattr(main_module, "is_technical_works_enabled", fake_enabled)
+
+    response = client.get("/", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/technical-works"
+
+
+def test_technical_works_does_not_redirect_excluded_paths(monkeypatch) -> None:
+    client = TestClient(app)
+
+    async def fake_enabled() -> bool:
+        return True
+
+    monkeypatch.setattr(main_module, "is_technical_works_enabled", fake_enabled)
+
+    freak_response = client.get("/freak", follow_redirects=False)
+    login_response = client.get("/admin/login", follow_redirects=False)
+
+    assert freak_response.status_code == 404
+    assert login_response.status_code == 404

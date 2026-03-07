@@ -28,6 +28,16 @@
     </div>
     <div class="col-12 col-xl-4">
       <div class="card bg-black neon-border-blue"><div class="card-body">
+        <h4>Технические работы</h4>
+        <form action="/admin/technical-works" method="post" class="mb-2">
+          <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="technical_works_enabled" {% if technical_works_enabled %}checked{% endif %}><label class="form-check-label">Включить заглушку технических работ</label></div>
+          <button class="btn btn-outline-info">{{ tr('admin_save') }}</button>
+        </form>
+        <div class="small text-contrast-muted">При включении все публичные страницы перенаправляются на /technical-works. Исключения: /freak и /admin/login.</div>
+      </div></div>
+    </div>
+    <div class="col-12 col-xl-4">
+      <div class="card bg-black neon-border-blue"><div class="card-body">
         <h4>{{ tr('admin_manual_invited_add') }}</h4>
         <form action="/admin/invite" method="post" class="row g-2" id="manual-invite-form">
           <div class="col-12"><input class="form-control" name="nickname" placeholder="{{ tr('admin_nickname') }}" required></div>
