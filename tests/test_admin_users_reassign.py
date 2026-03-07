@@ -100,6 +100,27 @@ async def test_admin_reassign_user_accepts_empty_string_stage_and_group_without_
 
 
 @pytest.mark.asyncio
+async def test_admin_reassign_user_requires_stage_for_stage_move_without_quick_action() -> None:
+    user = User(id=90, nickname="nostage", basket=Basket.ROOK.value)
+    target_stage = PlayoffStage(id=33, key="stage_2", title="Stage 2", stage_size=16, stage_order=1)
+    db = _FakeDB(user=user, stage=target_stage, memberships=[])
+
+    response = await web.admin_reassign_user(
+        user_id=90,
+        target_stage_id="",
+        target_group_number="",
+        replace_from_user_id="",
+        quick_move=None,
+        db=db,
+    )
+
+    assert response.status_code == 303
+    assert "msg_operation_failed" in response.headers["location"]
+    assert "details=target_stage_id_required" in response.headers["location"]
+    assert db.rollback.await_count == 1
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("quick_move", "expected_basket"),
     [
@@ -263,3 +284,49 @@ def test_admin_users_page_reassign_ui_has_fallback_stage_options_when_playoff_st
     assert '"stage_1_4": [1, 2]' in html
     assert '"stage_final": [1]' in html
 
+
+
+def test_admin_users_page_reassign_ui_has_explicit_labels_and_tooltips(monkeypatch) -> None:
+    class _DB:
+        async def scalars(self, statement):
+            sql = str(statement)
+            if "FROM users" in sql:
+                return _ScalarResult([User(id=10, nickname="u10")])
+            if "FROM playoff_stages" in sql:
+                return _ScalarResult([PlayoffStage(id=21, key="stage_2", title="Stage 2", stage_size=16, stage_order=1)])
+            if "FROM playoff_participants" in sql:
+                return _ScalarResult([])
+            if "FROM tournament_groups" in sql:
+                return _ScalarResult([])
+            return _ScalarResult([])
+
+        async def execute(self, statement):
+            return SimpleNamespace(all=lambda: [])
+
+    class _Req:
+        cookies = {}
+        query_params = {}
+
+    async def fake_get_draw_applied(db):
+        return False
+
+    async def fake_get_tournament_started(db):
+        return False
+
+    monkeypatch.setattr(web, "get_draw_applied", fake_get_draw_applied)
+    monkeypatch.setattr(web, "get_tournament_started", fake_get_tournament_started)
+
+    import asyncio
+
+    response = asyncio.run(web.admin_users_page(request=_Req(), db=_DB()))
+    html = response.body.decode("utf-8")
+
+    assert response.status_code == 200
+    assert "Basket" in html
+    assert "Stage/Group" in html
+    assert "To Main Basket" in html
+    assert "To Reserve Basket" in html
+    assert "Move to Stage/Group" in html
+    assert 'title="Move user to the main basket pair"' in html
+    assert 'title="Move user to the reserve basket pair"' in html
+    assert 'title="Move user to selected stage and optionally selected group"' in html

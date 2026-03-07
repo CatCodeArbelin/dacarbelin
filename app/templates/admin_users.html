@@ -91,11 +91,17 @@
                     {% endfor %}
                   {% endif %}
                 </select>
-                <div class="btn-group btn-group-sm" role="group">
-                  <button class="btn btn-outline-secondary" type="submit" name="quick_move" value="to_main">→ Main</button>
-                  <button class="btn btn-outline-secondary" type="submit" name="quick_move" value="to_reserve">→ Reserve</button>
+                <div class="border rounded p-2">
+                  <div class="small text-contrast-muted mb-1">Basket</div>
+                  <div class="btn-group btn-group-sm w-100" role="group" aria-label="Basket quick move actions">
+                    <button class="btn btn-outline-secondary" type="submit" name="quick_move" value="to_main" title="Move user to the main basket pair">To Main Basket</button>
+                    <button class="btn btn-outline-secondary" type="submit" name="quick_move" value="to_reserve" title="Move user to the reserve basket pair">To Reserve Basket</button>
+                  </div>
                 </div>
-                <button class="btn btn-sm btn-outline-warning" type="submit">Move</button>
+                <div class="border rounded p-2">
+                  <div class="small text-contrast-muted mb-1">Stage/Group</div>
+                  <button class="btn btn-sm btn-outline-warning w-100" type="submit" name="reassign_action" value="move_stage" title="Move user to selected stage and optionally selected group">Move to Stage/Group</button>
+                </div>
               </form>
             </td>
             <td>
@@ -152,6 +158,16 @@
         groupSelect.value = '';
         fillGroupOptions();
       });
+
+      form.addEventListener('submit', (event) => {
+        const submitter = event.submitter;
+        if (submitter?.name === 'reassign_action' && submitter.value === 'move_stage' && !stageSelect.value) {
+          event.preventDefault();
+          window.alert('Please select a target stage before moving to Stage/Group.');
+          stageSelect.focus();
+        }
+      });
+
       fillGroupOptions();
     });
   })();
