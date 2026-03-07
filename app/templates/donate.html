@@ -42,6 +42,7 @@
     </ul>
   </section>
 
+  {% if show_support_author_block %}
   <section class="donate-section">
     <h4>{{ tr('donate_support_author') }}</h4>
     <ul class="donate-list">
@@ -52,6 +53,7 @@
       {% endfor %}
     </ul>
   </section>
+  {% endif %}
 
   <section class="donate-section">
     <h4>{{ tr('donate_donors') }}</h4>

@@ -4,7 +4,7 @@ from app.core.admin_session import ADMIN_SESSION_COOKIE, create_admin_session_co
 from app.db.session import get_db
 from app.main import app
 import app.main as main_module
-from app.models.settings import CryptoWallet, DonationLink, Donor, PrizePoolEntry
+from app.models.settings import CryptoWallet, DonationLink, Donor, PrizePoolEntry, SiteSetting
 
 
 class _FakeScalarResult:
@@ -21,6 +21,7 @@ class _FakeContentDB:
         self.crypto_wallets = []
         self.prize_pool_entries = []
         self.donors = []
+        self.site_settings = []
 
     async def scalars(self, statement):
         query = str(statement)
@@ -45,6 +46,16 @@ class _FakeContentDB:
             return max([item.sort_order for item in self.crypto_wallets], default=None)
         if "max(donors.sort_order)" in query:
             return max([item.sort_order for item in self.donors], default=None)
+        if "site_settings.key" in query:
+            if "donate_highlight_amount" in query:
+                key = "donate_highlight_amount"
+            elif "donate_support_author_visible" in query:
+                key = "donate_support_author_visible"
+            else:
+                key = "donate_support_author_visible"
+            for row in self.site_settings:
+                if row.key == key:
+                    return row
         return None
 
     async def get(self, model, row_id):
@@ -52,6 +63,7 @@ class _FakeContentDB:
             DonationLink: self.donation_links,
             CryptoWallet: self.crypto_wallets,
             Donor: self.donors,
+            SiteSetting: self.site_settings,
         }
         for row in collection_map.get(model, []):
             if row.id == row_id:
@@ -71,9 +83,12 @@ class _FakeContentDB:
         elif isinstance(row, Donor):
             row.id = len(self.donors) + 1
             self.donors.append(row)
+        elif isinstance(row, SiteSetting):
+            row.id = len(self.site_settings) + 1
+            self.site_settings.append(row)
 
     async def delete(self, row):
-        for collection in (self.donation_links, self.crypto_wallets, self.prize_pool_entries, self.donors):
+        for collection in (self.donation_links, self.crypto_wallets, self.prize_pool_entries, self.donors, self.site_settings):
             if row in collection:
                 collection.remove(row)
 
@@ -174,3 +189,34 @@ def test_donate_page_renders_sanitized_html_content(monkeypatch):
     assert "<strong>Link</strong>" in response.text
     assert "<script>" not in response.text
     assert "<u>Hi</u>" in response.text
+
+
+def test_admin_can_toggle_donate_support_author_visibility():
+    fake_db = _FakeContentDB()
+
+    async def override_get_db():
+        yield fake_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+
+            response_off = client.post(
+                "/admin/donate-support-author-visibility",
+                data={"visible": "0"},
+                follow_redirects=False,
+            )
+            response_on = client.post(
+                "/admin/donate-support-author-visibility",
+                data={"visible": "1"},
+                follow_redirects=False,
+            )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response_off.status_code == 303
+    assert response_on.status_code == 303
+    assert len(fake_db.site_settings) == 1
+    assert fake_db.site_settings[0].key == "donate_support_author_visible"
+    assert fake_db.site_settings[0].value == "1"
