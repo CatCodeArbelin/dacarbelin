@@ -712,6 +712,20 @@ def get_admin_active_playoff_stage_key(playoff_stages: list[PlayoffStage], stage
 
     return get_default_playoff_stage_key(playoff_stages, stage_progression_keys)
 
+
+def resolve_admin_active_stage_key(
+    *,
+    tournament_started: bool,
+    group_stage_finish_ready: bool,
+    playoff_stages: list[PlayoffStage],
+    stage_progression_keys: list[str],
+) -> str | None:
+    if not tournament_started:
+        return None
+    if not group_stage_finish_ready:
+        return "group_stage"
+    return get_admin_active_playoff_stage_key(playoff_stages, stage_progression_keys)
+
 def can_submit_playoff_stage_results(stage: PlayoffStage) -> bool:
     return get_playoff_stage_submit_status(stage)["can_submit"]
 
@@ -1916,19 +1930,17 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     )
     if is_draw_valid:
         invalid_draw_reason = None
-    group_stage_finished = bool(playoff_stages)
-    active_stage_key = None
-    if not tournament_started:
-        active_stage_key = None
-    elif not group_stage_finished:
-        active_stage_key = "group_stage"
-    else:
-        active_stage_key = get_admin_active_playoff_stage_key(playoff_stages, stage_progression_keys)
+    group_stage_finish_ready, group_stage_finish_status, group_stage_games_played = await get_group_stage_completion_status(db)
+    active_stage_key = resolve_admin_active_stage_key(
+        tournament_started=tournament_started,
+        group_stage_finish_ready=group_stage_finish_ready,
+        playoff_stages=playoff_stages,
+        stage_progression_keys=stage_progression_keys,
+    )
 
     show_group_stage_controls = active_stage_key == "group_stage"
     groups = group_stage_groups if show_group_stage_controls else []
     draw_groups = group_stage_groups
-    group_stage_finish_ready, group_stage_finish_status, group_stage_games_played = await get_group_stage_completion_status(db)
     group_stage_games_summary = [
         {
             "name": group.name,
