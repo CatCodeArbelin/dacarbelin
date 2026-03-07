@@ -31,7 +31,6 @@
             <th>Basket</th>
             <th>{{ tr('tournament_pts') }}</th>
             <th>Ручные очки</th>
-            <th>Direct invite</th>
             <th>{{ tr('participants_telegram') }}</th>
             <th>Reassign</th>
             <th>{{ tr('admin_save') }}</th>
@@ -57,15 +56,6 @@
             <td>{{ points_by_user.get(user.id, 0) }}</td>
             <td>
               <input class="form-control form-control-sm" form="user-update-{{ user.id }}" type="number" min="0" name="manual_points" value="{{ points_by_user.get(user.id, 0) }}">
-            </td>
-            <td>
-              <select class="form-select form-select-sm" form="user-update-{{ user.id }}" name="direct_invite_stage" title="Used only by direct-invite flow (not for stage transfer)">
-                <option value="" {% if not user.direct_invite_stage %}selected{% endif %}>-</option>
-                {% for stage_key in allowed_direct_invite_stages %}
-                <option value="{{ stage_key }}" {% if user.direct_invite_stage == stage_key %}selected{% endif %}>{{ stage_key }}</option>
-                {% endfor %}
-              </select>
-              <div class="small text-contrast-muted mt-1">Direct-invite only, not a stage transfer.</div>
             </td>
             <td>{{ user.telegram or 'None' }}</td>
             <td>
@@ -120,7 +110,7 @@
           </tr>
           {% endfor %}
           {% if section.users|length == 0 %}
-          <tr><td colspan="12" class="text-muted">Нет участников</td></tr>
+          <tr><td colspan="11" class="text-muted">Нет участников</td></tr>
           {% endif %}
         </tbody>
       </table>

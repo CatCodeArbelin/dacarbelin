@@ -17,17 +17,18 @@ class _ScalarResult:
 
 
 class _FakeDB:
-    def __init__(self, *, user: User, stage: PlayoffStage, memberships: list[PlayoffParticipant]):
+    def __init__(self, *, user: User, stage: PlayoffStage | None, memberships: list[PlayoffParticipant]):
         self.user = user
         self.stage = stage
         self.memberships = memberships
         self.commit = AsyncMock()
         self.rollback = AsyncMock()
+        self.flush = AsyncMock()
 
     async def get(self, model, key):
         if model is User and key == self.user.id:
             return self.user
-        if model is PlayoffStage and key == self.stage.id:
+        if model is PlayoffStage and self.stage and key == self.stage.id:
             return self.stage
         return None
 
@@ -37,17 +38,28 @@ class _FakeDB:
             return _ScalarResult(self.memberships)
         if "FROM playoff_participants" in sql and "playoff_participants.stage_id" in sql:
             return _ScalarResult(self.memberships)
+        if "FROM playoff_stages" in sql:
+            return _ScalarResult([self.stage] if self.stage else [])
         return _ScalarResult([])
 
     async def scalar(self, statement):
         sql = str(statement)
         if "FROM group_members" in sql:
             return None
+        if "FROM playoff_stages" in sql and "playoff_stages.key" in sql:
+            return self.stage
         if "FROM playoff_participants" in sql:
+            if self.stage is None:
+                return None
             return next((m for m in self.memberships if m.stage_id == self.stage.id and m.user_id == self.user.id), None)
         return None
 
     def add(self, obj):
+        if isinstance(obj, PlayoffStage):
+            if self.stage is None:
+                self.stage = obj
+                self.stage.id = 999
+            return
         self.memberships.append(obj)
 
 
@@ -351,6 +363,27 @@ def test_admin_users_page_reassign_ui_has_explicit_labels_and_tooltips(monkeypat
     assert "To Main Basket" in html
     assert "To Reserve Basket" in html
     assert "Move to Stage/Group" in html
+    assert "Direct invite" not in html
     assert 'title="Move user to the main basket pair"' in html
     assert 'title="Move user to the reserve basket pair"' in html
     assert 'title="Move user to selected stage and optionally selected group"' in html
+
+
+@pytest.mark.asyncio
+async def test_admin_reassign_user_accepts_stage_key_and_creates_stage_when_missing() -> None:
+    user = User(id=92, nickname="missing-stage", basket=Basket.ROOK.value)
+    db = _FakeDB(user=user, stage=None, memberships=[])
+
+    response = await web.admin_reassign_user(
+        user_id=92,
+        target_stage_id="stage_2",
+        target_group_number="1",
+        replace_from_user_id="",
+        quick_move=None,
+        db=db,
+    )
+
+    assert response.status_code == 303
+    assert "msg_player_moved" in response.headers["location"]
+    assert db.stage is not None
+    assert db.stage.key == "stage_2"
