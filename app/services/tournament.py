@@ -4,7 +4,7 @@ from collections import defaultdict
 import json
 import random
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -48,21 +48,12 @@ PRIMARY_BASKETS = [
     Basket.LOW_RANK_RESERVE.value,
 ]
 
-STAGE_I_AUTO_DRAW_MAIN_BASKETS = [
-    Basket.QUEEN_TOP.value,
-    Basket.QUEEN.value,
-    Basket.KING.value,
-    Basket.ROOK.value,
-    Basket.BISHOP.value,
-    Basket.LOW_RANK.value,
-]
-
-PRIMARY_DRAW_BASKETS = [
-    Basket.QUEEN.value,
-    Basket.KING.value,
-    Basket.ROOK.value,
-    Basket.BISHOP.value,
-]
+PRIMARY_DRAW_BASKETS_WITH_RESERVE = {
+    Basket.QUEEN.value: Basket.QUEEN_RESERVE.value,
+    Basket.KING.value: Basket.KING_RESERVE.value,
+    Basket.ROOK.value: Basket.ROOK_RESERVE.value,
+    Basket.BISHOP.value: Basket.BISHOP_RESERVE.value,
+}
 
 
 class ManualDrawValidationError(ValueError):
@@ -91,8 +82,7 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
         (
             await db.scalars(
                 select(User)
-                .where(User.basket.in_(STAGE_I_AUTO_DRAW_MAIN_BASKETS))
-                .where(or_(User.direct_invite_stage.is_(None), User.direct_invite_stage != "stage_2"))
+                .where(User.basket.in_(PRIMARY_BASKETS))
                 .order_by(User.created_at)
             )
         ).all()
@@ -105,8 +95,7 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
     if len(users) < expected_participants:
         return False, (
             "Автожеребьевка недоступна: требуется минимум "
-            f"{expected_participants} участников, доступных для Stage I, "
-            f"(формат {expected_group_count}x{stage_group_size}); сейчас доступно {len(users)}. "
+            f"{expected_participants} валидных участников (формат {expected_group_count}x{stage_group_size}). "
             "Доступна только ручная жеребьевка."
         )
 
@@ -122,15 +111,21 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
         assigned_by_group: list[list[User]] = []
         for _ in range(expected_group_count):
             picked: list[User] = []
-            for basket in PRIMARY_DRAW_BASKETS:
+            for basket, reserve_basket in PRIMARY_DRAW_BASKETS_WITH_RESERVE.items():
                 for _ in range(2):
-                    if by_basket[basket]:
-                        picked.append(by_basket[basket].pop())
+                    source_basket = basket
+                    if not by_basket[source_basket] and by_basket[reserve_basket]:
+                        source_basket = reserve_basket
+
+                    if by_basket[source_basket]:
+                        picked.append(by_basket[source_basket].pop())
                 if len(picked) >= stage_group_size:
                     break
 
             fallback_pool: list[User] = []
-            for basket in STAGE_I_AUTO_DRAW_MAIN_BASKETS:
+            for basket in PRIMARY_BASKETS:
+                if basket == Basket.INVITED.value:
+                    continue
                 fallback_pool.extend(by_basket[basket])
             random.shuffle(fallback_pool)
             while len(picked) < stage_group_size and fallback_pool:
@@ -890,6 +885,7 @@ async def move_user_to_stage(db: AsyncSession, from_stage_id: int, to_stage_id: 
 
     await db.delete(participant)
     db.add(PlayoffParticipant(stage_id=to_stage_id, user_id=user_id, seed=next_seed))
+    await db.commit()
 
 
 async def promote_group_member_to_stage(db: AsyncSession, group_id: int, user_id: int, target_stage_id: int) -> None:
@@ -926,6 +922,7 @@ async def promote_group_member_to_stage(db: AsyncSession, group_id: int, user_id
             seed=next_seed,
         )
     )
+    await db.commit()
 
 
 async def replace_stage_player(db: AsyncSession, stage_id: int, from_user_id: int, to_user_id: int) -> None:
@@ -936,6 +933,7 @@ async def replace_stage_player(db: AsyncSession, stage_id: int, from_user_id: in
     if exists:
         raise ValueError("Новый игрок уже присутствует на этапе")
     participant.user_id = to_user_id
+    await db.commit()
 
 
 async def adjust_stage_points(db: AsyncSession, stage_id: int, user_id: int, points_delta: int) -> None:
