@@ -36,10 +36,21 @@ async def consume_persisted_judge_token(token: str | None) -> bool:
         return True
 
 
+async def is_technical_works_enabled() -> bool:
+    async with SessionLocal() as session:
+        row = await session.scalar(select(SiteSetting).where(SiteSetting.key == "technical_works_enabled"))
+        return bool(row and row.value == "1")
+
+
 
 @app.middleware("http")
 async def admin_auth_middleware(request: Request, call_next):
     normalized_path = request.url.path.rstrip("/") or "/"
+
+    if request.method in {"GET", "HEAD"} and not normalized_path.startswith("/admin"):
+        if normalized_path not in {"/technical-works", "/freak"} and not normalized_path.startswith("/static"):
+            if await is_technical_works_enabled():
+                return RedirectResponse(url="/technical-works", status_code=303)
 
     if normalized_path == "/admin" and not is_admin_session(request.cookies.get(ADMIN_SESSION_COOKIE)):
         admin_key = request.query_params.get("admin_key")
