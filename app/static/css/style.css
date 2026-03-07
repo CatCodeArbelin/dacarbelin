@@ -781,6 +781,11 @@ body {
 
 .prize-pool-card {
   background: radial-gradient(circle at top right, rgba(0, 183, 255, 0.16), rgba(0, 0, 0, 0.95));
+  max-width: 430px;
+}
+
+.prize-pool-card .page-title-neon {
+  text-align: left;
 }
 
 .prize-pool-title-neon {
