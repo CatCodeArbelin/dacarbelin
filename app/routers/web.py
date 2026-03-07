@@ -97,6 +97,7 @@ from app.services.tournament_view import (
 )
 
 from app.services.tournament_stage_config import (
+    TOURNAMENT_FLOW_SPEC,
     get_tournament_profile_spec,
     FINAL_STAGE_SCORING_MODES,
     GROUP_STAGE_GAME_LIMIT,
@@ -109,6 +110,7 @@ from app.services.tournament_stage_config import (
     get_promote_top_n,
     get_stage_group_count,
     get_stage_group_size,
+    get_stage_spec,
     is_final_stage,
     is_final_stage_key,
     is_limited_stage,
@@ -2107,9 +2109,10 @@ async def admin_users_page(request: Request, db: AsyncSession = Depends(get_db))
 
     users_by_id: dict[int, User] = {user.id: user for user in users}
     playoff_stages = list((await db.scalars(select(PlayoffStage).order_by(PlayoffStage.stage_order, PlayoffStage.id))).all())
+    reassign_stage_options = _build_reassign_stage_options(playoff_stages)
     stage_group_options = {
-        stage.id: list(range(1, max(1, math.ceil(int(stage.stage_size or 0) / 8)) + 1))
-        for stage in playoff_stages
+        str(option.get("id") if option.get("id") is not None else option.get("key")): list(option.get("group_numbers", []))
+        for option in reassign_stage_options
     }
     user_playoff_participants = (
         await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.user_id.in_(list(users_by_id.keys()))))
@@ -2158,6 +2161,7 @@ async def admin_users_page(request: Request, db: AsyncSession = Depends(get_db))
             group_sections=group_sections,
             show_group_sections=show_group_sections,
             playoff_stages=playoff_stages,
+            reassign_stage_options=reassign_stage_options,
             stage_group_options=stage_group_options,
             user_playoff_state=user_playoff_state,
             basket_pairs=BASKET_PAIRS,
@@ -2173,6 +2177,43 @@ def _resolve_basket_quick_move(current_basket: str | None, quick_move: str | Non
         if current_basket in {main_basket, reserve_basket}:
             return main_basket if quick_move == "to_main" else reserve_basket
     return None
+
+
+def _build_reassign_stage_options(playoff_stages: list[PlayoffStage]) -> list[dict[str, object]]:
+    if playoff_stages:
+        return [
+            {
+                "id": stage.id,
+                "key": stage.key,
+                "title": stage.title,
+                "group_numbers": list(range(1, max(1, math.ceil(int(stage.stage_size or 0) / 8)) + 1)),
+            }
+            for stage in playoff_stages
+        ]
+
+    fallback_options: list[dict[str, object]] = []
+    for stage_key in get_playoff_stage_sequence_keys():
+        stage_spec = get_stage_spec(stage_key)
+        groups_count = get_stage_group_count(stage_key)
+        if groups_count is None:
+            stage_size = int(stage_spec.get("participants") or 0)
+            group_size = max(1, get_stage_group_size(stage_key))
+            groups_count = max(1, math.ceil(stage_size / group_size))
+        stage_title = str(
+            stage_spec.get("admin_title")
+            or stage_spec.get("column_title")
+            or TOURNAMENT_FLOW_SPEC.get(stage_key, {}).get("admin_title")
+            or stage_key
+        )
+        fallback_options.append(
+            {
+                "id": None,
+                "key": stage_key,
+                "title": stage_title,
+                "group_numbers": list(range(1, max(1, groups_count) + 1)),
+            }
+        )
+    return fallback_options
 
 
 async def _find_group_seed_for_stage(
