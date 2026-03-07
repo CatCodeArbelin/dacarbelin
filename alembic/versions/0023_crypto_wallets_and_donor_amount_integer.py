@@ -29,14 +29,25 @@ def upgrade() -> None:
     op.add_column("donors", sa.Column("amount_int", sa.Integer(), nullable=False, server_default="0"))
     op.execute(
         """
+        -- Legacy parsing policy:
+        -- 1) keep only digits and minus sign via regexp_replace
+        -- 2) treat empty/non-convertible result as 0 (defensive fallback)
+        -- 3) fractional separators are removed with other non-digits, so
+        --    legacy fractional values are effectively truncated to a whole-number string
+        --    before CAST (e.g. "12.34" -> "1234")
         UPDATE donors
-        SET amount_int = CAST(
-            CASE
-                WHEN amount IS NULL OR TRIM(amount) = '' THEN '0'
-                ELSE REPLACE(REPLACE(REPLACE(REPLACE(amount, '$', ''), '€', ''), ',', ''), ' ', '')
-            END
-            AS INTEGER
-        )
+        SET amount_int = CASE
+            WHEN src.sanitized_amount = '' THEN 0
+            WHEN src.sanitized_amount ~ '^-?[0-9]+$' THEN CAST(src.sanitized_amount AS INTEGER)
+            ELSE 0
+        END
+        FROM (
+            SELECT
+                id,
+                regexp_replace(COALESCE(amount, ''), '[^0-9-]', '', 'g') AS sanitized_amount
+            FROM donors
+        ) AS src
+        WHERE donors.id = src.id
         """
     )
     op.drop_column("donors", "amount")
@@ -45,6 +56,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.add_column("donors", sa.Column("amount_text", sa.String(length=120), nullable=False, server_default=""))
+    # Formatting/currency symbols from the original string amount are already lost in upgrade().
     op.execute("UPDATE donors SET amount_text = CAST(amount AS TEXT)")
     op.drop_column("donors", "amount")
     op.alter_column("donors", "amount_text", new_column_name="amount", server_default="")
