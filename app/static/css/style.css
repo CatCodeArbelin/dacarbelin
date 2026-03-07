@@ -834,7 +834,67 @@ body {
 }
 
 .prize-pool-card {
+  position: relative;
+  overflow: hidden;
   background: radial-gradient(circle at top right, rgba(61, 155, 255, 0.16), rgba(2, 8, 6, 0.96));
+}
+
+.matrix-rain-panel {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.matrix-rain-panel::before,
+.matrix-rain-panel::after {
+  content: "01001101 01100001 01110100 01110010 01101001 01111000 00100000 01000100 01000001 01000011 00100000 01001101 01100001 01110100 01110010 01101001 01111000";
+  position: absolute;
+  top: -130%;
+  bottom: -130%;
+  width: 36%;
+  font-family: "Courier New", monospace;
+  font-size: clamp(0.68rem, 1.05vw, 0.82rem);
+  line-height: 1.5;
+  letter-spacing: 0.11em;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: rgba(157, 255, 87, 0.2);
+  text-shadow: 0 0 8px rgba(0, 255, 133, 0.42);
+  pointer-events: none;
+  z-index: 0;
+  animation: matrix-rain-fall 15s linear infinite;
+}
+
+.matrix-rain-panel::before {
+  left: 5%;
+}
+
+.matrix-rain-panel::after {
+  right: 4%;
+  color: rgba(61, 155, 255, 0.18);
+  animation-duration: 18s;
+  animation-delay: -5s;
+}
+
+.matrix-rain-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes matrix-rain-fall {
+  from {
+    transform: translateY(-24%);
+  }
+  to {
+    transform: translateY(24%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .matrix-rain-panel::before,
+  .matrix-rain-panel::after {
+    animation: none;
+  }
 }
 
 .home-right-column .prize-pool-card .card-body {
@@ -1634,4 +1694,3 @@ textarea:focus {
   border-color: rgba(157, 255, 87, 0.72) !important;
   box-shadow: 0 0 20px rgba(0, 255, 133, 0.32), 0 0 34px rgba(61, 155, 255, 0.26);
 }
-

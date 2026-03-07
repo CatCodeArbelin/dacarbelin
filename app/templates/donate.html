@@ -3,12 +3,12 @@
 <div class="donate-page">
   <h2 class="page-title-neon">{{ tr('donate_title') }}</h2>
 
-  <section class="donate-section donate-section--highlight prize-pool-card">
+  <section class="donate-section donate-section--highlight prize-pool-card matrix-rain-panel">
     <h4>{{ tr('donate_prize_pool') }}</h4>
     <div class="prize-pool-amount">{% if prize_pool_display_mode == "rub" %}{{ total_sponsors_amount_rub }} ₽{% else %}${{ total_sponsors_amount_usd }}{% endif %}</div>
   </section>
 
-  <section class="donate-section">
+  <section class="donate-section matrix-rain-panel">
     <h4>{{ tr('donate_links') }}</h4>
     <ul class="donate-list">
       {% for item in donation_links %}
@@ -20,7 +20,7 @@
   </section>
 
 
-  <section class="donate-section">
+  <section class="donate-section matrix-rain-panel">
     <h4>{{ tr('donate_bank_cards') }}</h4>
     <ul class="donate-list">
       {% for item in bank_cards_links %}
@@ -31,7 +31,7 @@
     </ul>
   </section>
 
-  <section class="donate-section">
+  <section class="donate-section matrix-rain-panel">
     <h4>{{ tr('donate_card_crypto') }}</h4>
     <ul class="donate-list">
       {% for item in crypto_wallets %}
@@ -43,7 +43,7 @@
   </section>
 
   {% if show_support_author_block %}
-  <section class="donate-section">
+  <section class="donate-section matrix-rain-panel">
     <h4>{{ tr('donate_support_author') }}</h4>
     <ul class="donate-list">
       {% for item in support_author_links %}
@@ -55,7 +55,7 @@
   </section>
   {% endif %}
 
-  <section class="donate-section">
+  <section class="donate-section matrix-rain-panel">
     <h4>{{ tr('donate_donors') }}</h4>
     <div class="table-responsive">
       <table class="table donate-sponsors-table">
