@@ -11,17 +11,17 @@
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body class="bg-dark text-light">
-<nav class="navbar navbar-expand-lg navbar-dark neon-border-blue mb-4">
+<nav class="navbar navbar-expand-lg navbar-dark neon-border-blue mb-4 navbar-neon">
   <div class="container">
-    <a class="navbar-brand nav-main-link" href="/">{{ tr('nav_home') }}</a>
+    <a class="navbar-brand nav-main-link neon-title neon-title--logo" href="/">DAC Tournament</a>
     <div class="d-flex gap-3">
       <a href="/participants" class="nav-link nav-main-link">{{ tr('nav_participants') }}</a>
       <a href="/tournament" class="nav-link nav-main-link">{{ tr('nav_tournament') }}</a>
       <a href="/donate" class="nav-link nav-main-link">{{ tr('nav_donate') }}</a>
       <a href="/rules" class="nav-link nav-main-link">{{ tr('nav_rules') }}</a>
       <a href="/archive" class="nav-link nav-main-link">{{ tr('nav_archive') }}</a>
-      <a href="/set-lang/en" class="btn btn-sm btn-outline-info">{{ tr('base_lang_en') }}</a>
-      <a href="/set-lang/ru" class="btn btn-sm btn-outline-danger">{{ tr('base_lang_ru') }}</a>
+      <a href="/set-lang/en" class="btn btn-sm btn-neon btn-neon-cyan">{{ tr('base_lang_en') }}</a>
+      <a href="/set-lang/ru" class="btn btn-sm btn-neon btn-neon-pink">{{ tr('base_lang_ru') }}</a>
     </div>
   </div>
 </nav>
