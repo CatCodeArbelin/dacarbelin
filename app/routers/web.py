@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, Form, Query, Request
 from pydantic import BaseModel
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import case, delete, desc, func, select, update
+from sqlalchemy import delete, desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -97,7 +97,6 @@ from app.services.tournament_view import (
 )
 
 from app.services.tournament_stage_config import (
-    TOURNAMENT_FLOW_SPEC,
     get_tournament_profile_spec,
     FINAL_STAGE_SCORING_MODES,
     GROUP_STAGE_GAME_LIMIT,
@@ -110,7 +109,6 @@ from app.services.tournament_stage_config import (
     get_promote_top_n,
     get_stage_group_count,
     get_stage_group_size,
-    get_stage_spec,
     is_final_stage,
     is_final_stage_key,
     is_limited_stage,
@@ -136,22 +134,6 @@ BASKET_PAIRS = [
     (Basket.BISHOP.value, Basket.BISHOP_RESERVE.value),
     (Basket.LOW_RANK.value, Basket.LOW_RANK_RESERVE.value),
 ]
-RANK_PRIORITY_TO_PAIR = {
-    Basket.QUEEN.value: (Basket.QUEEN.value, Basket.QUEEN_RESERVE.value),
-    Basket.KING.value: (Basket.KING.value, Basket.KING_RESERVE.value),
-    Basket.ROOK.value: (Basket.ROOK.value, Basket.ROOK_RESERVE.value),
-    Basket.BISHOP.value: (Basket.BISHOP.value, Basket.BISHOP_RESERVE.value),
-    Basket.LOW_RANK.value: (Basket.LOW_RANK.value, Basket.LOW_RANK_RESERVE.value),
-}
-
-RANK_PRIORITY_ORDER = {
-    "queen": 0,
-    "king": 1,
-    "rook": 2,
-    "bishop": 3,
-    "knight": 4,
-    "pawn": 5,
-}
 EXPECTED_32_PLAYER_STAGE_ORDER_PAIRS = [
     (0, "stage_2"),
     (1, "stage_1_4"),
@@ -712,20 +694,6 @@ def get_admin_active_playoff_stage_key(playoff_stages: list[PlayoffStage], stage
 
     return get_default_playoff_stage_key(playoff_stages, stage_progression_keys)
 
-
-def resolve_admin_active_stage_key(
-    *,
-    tournament_started: bool,
-    group_stage_finish_ready: bool,
-    playoff_stages: list[PlayoffStage],
-    stage_progression_keys: list[str],
-) -> str | None:
-    if not tournament_started:
-        return None
-    if not group_stage_finish_ready:
-        return "group_stage"
-    return get_admin_active_playoff_stage_key(playoff_stages, stage_progression_keys)
-
 def can_submit_playoff_stage_results(stage: PlayoffStage) -> bool:
     return get_playoff_stage_submit_status(stage)["can_submit"]
 
@@ -901,7 +869,6 @@ def get_playoff_stage_integrity_alert(playoff_stages: list[PlayoffStage]) -> str
 
 
 def _normalize_direct_invite_stage(raw_value: str | None) -> str | None:
-    """Нормализует direct-invite флаг (не используется как универсальный перенос между стадиями)."""
     value = (raw_value or "").strip() or None
     if value not in ALLOWED_DIRECT_INVITE_STAGES:
         raise ValueError("invalid direct invite stage")
@@ -1475,11 +1442,11 @@ async def chat_stream(request: Request):
 @router.get("/participants", response_class=HTMLResponse)
 async def participants(
     request: Request,
-    rank_priority: str = Query("all", pattern="^(queen|king|rook|bishop|low_rank|all)$"),
+    basket: str = Query(Basket.QUEEN.value),
     view: str = Query("baskets"),
     db: AsyncSession = Depends(get_db),
 ):
-    # Показываем участников одним списком с приоритизацией выбранного ранга.
+    # Показываем участников по паре корзин: основной состав + резерв.
     basket_tabs = [
         {
             "main_basket": Basket.QUEEN.value,
@@ -1508,9 +1475,11 @@ async def participants(
         },
     ]
     basket_pairs = BASKET_PAIRS
+    basket_to_pair = {basket_name: pair for pair in basket_pairs for basket_name in pair}
+    selected_pair = basket_to_pair.get(basket, basket_pairs[0])
+    main_basket, reserve_basket = selected_pair
 
     direct_invite_users: list[User] = []
-    all_users: list[User] = []
 
     if view == "direct_invites":
         invited_users = (
@@ -1523,29 +1492,21 @@ async def participants(
             )
         ).all()
         direct_invite_users = list(invited_users)
+        main_users = []
+        reserve_users = []
     else:
         view = "baskets"
-        selected_pair = RANK_PRIORITY_TO_PAIR.get(rank_priority)
-        priority_baskets = selected_pair if selected_pair else tuple()
-        priority_order = case(
-            (User.basket.in_(priority_baskets), 0),
-            else_=1,
-        )
-        all_users = (
-            await db.scalars(
-                select(User)
-                .order_by(priority_order, User.created_at, User.id)
-            )
+        main_users = (
+            await db.scalars(select(User).where(User.basket == main_basket).order_by(User.created_at))
         ).all()
-        all_users = sorted(
-            all_users,
-            key=lambda user: _highest_rank_sort_key(user.highest_rank, rank_priority=rank_priority),
-        )
+        reserve_users = (
+            await db.scalars(select(User).where(User.basket == reserve_basket).order_by(User.created_at))
+        ).all()
 
     is_empty = (
         not direct_invite_users
         if view == "direct_invites"
-        else not all_users
+        else (not main_users and not reserve_users)
     )
 
     return templates.TemplateResponse(
@@ -1553,39 +1514,16 @@ async def participants(
         "participants.html",
         template_context(
             request,
-            rank_priority=rank_priority,
+            basket=main_basket,
             view=view,
             basket_pairs=basket_pairs,
             basket_tabs=basket_tabs,
-            all_users=all_users,
+            main_users=main_users,
+            reserve_users=reserve_users,
             direct_invite_users=direct_invite_users,
             is_empty=is_empty,
         ),
     )
-
-
-def _highest_rank_sort_key(highest_rank: str | None, *, rank_priority: str) -> tuple[int, int, int, str]:
-    normalized = (highest_rank or "").strip()
-    if not normalized:
-        return (len(RANK_PRIORITY_ORDER), 10_000, 1, "")
-
-    tier_token, _, suffix = normalized.partition("-")
-    tier_name = tier_token.partition("#")[0].strip().lower()
-    tier_order = RANK_PRIORITY_ORDER.get(tier_name, len(RANK_PRIORITY_ORDER))
-
-    suffix_token = suffix.strip()
-    queen_order = 10_000
-    non_queen_order = 0
-    if tier_name == "queen":
-        queen_suffix = normalized.partition("#")[2].strip()
-        if queen_suffix.isdigit():
-            queen_order = int(queen_suffix)
-    elif suffix_token.isdigit():
-        non_queen_order = -int(suffix_token)
-
-    selected_tier_order = RANK_PRIORITY_ORDER.get(rank_priority, -1)
-    selected_rank_penalty = 0 if tier_order == selected_tier_order else 1
-    return (selected_rank_penalty, tier_order, queen_order if tier_name == "queen" else non_queen_order, normalized.lower())
 
 
 @router.get("/tournament", response_class=HTMLResponse)
@@ -1603,7 +1541,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             )
         ).all()
     )
-    playoff_stages = await get_playoff_stages_with_data(db)
+    playoff_stages = await get_playoff_stages_with_data(db) if tournament_started else []
 
     direct_invite_users = list(
         (
@@ -1668,10 +1606,9 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
         )
 
     lang = get_lang(request.cookies.get("lang"))
-    has_started_playoff = any(stage.is_started for stage in playoff_stages)
     active_playoff_stage = next((stage for stage in playoff_stages if stage.is_started), None)
     active_stage_key = active_playoff_stage.key if active_playoff_stage else "group_stage"
-    current_stage_display = resolve_current_stage_label(lang, playoff_stages, show_playoff=has_started_playoff)
+    current_stage_display = resolve_current_stage_label(lang, playoff_stages, tournament_started)
     try:
         tournament_tree = build_tournament_tree_vm(
             groups,
@@ -1891,8 +1828,6 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             .order_by(User.nickname.asc(), User.created_at.desc())
     )
     ).all()
-    manual_draw_users_main = [user for user in manual_draw_users if not user.basket.endswith("_reserve")]
-    manual_draw_users_reserve = [user for user in manual_draw_users if user.basket.endswith("_reserve")]
     user_rows = (await db.execute(select(User.id, User.nickname))).all()
     users_by_id = {user_id: nickname for user_id, nickname in user_rows}
     stages = (await db.scalars(select(TournamentStage).order_by(TournamentStage.id))).all()
@@ -1930,17 +1865,19 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
     )
     if is_draw_valid:
         invalid_draw_reason = None
-    group_stage_finish_ready, group_stage_finish_status, group_stage_games_played = await get_group_stage_completion_status(db)
-    active_stage_key = resolve_admin_active_stage_key(
-        tournament_started=tournament_started,
-        group_stage_finish_ready=group_stage_finish_ready,
-        playoff_stages=playoff_stages,
-        stage_progression_keys=stage_progression_keys,
-    )
+    group_stage_finished = bool(playoff_stages)
+    active_stage_key = None
+    if not tournament_started:
+        active_stage_key = None
+    elif not group_stage_finished:
+        active_stage_key = "group_stage"
+    else:
+        active_stage_key = get_admin_active_playoff_stage_key(playoff_stages, stage_progression_keys)
 
     show_group_stage_controls = active_stage_key == "group_stage"
     groups = group_stage_groups if show_group_stage_controls else []
     draw_groups = group_stage_groups
+    group_stage_finish_ready, group_stage_finish_status, group_stage_games_played = await get_group_stage_completion_status(db)
     group_stage_games_summary = [
         {
             "name": group.name,
@@ -2119,8 +2056,6 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             chat_messages=chat_messages,
             judge_login_url=judge_login_url,
             manual_draw_users=manual_draw_users,
-            manual_draw_users_main=manual_draw_users_main,
-            manual_draw_users_reserve=manual_draw_users_reserve,
             group_user_choices=group_user_choices,
             group_stage_table_members=group_stage_table_members,
             playoff_stage_participants=playoff_stage_participants,
@@ -2168,14 +2103,13 @@ async def admin_users_page(request: Request, db: AsyncSession = Depends(get_db))
 
     draw_applied = await get_draw_applied(db)
     tournament_started = await get_tournament_started(db)
-    show_group_sections = draw_applied
+    show_group_sections = draw_applied and tournament_started
 
     users_by_id: dict[int, User] = {user.id: user for user in users}
     playoff_stages = list((await db.scalars(select(PlayoffStage).order_by(PlayoffStage.stage_order, PlayoffStage.id))).all())
-    reassign_stage_options = _build_reassign_stage_options(playoff_stages)
     stage_group_options = {
-        str(option.get("id") if option.get("id") is not None else option.get("key")): list(option.get("group_numbers", []))
-        for option in reassign_stage_options
+        stage.id: list(range(1, max(1, math.ceil(int(stage.stage_size or 0) / 8)) + 1))
+        for stage in playoff_stages
     }
     user_playoff_participants = (
         await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.user_id.in_(list(users_by_id.keys()))))
@@ -2224,7 +2158,6 @@ async def admin_users_page(request: Request, db: AsyncSession = Depends(get_db))
             group_sections=group_sections,
             show_group_sections=show_group_sections,
             playoff_stages=playoff_stages,
-            reassign_stage_options=reassign_stage_options,
             stage_group_options=stage_group_options,
             user_playoff_state=user_playoff_state,
             basket_pairs=BASKET_PAIRS,
@@ -2240,43 +2173,6 @@ def _resolve_basket_quick_move(current_basket: str | None, quick_move: str | Non
         if current_basket in {main_basket, reserve_basket}:
             return main_basket if quick_move == "to_main" else reserve_basket
     return None
-
-
-def _build_reassign_stage_options(playoff_stages: list[PlayoffStage]) -> list[dict[str, object]]:
-    if playoff_stages:
-        return [
-            {
-                "id": stage.id,
-                "key": stage.key,
-                "title": stage.title,
-                "group_numbers": list(range(1, max(1, math.ceil(int(stage.stage_size or 0) / 8)) + 1)),
-            }
-            for stage in playoff_stages
-        ]
-
-    fallback_options: list[dict[str, object]] = []
-    for stage_key in get_playoff_stage_sequence_keys():
-        stage_spec = get_stage_spec(stage_key)
-        groups_count = get_stage_group_count(stage_key)
-        if groups_count is None:
-            stage_size = int(stage_spec.get("participants") or 0)
-            group_size = max(1, get_stage_group_size(stage_key))
-            groups_count = max(1, math.ceil(stage_size / group_size))
-        stage_title = str(
-            stage_spec.get("admin_title")
-            or stage_spec.get("column_title")
-            or TOURNAMENT_FLOW_SPEC.get(stage_key, {}).get("admin_title")
-            or stage_key
-        )
-        fallback_options.append(
-            {
-                "id": None,
-                "key": stage_key,
-                "title": stage_title,
-                "group_numbers": list(range(1, max(1, groups_count) + 1)),
-            }
-        )
-    return fallback_options
 
 
 async def _find_group_seed_for_stage(
@@ -2296,108 +2192,34 @@ async def _find_group_seed_for_stage(
     raise ValueError("target_group_is_full")
 
 
-def _normalize_optional_int_form_value(value: str | None, field_name: str) -> int | None:
-    if value is None:
-        return None
-    normalized_value = value.strip()
-    if normalized_value == "":
-        return None
-    try:
-        return int(normalized_value)
-    except ValueError as exc:
-        raise ValueError(f"invalid_{field_name}") from exc
-
-
-async def _ensure_playoff_stages_exist(db: AsyncSession) -> None:
-    existing_stages = list((await db.scalars(select(PlayoffStage).order_by(PlayoffStage.stage_order, PlayoffStage.id))).all())
-    if existing_stages:
-        return
-
-    for stage_key in get_playoff_stage_sequence_keys():
-        stage_spec = get_stage_spec(stage_key)
-        db.add(
-            PlayoffStage(
-                key=stage_key,
-                title=str(stage_spec.get("admin_title") or stage_key),
-                stage_size=int(stage_spec.get("participants") or 0),
-                stage_order=max(0, int(stage_spec.get("order") or 1) - 2),
-                scoring_mode=str(stage_spec.get("scoring_mode") or "standard"),
-                stage_code=stage_key,
-                is_started=False,
-            )
-        )
-    await db.flush()
-
-
-async def _resolve_target_stage_id(db: AsyncSession, raw_target_stage_id: str | None) -> int | None:
-    if raw_target_stage_id is None:
-        return None
-    normalized_value = raw_target_stage_id.strip()
-    if not normalized_value:
-        return None
-
-    try:
-        return int(normalized_value)
-    except ValueError:
-        pass
-
-    normalized_stage_key = normalize_stage_key(normalized_value)
-    if normalized_stage_key not in set(get_playoff_stage_sequence_keys()):
-        raise ValueError("invalid_target_stage_id")
-
-    target_stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.key == normalized_stage_key))
-    if target_stage:
-        return int(target_stage.id)
-
-    await _ensure_playoff_stages_exist(db)
-    target_stage = await db.scalar(select(PlayoffStage).where(PlayoffStage.key == normalized_stage_key))
-    return int(target_stage.id) if target_stage else None
-
-
 @router.post("/admin/user/reassign")
 async def admin_reassign_user(
     user_id: int = Form(...),
-    target_stage_id: str | None = Form(default=None),
-    target_group_number: str | None = Form(default=None),
-    replace_from_user_id: str | None = Form(default=None),
+    target_stage_id: int | None = Form(default=None),
+    target_group_number: int | None = Form(default=None),
+    replace_from_user_id: int | None = Form(default=None),
     quick_move: str | None = Form(default=None),
-    reassign_action: str | None = Form(default=None),
     db: AsyncSession = Depends(get_db),
 ):
-    try:
-        normalized_target_group_number = _normalize_optional_int_form_value(target_group_number, "target_group_number")
-        normalized_replace_from_user_id = _normalize_optional_int_form_value(replace_from_user_id, "replace_from_user_id")
-    except ValueError as exc:
-        return redirect_with_admin_users_msg("msg_operation_failed", details=str(exc))
-
     user = await db.get(User, user_id)
     if not user:
         return redirect_with_admin_users_msg("msg_operation_failed", details="user_not_found")
 
     next_basket = _resolve_basket_quick_move(user.basket, quick_move)
-    basket_changed = False
     if next_basket and next_basket != user.basket:
         user.basket = next_basket
-        basket_changed = True
 
-    try:
-        normalized_target_stage_id = await _resolve_target_stage_id(db, target_stage_id)
-    except ValueError as exc:
-        return redirect_with_admin_users_msg("msg_operation_failed", details=str(exc))
-    if not normalized_target_stage_id:
-        if quick_move in {"to_main", "to_reserve"}:
-            await db.commit()
-            return redirect_with_admin_users_msg("msg_status_ok")
-        await db.rollback()
-        return redirect_with_admin_users_msg("msg_operation_failed", details="target_stage_id_required")
+    if not target_stage_id:
+        await db.commit()
+        return redirect_with_admin_users_msg("msg_status_ok")
 
-    target_stage = await db.get(PlayoffStage, normalized_target_stage_id)
+    target_stage = await db.get(PlayoffStage, target_stage_id)
     if not target_stage:
-        return redirect_with_admin_users_msg("msg_operation_failed", details="invalid_target_stage_id")
+        return redirect_with_admin_users_msg("msg_invalid_playoff_stage")
 
-    if normalized_target_group_number is not None:
+    if target_group_number is not None:
         allowed_group_numbers = set(range(1, max(1, math.ceil(int(target_stage.stage_size or 0) / 8)) + 1))
-        if normalized_target_group_number not in allowed_group_numbers:
+        if target_group_number not in allowed_group_numbers:
             return redirect_with_admin_users_msg("msg_operation_failed", details="invalid_target_group")
 
     existing_memberships = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.user_id == user_id))).all())
@@ -2405,66 +2227,44 @@ async def admin_reassign_user(
         return redirect_with_admin_users_msg("msg_operation_failed", details="duplicate_membership")
     current_membership = existing_memberships[0] if existing_memberships else None
 
-    current_stage_id = current_membership.stage_id if current_membership else None
-    current_group_number = get_stage_group_number_by_seed(current_membership.seed) if current_membership else None
-    stage_unchanged = current_stage_id == normalized_target_stage_id
-    group_unchanged = normalized_target_group_number is None or normalized_target_group_number == current_group_number
-    if reassign_action == "move_stage" and stage_unchanged and group_unchanged:
-        if basket_changed:
-            await db.commit()
-            return redirect_with_admin_users_msg("msg_status_ok")
-        await db.rollback()
-        return redirect_with_admin_users_msg("msg_status_ok", details="no_changes")
-
     try:
-        if current_membership and current_membership.stage_id != normalized_target_stage_id:
-            await move_user_to_stage(db, current_membership.stage_id, normalized_target_stage_id, user_id)
+        if current_membership and current_membership.stage_id != target_stage_id:
+            await move_user_to_stage(db, current_membership.stage_id, target_stage_id, user_id)
         elif not current_membership:
             group_member = await db.scalar(select(GroupMember).where(GroupMember.user_id == user_id).order_by(GroupMember.id))
             if group_member:
-                await promote_group_member_to_stage(db, group_member.group_id, user_id, normalized_target_stage_id)
-            elif normalized_replace_from_user_id:
-                await replace_stage_player(db, normalized_target_stage_id, normalized_replace_from_user_id, user_id)
+                await promote_group_member_to_stage(db, group_member.group_id, user_id, target_stage_id)
+            elif replace_from_user_id:
+                await replace_stage_player(db, target_stage_id, replace_from_user_id, user_id)
             else:
-                stage_participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == normalized_target_stage_id))).all())
+                stage_participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == target_stage_id))).all())
                 if any(participant.user_id == user_id for participant in stage_participants):
                     raise ValueError("duplicate_membership")
                 if len(stage_participants) >= int(target_stage.stage_size or 0):
                     raise ValueError("target_stage_is_full")
                 next_seed = max((participant.seed for participant in stage_participants), default=0) + 1
-                db.add(PlayoffParticipant(stage_id=normalized_target_stage_id, user_id=user_id, seed=next_seed))
+                db.add(PlayoffParticipant(stage_id=target_stage_id, user_id=user_id, seed=next_seed))
+                await db.commit()
 
         target_membership = await db.scalar(
-            select(PlayoffParticipant).where(PlayoffParticipant.stage_id == normalized_target_stage_id, PlayoffParticipant.user_id == user_id)
+            select(PlayoffParticipant).where(PlayoffParticipant.stage_id == target_stage_id, PlayoffParticipant.user_id == user_id)
         )
         if not target_membership:
-            raise ValueError("target_membership_not_found")
+            return redirect_with_admin_users_msg("msg_operation_failed", details="target_membership_not_found")
 
-        if normalized_target_group_number is not None:
+        if target_group_number is not None:
             target_membership.seed = await _find_group_seed_for_stage(
                 db,
-                stage_id=normalized_target_stage_id,
-                group_number=normalized_target_group_number,
+                stage_id=target_stage_id,
+                group_number=target_group_number,
                 stage_size=int(target_stage.stage_size or 0),
             )
-
-        if target_membership.stage_id != normalized_target_stage_id:
-            target_membership.stage_id = normalized_target_stage_id
 
         await db.commit()
         return redirect_with_admin_users_msg("msg_player_moved")
     except ValueError as exc:
         await db.rollback()
         details = str(exc) or "reassign_failed"
-        logger.warning(
-            "Failed to reassign user from admin users page",
-            extra={
-                "user_id": user_id,
-                "target_stage_id": normalized_target_stage_id,
-                "target_group_number": normalized_target_group_number,
-                "details": details,
-            },
-        )
         return redirect_with_admin_users_msg("msg_operation_failed", details=details)
     except Exception:
         await db.rollback()
@@ -2481,7 +2281,6 @@ async def _update_user_allowed_fields(
     direct_invite_stage: str | None,
     manual_points: int | None = None,
 ) -> RedirectResponse:
-    """Обычное редактирование профиля участника без явного переноса по playoff-сетке."""
     user = await db.get(User, user_id)
     if not user:
         return redirect_with_admin_users_msg("msg_operation_failed")
@@ -2499,9 +2298,6 @@ async def _update_user_allowed_fields(
         if field_name not in ALLOWED_USER_UPDATE_FIELDS:
             continue
         setattr(user, field_name, field_value)
-
-    if validated_data.get("direct_invite_stage") is None:
-        user.direct_invite_group_number = None
 
     if manual_points is not None:
         normalized_points = max(0, int(manual_points))
@@ -2614,20 +2410,12 @@ async def admin_update_user(
     db: AsyncSession = Depends(get_db),
 ):
     # Атомарно обновляем разрешенные поля пользователя из админ-панели.
-    user = await db.get(User, user_id)
-    if not user:
-        return redirect_with_admin_users_msg("msg_operation_failed")
-
-    resolved_direct_invite_stage = direct_invite_stage
-    if resolved_direct_invite_stage is None:
-        resolved_direct_invite_stage = user.direct_invite_stage
-
     return await _update_user_allowed_fields(
         db,
         user_id=user_id,
         nickname=nickname,
         basket=basket,
-        direct_invite_stage=resolved_direct_invite_stage,
+        direct_invite_stage=direct_invite_stage,
         manual_points=manual_points,
     )
 
@@ -3057,7 +2845,6 @@ async def admin_promote_group_member_manual(
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         await promote_group_member_to_stage(db, group_id, user_id, target_stage_id)
-        await db.commit()
         return redirect_with_admin_msg("msg_player_moved")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
@@ -3374,7 +3161,6 @@ async def admin_move_playoff_player(
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         await move_user_to_stage(db, from_stage_id, to_stage_id, user_id)
-        await db.commit()
         return redirect_with_admin_msg("msg_player_moved")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
@@ -3395,7 +3181,6 @@ async def admin_replace_playoff_player(
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         await replace_stage_player(db, stage_id, from_user_id, to_user_id)
-        await db.commit()
         return redirect_with_admin_msg("msg_player_replaced")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
