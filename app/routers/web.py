@@ -1541,7 +1541,7 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             )
         ).all()
     )
-    playoff_stages = await get_playoff_stages_with_data(db) if tournament_started else []
+    playoff_stages = await get_playoff_stages_with_data(db)
 
     direct_invite_users = list(
         (
@@ -2103,7 +2103,7 @@ async def admin_users_page(request: Request, db: AsyncSession = Depends(get_db))
 
     draw_applied = await get_draw_applied(db)
     tournament_started = await get_tournament_started(db)
-    show_group_sections = draw_applied and tournament_started
+    show_group_sections = draw_applied
 
     users_by_id: dict[int, User] = {user.id: user for user in users}
     playoff_stages = list((await db.scalars(select(PlayoffStage).order_by(PlayoffStage.stage_order, PlayoffStage.id))).all())

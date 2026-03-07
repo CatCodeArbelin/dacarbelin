@@ -15,7 +15,7 @@
 <div class="card bg-black neon-border-red"><div class="card-body">
   <h4>{{ tr('admin_participants_list') }}</h4>
   {% if show_group_sections %}
-  <div class="small text-contrast-muted mb-3">Группы отображаются, потому что жеребьевка применена и турнир запущен.</div>
+  <div class="small text-contrast-muted mb-3">Группы отображаются, потому что жеребьевка уже применена.</div>
   {% endif %}
   {% for section in group_sections %}
   <div class="mb-4 {% if not loop.last %}border-bottom border-secondary pb-3{% endif %}">
