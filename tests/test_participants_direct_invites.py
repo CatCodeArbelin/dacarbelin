@@ -42,7 +42,7 @@ def test_participants_direct_invites_shows_stage_2_user() -> None:
     )
     fake_db = _FakeDB(users=[stage_2_user])
 
-    response = asyncio.run(web.participants(request=_fake_request(), view="direct_invites", db=fake_db))
+    response = asyncio.run(web.participants(request=_fake_request(), basket=Basket.QUEEN.value, view="direct_invites", db=fake_db))
 
     assert response.status_code == 200
     assert fake_db.last_statement is not None
@@ -64,7 +64,7 @@ def test_participants_direct_invites_excludes_non_stage_2_invites() -> None:
     )
     fake_db = _FakeDB(users=[stage_2_user])
 
-    response = asyncio.run(web.participants(request=_fake_request(), view="direct_invites", db=fake_db))
+    response = asyncio.run(web.participants(request=_fake_request(), basket=Basket.QUEEN.value, view="direct_invites", db=fake_db))
 
     assert response.status_code == 200
     compiled = str(fake_db.last_statement)

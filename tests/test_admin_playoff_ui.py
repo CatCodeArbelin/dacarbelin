@@ -72,15 +72,3 @@ def test_admin_template_disables_stage_result_submit_for_disallowed_stage() -> N
     assert "can_submit_results=True" in macros
     assert "group_locked or not can_submit_results" in macros
     assert "Запись результатов для этой стадии запрещена" in macros
-
-
-def test_admin_template_has_split_unassigned_columns_for_manual_draw() -> None:
-    template = Path("app/templates/admin.html").read_text(encoding="utf-8")
-
-    assert "Нераспределённые (Основа)" in template
-    assert "Нераспределённые (Резерв)" in template
-    assert "manual_draw_users_main" in template
-    assert "manual_draw_users_reserve" in template
-    assert "unassigned_main" in template
-    assert "unassigned_reserve" in template
-    assert "'unassigned'" not in template

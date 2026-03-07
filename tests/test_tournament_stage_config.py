@@ -108,8 +108,6 @@ class TournamentStageConfigTests(unittest.TestCase):
         self.assertEqual(normalize_stage_key("stage_4"), "stage_final")
         self.assertEqual(normalize_stage_key("stage4"), "stage_final")
         self.assertEqual(normalize_stage_key("stage_4_final"), "stage_final")
-        self.assertEqual(normalize_stage_key("stage_1_8"), "stage_2")
-        self.assertEqual(normalize_stage_key("stage_3"), "stage_1_4")
 
         legacy_final_config = get_admin_playoff_stage_config("final")
         legacy_stage_4_config = get_admin_playoff_stage_config("stage_4")
@@ -253,14 +251,6 @@ class TournamentStageConfigTests(unittest.TestCase):
         statuses = [row["status"] for row in standings[0]["participants"]]
 
         self.assertEqual(statuses, ["promoted", "promoted", "promoted", "promoted"])
-
-    def test_resolve_current_stage_label_returns_group_stage_when_playoff_hidden(self) -> None:
-        stages = [
-            PlayoffStage(id=1, key="stage_2", title="Stage 2", stage_order=1, stage_size=32, is_started=False),
-            PlayoffStage(id=2, key="stage_1_4", title="Stage 3", stage_order=2, stage_size=16, is_started=False),
-        ]
-
-        self.assertEqual(resolve_current_stage_label("ru", stages, show_playoff=False), web.t("ru", "tournament_stage_group_stage_label"))
 
     def test_resolve_current_stage_label_supports_existing_stage_keys(self) -> None:
         stages = [

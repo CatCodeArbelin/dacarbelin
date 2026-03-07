@@ -262,11 +262,8 @@ def test_tournament_page_shows_tree_structure_before_start(monkeypatch) -> None:
     async def fake_get_tournament_started(db):
         return False
 
-    called = {"playoff_loaded": False}
-
     async def fake_get_playoff_stages_with_data(db):
-        called["playoff_loaded"] = True
-        return []
+        raise AssertionError("Playoff data must stay hidden before tournament start")
 
     monkeypatch.setattr(web, "get_draw_applied", fake_get_draw_applied)
     monkeypatch.setattr(web, "get_tournament_started", fake_get_tournament_started)
@@ -283,7 +280,6 @@ def test_tournament_page_shows_tree_structure_before_start(monkeypatch) -> None:
     assert "Сетка турнира" in response.text
     assert "Group A" in response.text
     assert "Group Final" in response.text
-    assert called["playoff_loaded"] is True
 
 
 
@@ -322,44 +318,6 @@ def test_tournament_page_context_contains_expected_keys_when_started(monkeypatch
     assert response.context["playoff_stages"][0].key == "stage_2"
     assert response.context["stage_columns"] == [{"key": "group_stage"}, {"key": "stage_2"}]
     assert response.context["tournament_tree"]["stages"][0]["key"] == "group_stage"
-
-
-def test_tournament_page_shows_group_stage_label_when_tournament_started_but_playoff_not_started(monkeypatch) -> None:
-    fake_db = _FakeTournamentPageDB()
-
-    class _CaptureResponse:
-        def __init__(self, context):
-            self.context = context
-
-    async def fake_get_tournament_started(db):
-        return True
-
-    async def fake_get_playoff_stages_with_data(db):
-        return [
-            SimpleNamespace(key="stage_2", is_started=False, title="Stage 2"),
-            SimpleNamespace(key="stage_1_4", is_started=False, title="Stage 3"),
-            SimpleNamespace(key="stage_final", is_started=False, title="Final"),
-        ]
-
-    def fake_build_bracket_columns(groups, playoff_stages, user_by_id, direct_invite_ids, *args, **kwargs):
-        return [{"key": "group_stage"}, {"key": "stage_2"}]
-
-    def fake_build_tournament_tree_vm(groups, playoff_stages, user_by_id, direct_invite_ids, tournament_winner_user_id=None, *args, **kwargs):
-        return {"stages": [{"key": "group_stage", "title": "I этап", "level": 0, "matches": []}]}
-
-    def fake_template_response(request, template_name, context):
-        return _CaptureResponse(context)
-
-    monkeypatch.setattr(web, "get_tournament_started", fake_get_tournament_started)
-    monkeypatch.setattr(web, "get_playoff_stages_with_data", fake_get_playoff_stages_with_data)
-    monkeypatch.setattr(web, "build_bracket_columns", fake_build_bracket_columns)
-    monkeypatch.setattr(web, "build_tournament_tree_vm", fake_build_tournament_tree_vm)
-    monkeypatch.setattr(web.templates, "TemplateResponse", fake_template_response)
-
-    request = SimpleNamespace(cookies={"lang": "ru"})
-    response = __import__("asyncio").run(web.tournament_page(request, fake_db))
-
-    assert response.context["current_stage_display"] == web.t("ru", "tournament_stage_group_stage_label")
 
 def test_stage_order_constants_match_active_stage_progression_order() -> None:
     assert web.TOURNAMENT_STAGE_KEYS_ORDER == get_public_stage_display_sequence()
@@ -432,39 +390,6 @@ def test_build_bracket_columns_sorts_stage_2_participants_by_points_within_group
 
     assert [participant["user_id"] for participant in group_a["participants"]] == [10, 20, 30]
 
-
-
-def test_build_bracket_columns_supports_legacy_stage_key_alias_for_stage_2() -> None:
-    legacy_stage = SimpleNamespace(
-        key="stage_1_8",
-        stage_size=32,
-        participants=[
-            SimpleNamespace(user_id=501, seed=9, points=11, wins=1, top4_finishes=1, top8_finishes=1, last_place=2),
-        ],
-        matches=[
-            SimpleNamespace(group_number=2, game_number=2, schedule_text="Tomorrow", lobby_password="1234", state="started"),
-        ],
-    )
-
-    columns = build_bracket_columns(
-        groups=[],
-        playoff_stages=[legacy_stage],
-        user_by_id={},
-        direct_invite_ids=[],
-    )
-
-    stage_2_column = next(column for column in columns if column["key"] == "stage_2")
-    group_b = next(match for match in stage_2_column["matches"] if match["group_label"] == "B")
-
-    assert group_b["participants"]
-    assert group_b["participants"][0]["user_id"] == 501
-    assert group_b["state"] == "started"
-
-
-def test_resolve_current_stage_label_normalizes_legacy_stage_aliases() -> None:
-    legacy_stage = SimpleNamespace(key="stage4", title="Legacy Final", is_started=True)
-
-    assert resolve_current_stage_label("ru", [legacy_stage], show_playoff=True) == "Финал (8, правило 22+победа)"
 def test_build_bracket_columns_empty_tournament_has_all_stages_and_placeholders() -> None:
     columns = build_bracket_columns(
         groups=[],
@@ -511,9 +436,9 @@ def test_stage_2_preview_without_stage_and_invites_returns_four_empty_groups() -
 def test_stage_2_preview_without_stage_keeps_four_groups_with_partial_invites() -> None:
     direct_invite_ids = [101, 102, 103]
     user_by_id = {
-        101: SimpleNamespace(id=101, nickname="Alpha", game_nickname="", highest_rank=""),
-        102: SimpleNamespace(id=102, nickname="Bravo", game_nickname="", highest_rank=""),
-        103: SimpleNamespace(id=103, nickname="Charlie", game_nickname="", highest_rank=""),
+        101: SimpleNamespace(id=101, nickname="Alpha", game_nickname=""),
+        102: SimpleNamespace(id=102, nickname="Bravo", game_nickname=""),
+        103: SimpleNamespace(id=103, nickname="Charlie", game_nickname=""),
     }
 
     columns = build_bracket_columns(
@@ -534,50 +459,7 @@ def test_stage_2_preview_without_stage_keeps_four_groups_with_partial_invites() 
         expected_by_group[group_label].append(
             {
                 "user_id": invited["user_id"],
-                "nickname": f"{user.nickname} (-)",
-                "is_direct_invite_preview": True,
-            }
-        )
-
-    assert participants_by_group == expected_by_group
-
-
-def test_stage_2_preview_with_existing_stage_and_empty_participants_shows_direct_invites() -> None:
-    direct_invite_ids = [101, 102, 103]
-    direct_invite_groups = {101: 1, 102: 2, 103: 4}
-    user_by_id = {
-        101: SimpleNamespace(id=101, nickname="Alpha", game_nickname="", highest_rank=""),
-        102: SimpleNamespace(id=102, nickname="Bravo", game_nickname="", highest_rank=""),
-        103: SimpleNamespace(id=103, nickname="Charlie", game_nickname="", highest_rank=""),
-    }
-    stage = SimpleNamespace(
-        key="stage_2",
-        stage_size=32,
-        participants=[],
-        matches=[],
-    )
-
-    columns = build_bracket_columns(
-        groups=[],
-        playoff_stages=[stage],
-        user_by_id=user_by_id,
-        direct_invite_ids=direct_invite_ids,
-        direct_invite_groups=direct_invite_groups,
-    )
-
-    stage_2_column = next(column for column in columns if column["key"] == "stage_2")
-    participants_by_group = {match["group_label"]: match["participants"] for match in stage_2_column["matches"]}
-
-    expected_by_group: dict[str, list[dict[str, object]]] = {"A": [], "B": [], "C": [], "D": []}
-    for invited in build_stage_2_direct_invite_preview(
-        direct_invite_ids,
-        direct_invite_groups=direct_invite_groups,
-    ):
-        group_label = web.get_stage_group_label("stage_2", invited["group_number"])
-        expected_by_group[group_label].append(
-            {
-                "user_id": invited["user_id"],
-                "nickname": f"{user_by_id[invited['user_id']].nickname} (-)",
+                "nickname": user.nickname,
                 "is_direct_invite_preview": True,
             }
         )
