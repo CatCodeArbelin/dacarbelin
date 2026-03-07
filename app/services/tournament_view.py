@@ -245,6 +245,8 @@ def _participants_for_playoff_members(
 ) -> dict[int, list[BracketParticipantVM]]:
     grouped_participants: dict[int, list[PlayoffParticipant]] = {}
     for participant in participants:
+        if user_by_id.get(participant.user_id) is None:
+            continue
         group_number = get_stage_group_number_by_seed(participant.seed)
         grouped_participants.setdefault(group_number, []).append(participant)
 
@@ -546,7 +548,11 @@ def build_playoff_standings(
 ) -> list[PlayoffStageStandingsVM]:
     standings: list[PlayoffStageStandingsVM] = []
     for stage in playoff_stages:
-        participants_sorted = sorted(stage.participants, key=playoff_sort_key, reverse=True)
+        participants_sorted = sorted(
+            [participant for participant in stage.participants if user_by_id.get(participant.user_id) is not None],
+            key=playoff_sort_key,
+            reverse=True,
+        )
         stage_group_done: set[int] = set()
         for match in stage.matches:
             normalized_stage_key = normalize_stage_key(stage.key)
