@@ -166,7 +166,12 @@ def _participants_for_group_members(members: Sequence[GroupMember]) -> list[Brac
     return _apply_stage_highlight_rules("group_stage", participants)
 
 
-def _apply_stage_highlight_rules(stage_key: str, participants: list[BracketParticipantVM]) -> list[BracketParticipantVM]:
+def _apply_stage_highlight_rules(
+    stage_key: str,
+    participants: list[BracketParticipantVM],
+    *,
+    allow_live_candidate_highlight: bool = True,
+) -> list[BracketParticipantVM]:
     if not participants:
         return participants
 
@@ -184,9 +189,13 @@ def _apply_stage_highlight_rules(stage_key: str, participants: list[BracketParti
 
         for participant in participants:
             participant["is_promoted_highlight"] = False
-            participant["highlight_color"] = "purple" if (participant.get("points") or 0) >= 22 else "eliminated"
+            participant["highlight_color"] = "eliminated"
 
         if winner_participant is None:
+            if allow_live_candidate_highlight:
+                for participant in participants:
+                    if (participant.get("points") or 0) >= 22:
+                        participant["highlight_color"] = "purple"
             return participants
 
         winner_participant["is_promoted_highlight"] = True

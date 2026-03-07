@@ -528,7 +528,11 @@ def _apply_archive_stage_highlight(stage_key: str, participants: list[dict[str, 
         reverse=True,
     )
 
-    return _apply_stage_highlight_rules(normalized_stage_key, ranked_participants)
+    return _apply_stage_highlight_rules(
+        normalized_stage_key,
+        ranked_participants,
+        allow_live_candidate_highlight=False,
+    )
 
 def _build_archive_tree_vm(columns: list[dict[str, object]]) -> dict[str, object]:
     stage_keys = ["group_stage", "stage_2", "stage_1_4", "stage_final"]

@@ -58,6 +58,19 @@ def test_final_winner_gets_gold_before_points_ranking() -> None:
     assert promoted == [False, False, True, False]
 
 
+def test_final_archive_context_keeps_only_podium_when_winner_known() -> None:
+    rows = _participants([30, 29, 28, 27, 26])
+    rows[3]["is_tournament_winner"] = True
+    rows = _apply_stage_highlight_rules("stage_final", rows, allow_live_candidate_highlight=False)
+
+    colors = [row.get("highlight_color") for row in rows]
+    assert colors == ["silver", "bronze", "eliminated", "gold", "eliminated"]
+    assert colors.count("gold") == 1
+    assert colors.count("silver") == 1
+    assert colors.count("bronze") == 1
+    assert "purple" not in colors
+
+
 def test_stage_highlights_disabled_until_first_game_played() -> None:
     rows = _apply_stage_highlight_rules("group_stage", _participants([0, 0, 0, 0]))
     highlighted = [row.get("is_promoted_highlight", False) for row in rows]
