@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from app.core.admin_session import ADMIN_SESSION_COOKIE, create_admin_session_cookie
 from app.db.session import get_db
 from app.main import app
+import app.main as main_module
 from app.models.settings import CryptoWallet, DonationLink, Donor, PrizePoolEntry
 
 
@@ -147,8 +148,13 @@ def test_admin_content_structured_crud_forms():
     assert fake_db.donors == []
 
 
-def test_donate_page_renders_sanitized_html_content():
+def test_donate_page_renders_sanitized_html_content(monkeypatch):
     fake_db = _FakeContentDB()
+
+    async def fake_enabled() -> bool:
+        return False
+
+    monkeypatch.setattr(main_module, "is_technical_works_enabled", fake_enabled)
     fake_db.donation_links = [DonationLink(title_ru="<strong>Link</strong>", title_en="", url="https://example.com", is_active=True)]
     fake_db.crypto_wallets = [CryptoWallet(wallet_name="<em>Card</em>", requisites="<script>x</script>OK", is_active=True)]
     fake_db.prize_pool_entries = [PrizePoolEntry(place_label_ru="<b>1st</b>", reward_ru="<i>Gold</i>")]
