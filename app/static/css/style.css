@@ -779,6 +779,49 @@ body {
 }
 
 
+
+
+.home-right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.home-right-column .prize-pool-card,
+.home-right-column #chat {
+  width: 100%;
+  max-width: 460px;
+}
+
+.home-right-column .prize-pool-card {
+  min-height: 240px;
+}
+
+.home-right-column #chat {
+  min-height: 550px;
+}
+
+.home-right-column #chat .chat-box {
+  min-height: 220px;
+  max-height: 260px;
+}
+
+@media (max-width: 991.98px) {
+  .home-right-column .prize-pool-card,
+  .home-right-column #chat {
+    max-width: 100%;
+  }
+
+  .home-right-column .prize-pool-card,
+  .home-right-column #chat {
+    min-height: auto;
+  }
+
+  .home-right-column #chat .chat-box {
+    min-height: 300px;
+    max-height: 340px;
+  }
+}
 .prize-pool-card {
   background: radial-gradient(circle at top right, rgba(0, 183, 255, 0.16), rgba(0, 0, 0, 0.95));
   max-width: 430px;
