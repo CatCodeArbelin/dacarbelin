@@ -382,6 +382,45 @@ if (visualDrawRoot) {
   };
 
   const mainIds = new Set(mainUsers.map((user) => user.id));
+  let dragAutoScrollRafId = null;
+  let dragAutoScrollPointerY = null;
+
+  function stopDragAutoScroll() {
+    if (dragAutoScrollRafId !== null) {
+      window.cancelAnimationFrame(dragAutoScrollRafId);
+      dragAutoScrollRafId = null;
+    }
+    dragAutoScrollPointerY = null;
+  }
+
+  function runDragAutoScroll() {
+    if (dragAutoScrollPointerY === null) {
+      dragAutoScrollRafId = null;
+      return;
+    }
+
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const edgeThreshold = 120;
+    const maxSpeed = 24;
+    let delta = 0;
+
+    if (dragAutoScrollPointerY < edgeThreshold) {
+      delta = -Math.ceil(((edgeThreshold - dragAutoScrollPointerY) / edgeThreshold) * maxSpeed);
+    } else if (dragAutoScrollPointerY > viewportHeight - edgeThreshold) {
+      delta = Math.ceil(((dragAutoScrollPointerY - (viewportHeight - edgeThreshold)) / edgeThreshold) * maxSpeed);
+    }
+
+    if (delta !== 0) {
+      window.scrollBy(0, delta);
+    }
+
+    dragAutoScrollRafId = window.requestAnimationFrame(runDragAutoScroll);
+  }
+
+  function startDragAutoScroll() {
+    if (dragAutoScrollRafId !== null) return;
+    dragAutoScrollRafId = window.requestAnimationFrame(runDragAutoScroll);
+  }
   const reserveIds = new Set(reserveUsers.map((user) => user.id));
   const assignedIds = new Set(state.groups.flatMap((group) => group.members));
   state.mainUnassigned = mainUsers.filter((user) => !assignedIds.has(user.id)).map((user) => user.id);
@@ -455,9 +494,12 @@ if (visualDrawRoot) {
       card.addEventListener('dragstart', (event) => {
         card.classList.add('visual-draw-card-dragging');
         event.dataTransfer?.setData('text/plain', card.dataset.userId || '');
+        dragAutoScrollPointerY = event.clientY || null;
+        startDragAutoScroll();
       });
       card.addEventListener('dragend', () => {
         card.classList.remove('visual-draw-card-dragging');
+        stopDragAutoScroll();
       });
     });
 
@@ -487,10 +529,12 @@ if (visualDrawRoot) {
       });
       zone.addEventListener('dragover', (event) => {
         event.preventDefault();
+        dragAutoScrollPointerY = event.clientY || null;
       });
       zone.addEventListener('drop', (event) => {
         event.preventDefault();
         zone.classList.remove('visual-draw-dropzone-active');
+        stopDragAutoScroll();
         const rawUserId = event.dataTransfer?.getData('text/plain') || '';
         const userId = Number.parseInt(rawUserId, 10);
         if (!userId) return;
@@ -576,6 +620,14 @@ if (visualDrawRoot) {
 
     state.groups.pop();
     render();
+  });
+
+  document.addEventListener('dragover', (event) => {
+    dragAutoScrollPointerY = event.clientY || null;
+  });
+
+  document.addEventListener('drop', () => {
+    stopDragAutoScroll();
   });
 
   form?.addEventListener('submit', (event) => {

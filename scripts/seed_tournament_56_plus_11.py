@@ -1,4 +1,4 @@
-"""Заполняет БД тестовыми данными турнира: 56 основных, 20 резервных и 11 direct invite."""
+"""Заполняет БД тестовыми данными турнира: 56 основных, 4 резервных и 11 direct invite."""
 
 import asyncio
 import os
@@ -45,7 +45,7 @@ def _rank_from_mmr(mmr: int) -> str:
 
 
 async def main() -> None:
-    """Создает 56 основных, 20 резервных и 11 direct invite участников."""
+    """Создает 56 основных, 4 резервных и 11 direct invite участников."""
     os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/dac")
     os.environ.setdefault("ADMIN_KEY", "local_seed_admin_key")
 
@@ -89,7 +89,7 @@ async def main() -> None:
             main_created += 1
 
         reserve_created = 0
-        while reserve_created < 20:
+        while reserve_created < 4:
             steam_id = next_unique_steam_id()
 
             highest_mmr = random.randint(800, 4600)
