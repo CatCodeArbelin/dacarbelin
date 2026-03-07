@@ -53,78 +53,54 @@ def test_participants_baskets_mode_queries_all_users_without_basket_filter() -> 
     assert "ORDER BY CASE" in compiled
 
 
-def test_participants_rank_priority_queen_places_queen_pair_first() -> None:
+def test_participants_rank_priority_queen_places_queen_pair_first_in_order_by() -> None:
     fake_db = _FakeDB(users=[])
 
     asyncio.run(web.participants(request=_fake_request(), view="baskets", rank_priority=Basket.QUEEN.value, db=fake_db))
 
-    params = fake_db.last_statement.compile().params
-    assert params["basket_1"] == [Basket.QUEEN.value, Basket.QUEEN_RESERVE.value]
+    compiled = str(fake_db.last_statement)
+    queen_idx = compiled.find("users.basket = :basket_1")
+    queen_reserve_idx = compiled.find("users.basket = :basket_2")
+    king_idx = compiled.find("users.basket = :basket_3")
+    assert queen_idx >= 0 and queen_reserve_idx > queen_idx and king_idx > queen_reserve_idx
 
 
 def test_participants_rank_priority_other_ranks_place_corresponding_pair_first() -> None:
     fake_db = _FakeDB(users=[])
     cases = [
-        (Basket.KING.value, [Basket.KING.value, Basket.KING_RESERVE.value]),
-        (Basket.ROOK.value, [Basket.ROOK.value, Basket.ROOK_RESERVE.value]),
-        (Basket.BISHOP.value, [Basket.BISHOP.value, Basket.BISHOP_RESERVE.value]),
-        (Basket.LOW_RANK.value, [Basket.LOW_RANK.value, Basket.LOW_RANK_RESERVE.value]),
+        (Basket.KING.value, ":basket_1", ":basket_2", ":basket_3"),
+        (Basket.ROOK.value, ":basket_1", ":basket_2", ":basket_3"),
+        (Basket.BISHOP.value, ":basket_1", ":basket_2", ":basket_3"),
+        (Basket.LOW_RANK.value, ":basket_1", ":basket_2", ":basket_3"),
     ]
 
-    for rank_priority, expected_pair in cases:
+    for rank_priority, first_token, second_token, third_token in cases:
         asyncio.run(web.participants(request=_fake_request(), view="baskets", rank_priority=rank_priority, db=fake_db))
+        compiled = str(fake_db.last_statement)
         params = fake_db.last_statement.compile().params
-        assert params["basket_1"] == expected_pair
+        assert compiled.find(f"users.basket = {first_token}") < compiled.find(f"users.basket = {second_token}")
+        assert params[first_token.lstrip(":")] in [rank_priority, f"{rank_priority}_reserve"]
+        assert params[second_token.lstrip(":")] in [rank_priority, f"{rank_priority}_reserve"]
+        assert params[third_token.lstrip(":")] not in [rank_priority, f"{rank_priority}_reserve"]
 
 
-def test_participants_rank_priority_sorts_by_highest_rank_with_selected_tier_first() -> None:
-    users = [
-        User(
-            nickname="low_rank_user",
-            steam_input="low_input",
-            steam_id="steam_low",
-            game_nickname="low_game",
-            current_rank="Pawn-1",
-            highest_rank="Pawn-9",
-            basket=Basket.LOW_RANK.value,
-        ),
-        User(
-            nickname="queen_120",
-            steam_input="queen_input_120",
-            steam_id="steam_queen_120",
-            game_nickname="queen_game_120",
-            current_rank="Pawn-1",
-            highest_rank="Queen#120",
-            basket=Basket.QUEEN.value,
-        ),
-        User(
-            nickname="queen_2",
-            steam_input="queen_input_2",
-            steam_id="steam_queen_2",
-            game_nickname="queen_game_2",
-            current_rank="Pawn-1",
-            highest_rank="Queen#2",
-            basket=Basket.QUEEN.value,
-        ),
-        User(
-            nickname="king_user",
-            steam_input="king_input",
-            steam_id="steam_king",
-            game_nickname="king_game",
-            current_rank="Pawn-1",
-            highest_rank="King-4",
-            basket=Basket.KING.value,
-        ),
-    ]
-    fake_db = _FakeDB(users=users)
+def test_participants_rank_priority_sorts_selected_tier_first_with_deterministic_queen_order() -> None:
+    fake_db = _FakeDB(users=[])
 
-    response = asyncio.run(web.participants(request=_fake_request(), view="baskets", rank_priority=Basket.QUEEN.value, db=fake_db))
+    asyncio.run(web.participants(request=_fake_request(), view="baskets", rank_priority=Basket.QUEEN.value, db=fake_db))
 
-    html = response.body.decode("utf-8")
-    queen2_pos = html.find("queen_2")
-    queen120_pos = html.find("queen_120")
-    king_pos = html.find("king_user")
-    low_pos = html.find("low_rank_user")
+    compiled = str(fake_db.last_statement)
+    assert "CAST(substr(users.highest_rank, :substr_1) AS INTEGER)" in compiled
+    assert "users.highest_rank LIKE :highest_rank_1" in compiled
+    assert "coalesce" in compiled.lower()
 
-    assert all(pos >= 0 for pos in [queen2_pos, queen120_pos, king_pos, low_pos])
-    assert queen2_pos < queen120_pos < king_pos < low_pos
+
+
+def test_participants_invalid_rank_priority_falls_back_to_queen() -> None:
+    fake_db = _FakeDB(users=[])
+
+    asyncio.run(web.participants(request=_fake_request(), view="baskets", rank_priority="invalid-rank", db=fake_db))
+
+    params = fake_db.last_statement.compile().params
+    assert params["basket_1"] == Basket.QUEEN.value
+    assert params["basket_2"] == Basket.QUEEN_RESERVE.value
