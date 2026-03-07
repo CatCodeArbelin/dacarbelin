@@ -32,7 +32,10 @@ class _FakeSession:
 
         self._scalars_calls += 1
         if self._scalars_calls == 1:
-            return _FakeScalarsResult(self._users)
+            users = list(self._users)
+            if "direct_invite_stage" in query_text:
+                users = [user for user in users if user.direct_invite_stage != "stage_2"]
+            return _FakeScalarsResult(users)
         if self._scalars_calls == 2:
             return _FakeScalarsResult([])
         raise AssertionError("Unexpected scalars() call")
@@ -105,6 +108,13 @@ def _make_users_with_reserve_mix() -> list[User]:
     )
     return users
 
+
+
+
+def _make_users_with_stage_2_direct_invite() -> list[User]:
+    users = _make_users(56)
+    users[0].direct_invite_stage = "stage_2"
+    return users
 
 def _make_users_with_invited() -> list[User]:
     users = _make_users(56)
@@ -298,6 +308,21 @@ class TournamentAutoDrawTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(members), 56)
         self.assertTrue(invited_ids.isdisjoint(member_ids))
+
+
+    async def test_create_auto_draw_excludes_stage_2_direct_invites_from_group_stage(self) -> None:
+        session = _FakeSession(users=_make_users_with_stage_2_direct_invite())
+
+        ok, _message = await create_auto_draw(session)
+
+        self.assertFalse(ok)
+        self.assertIn("доступных для Stage I", _message)
+        members = [obj for obj in session.added if isinstance(obj, GroupMember)]
+        direct_invite_ids = {user.id for user in session._users if user.direct_invite_stage == "stage_2"}
+        member_ids = {member.user_id for member in members}
+
+        self.assertEqual(len(members), 0)
+        self.assertTrue(direct_invite_ids.isdisjoint(member_ids))
 
     async def test_create_auto_draw_rolls_back_when_add_fails_after_partial_assignments(self) -> None:
         """Проверяет негативный сценарий `test_create_auto_draw_rolls_back_when_add_fails_after_partial_assignments`.
