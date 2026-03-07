@@ -119,6 +119,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 DONATE_HIGHLIGHT_AMOUNT_SETTING_KEY = "donate_highlight_amount"
+RUB_PER_USD_RATE = Decimal("79")
 
 
 ALLOWED_USER_UPDATE_FIELDS = {"nickname", "basket", "direct_invite_stage"}
@@ -150,6 +151,15 @@ def parse_donor_amount(amount_raw: str) -> Decimal:
         return Decimal(numeric)
     except InvalidOperation:
         return Decimal("0")
+
+
+def format_money_amount(amount: Decimal) -> str:
+    return f"{int(amount)}" if amount == amount.to_integral() else f"{amount:.2f}"
+
+
+def to_rub_and_usd_display_amounts(total_rub_amount: Decimal) -> tuple[str, str]:
+    usd_amount = total_rub_amount / RUB_PER_USD_RATE
+    return format_money_amount(total_rub_amount), format_money_amount(usd_amount)
 
 
 class ChatEventBroker:
@@ -1224,10 +1234,7 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
     for donor_amount in donors:
         total_sponsors_amount += parse_donor_amount(str(donor_amount))
 
-    usd_amount = total_sponsors_amount / Decimal("79")
-
-    total_sponsors_amount_rub = f"{int(total_sponsors_amount)}" if total_sponsors_amount == total_sponsors_amount.to_integral() else f"{total_sponsors_amount:.2f}"
-    total_sponsors_amount_usd = f"{int(usd_amount)}" if usd_amount == usd_amount.to_integral() else f"{usd_amount:.2f}"
+    total_sponsors_amount_rub, total_sponsors_amount_usd = to_rub_and_usd_display_amounts(total_sponsors_amount)
     prize_pool_wave_enabled = total_sponsors_amount >= Decimal("1000")
     return templates.TemplateResponse(
         request,
@@ -1639,15 +1646,13 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
     total_sponsors_amount = parse_donor_amount("0")
     for donor in donors:
         total_sponsors_amount += parse_donor_amount(str(donor.amount))
-    total_sponsors_amount_display = (
-        f"{int(total_sponsors_amount)}"
-        if total_sponsors_amount == total_sponsors_amount.to_integral()
-        else f"{total_sponsors_amount:.2f}"
-    )
     highlight_amount_setting = await db.scalar(
         select(SiteSetting).where(SiteSetting.key == DONATE_HIGHLIGHT_AMOUNT_SETTING_KEY)
     )
     highlight_amount = (highlight_amount_setting.value or "").strip() if highlight_amount_setting else ""
+    display_total_amount = parse_donor_amount(highlight_amount) if highlight_amount else total_sponsors_amount
+    total_sponsors_amount_rub, total_sponsors_amount_usd = to_rub_and_usd_display_amounts(display_total_amount)
+    prize_pool_display_mode = "rub" if lang == "ru" else "usd"
 
     donation_links_vm = [
         {"url": item.url, "title_html": sanitize_content_html(localized_attr(item, "title", lang))}
@@ -1685,7 +1690,9 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
         "donate.html",
         template_context(
             request,
-            total_sponsors_amount=highlight_amount or total_sponsors_amount_display,
+            total_sponsors_amount_rub=total_sponsors_amount_rub,
+            total_sponsors_amount_usd=total_sponsors_amount_usd,
+            prize_pool_display_mode=prize_pool_display_mode,
             donation_links=donation_links_vm,
             bank_cards_links=bank_cards_vm,
             support_author_links=support_author_vm,

@@ -5,7 +5,7 @@
 
   <section class="donate-section donate-section--highlight prize-pool-card">
     <h4>{{ tr('donate_prize_pool') }}</h4>
-    <div class="prize-pool-amount">{{ total_sponsors_amount }}</div>
+    <div class="prize-pool-amount">{% if prize_pool_display_mode == "rub" %}{{ total_sponsors_amount_rub }} ₽{% else %}${{ total_sponsors_amount_usd }}{% endif %}</div>
   </section>
 
   <section class="donate-section">
