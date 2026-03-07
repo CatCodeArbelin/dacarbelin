@@ -66,7 +66,7 @@ class MoveUserToStageTests(unittest.IsolatedAsyncioTestCase):
         moved_participant = next(participant for participant in loaded_target_stage.participants if participant.user_id == 100)
 
         self.assertEqual(get_stage_group_number_by_seed(moved_participant.seed), 2)
-        db.commit.assert_called_once()
+        db.commit.assert_not_called()
 
     async def test_move_user_to_stage_checks_target_capacity(self) -> None:
         """Проверяет блокировку ручного переноса при переполнении целевого этапа."""
@@ -89,6 +89,59 @@ class MoveUserToStageTests(unittest.IsolatedAsyncioTestCase):
         db.add.assert_not_called()
         db.delete.assert_not_awaited()
         db.commit.assert_not_called()
+
+
+class AdminReassignRollbackTests(unittest.IsolatedAsyncioTestCase):
+    async def test_reassign_rolls_back_stage_move_when_group_assignment_fails(self) -> None:
+        user = User(id=500, nickname="rollback-user", basket=Basket.QUEEN.value)
+        source_stage = PlayoffStage(id=40, key="stage_2", title="Stage 2", stage_size=32, stage_order=1)
+        target_stage = PlayoffStage(id=41, key="stage_1_4", title="Quarter", stage_size=16, stage_order=2)
+        original_membership = PlayoffParticipant(stage_id=40, user_id=500, seed=2)
+        memberships = [original_membership]
+        db = _ReassignDb(user=user, stages={40: source_stage, 41: target_stage}, memberships=memberships)
+
+        snapshot = [(item.stage_id, item.user_id, item.seed) for item in db.memberships]
+
+        async def fake_move_user_to_stage(db, from_stage_id: int, to_stage_id: int, user_id: int):
+            participant = next(item for item in db.memberships if item.user_id == user_id and item.stage_id == from_stage_id)
+            participant.stage_id = to_stage_id
+
+        async def fake_rollback():
+            db.rollbacks += 1
+            db.memberships[:] = [
+                PlayoffParticipant(stage_id=stage_id, user_id=member_user_id, seed=seed)
+                for stage_id, member_user_id, seed in snapshot
+            ]
+
+        original_move = web.move_user_to_stage
+        original_find_seed = web._find_group_seed_for_stage
+        db.rollback = fake_rollback
+        web.move_user_to_stage = fake_move_user_to_stage
+
+        async def fail_group_seed(*args, **kwargs):
+            raise ValueError("target_group_is_full")
+
+        web._find_group_seed_for_stage = fail_group_seed
+        try:
+            response = await web.admin_reassign_user(
+                user_id=500,
+                target_stage_id="41",
+                target_group_number="1",
+                replace_from_user_id="",
+                quick_move=None,
+                reassign_action="move_stage",
+                db=db,
+            )
+        finally:
+            web.move_user_to_stage = original_move
+            web._find_group_seed_for_stage = original_find_seed
+
+        self.assertEqual(response.status_code, 303)
+        self.assertIn("msg_operation_failed", response.headers["location"])
+        self.assertIn("details=target_group_is_full", response.headers["location"])
+        rolled_back_membership = next(item for item in db.memberships if item.user_id == 500)
+        self.assertEqual(rolled_back_membership.stage_id, 40)
+
 
 
 if __name__ == "__main__":

@@ -885,7 +885,6 @@ async def move_user_to_stage(db: AsyncSession, from_stage_id: int, to_stage_id: 
 
     await db.delete(participant)
     db.add(PlayoffParticipant(stage_id=to_stage_id, user_id=user_id, seed=next_seed))
-    await db.commit()
 
 
 async def promote_group_member_to_stage(db: AsyncSession, group_id: int, user_id: int, target_stage_id: int) -> None:
@@ -922,7 +921,6 @@ async def promote_group_member_to_stage(db: AsyncSession, group_id: int, user_id
             seed=next_seed,
         )
     )
-    await db.commit()
 
 
 async def replace_stage_player(db: AsyncSession, stage_id: int, from_user_id: int, to_user_id: int) -> None:
@@ -933,7 +931,6 @@ async def replace_stage_player(db: AsyncSession, stage_id: int, from_user_id: in
     if exists:
         raise ValueError("Новый игрок уже присутствует на этапе")
     participant.user_id = to_user_id
-    await db.commit()
 
 
 async def adjust_stage_points(db: AsyncSession, stage_id: int, user_id: int, points_delta: int) -> None:

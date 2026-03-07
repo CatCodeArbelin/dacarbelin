@@ -2417,13 +2417,12 @@ async def admin_reassign_user(
                     raise ValueError("target_stage_is_full")
                 next_seed = max((participant.seed for participant in stage_participants), default=0) + 1
                 db.add(PlayoffParticipant(stage_id=normalized_target_stage_id, user_id=user_id, seed=next_seed))
-                await db.commit()
 
         target_membership = await db.scalar(
             select(PlayoffParticipant).where(PlayoffParticipant.stage_id == normalized_target_stage_id, PlayoffParticipant.user_id == user_id)
         )
         if not target_membership:
-            return redirect_with_admin_users_msg("msg_operation_failed", details="target_membership_not_found")
+            raise ValueError("target_membership_not_found")
 
         if normalized_target_group_number is not None:
             target_membership.seed = await _find_group_seed_for_stage(
@@ -2441,6 +2440,15 @@ async def admin_reassign_user(
     except ValueError as exc:
         await db.rollback()
         details = str(exc) or "reassign_failed"
+        logger.warning(
+            "Failed to reassign user from admin users page",
+            extra={
+                "user_id": user_id,
+                "target_stage_id": normalized_target_stage_id,
+                "target_group_number": normalized_target_group_number,
+                "details": details,
+            },
+        )
         return redirect_with_admin_users_msg("msg_operation_failed", details=details)
     except Exception:
         await db.rollback()
@@ -3022,6 +3030,7 @@ async def admin_promote_group_member_manual(
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         await promote_group_member_to_stage(db, group_id, user_id, target_stage_id)
+        await db.commit()
         return redirect_with_admin_msg("msg_player_moved")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
@@ -3338,6 +3347,7 @@ async def admin_move_playoff_player(
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         await move_user_to_stage(db, from_stage_id, to_stage_id, user_id)
+        await db.commit()
         return redirect_with_admin_msg("msg_player_moved")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
@@ -3358,6 +3368,7 @@ async def admin_replace_playoff_player(
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         await replace_stage_player(db, stage_id, from_user_id, to_user_id)
+        await db.commit()
         return redirect_with_admin_msg("msg_player_replaced")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
