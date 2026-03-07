@@ -68,32 +68,55 @@ def test_participants_rank_priority_queen_places_queen_pair_first_in_order_by() 
 def test_participants_rank_priority_other_ranks_place_corresponding_pair_first() -> None:
     fake_db = _FakeDB(users=[])
     cases = [
-        (Basket.KING.value, ":basket_1", ":basket_2", ":basket_3"),
-        (Basket.ROOK.value, ":basket_1", ":basket_2", ":basket_3"),
-        (Basket.BISHOP.value, ":basket_1", ":basket_2", ":basket_3"),
-        (Basket.LOW_RANK.value, ":basket_1", ":basket_2", ":basket_3"),
+        Basket.KING.value,
+        Basket.ROOK.value,
+        Basket.BISHOP.value,
+        Basket.LOW_RANK.value,
     ]
 
-    for rank_priority, first_token, second_token, third_token in cases:
+    for rank_priority in cases:
         asyncio.run(web.participants(request=_fake_request(), view="baskets", rank_priority=rank_priority, db=fake_db))
         compiled = str(fake_db.last_statement)
         params = fake_db.last_statement.compile().params
-        assert compiled.find(f"users.basket = {first_token}") < compiled.find(f"users.basket = {second_token}")
-        assert params[first_token.lstrip(":")] in [rank_priority, f"{rank_priority}_reserve"]
-        assert params[second_token.lstrip(":")] in [rank_priority, f"{rank_priority}_reserve"]
-        assert params[third_token.lstrip(":")] not in [rank_priority, f"{rank_priority}_reserve"]
+        assert compiled.find("users.basket = :basket_1") < compiled.find("users.basket = :basket_2")
+        assert params["basket_1"] in [rank_priority, f"{rank_priority}_reserve"]
+        assert params["basket_2"] in [rank_priority, f"{rank_priority}_reserve"]
+        assert params["basket_3"] not in [rank_priority, f"{rank_priority}_reserve"]
 
 
-def test_participants_rank_priority_sorts_selected_tier_first_with_deterministic_queen_order() -> None:
+def test_participants_rank_priority_uses_universal_highest_rank_sort_keys() -> None:
     fake_db = _FakeDB(users=[])
 
     asyncio.run(web.participants(request=_fake_request(), view="baskets", rank_priority=Basket.QUEEN.value, db=fake_db))
 
     compiled = str(fake_db.last_statement)
-    assert "CAST(substr(users.highest_rank, :substr_1) AS INTEGER)" in compiled
     assert "users.highest_rank LIKE :highest_rank_1" in compiled
-    assert "coalesce" in compiled.lower()
+    assert "users.highest_rank LIKE :highest_rank_2" in compiled
+    assert "users.highest_rank LIKE :highest_rank_3" in compiled
+    assert "users.highest_rank LIKE :highest_rank_4" in compiled
+    assert "users.highest_rank LIKE :highest_rank_5" in compiled
+    assert "users.highest_rank LIKE :highest_rank_6" in compiled
+    assert "replace(users.highest_rank, :replace_1, :replace_2)" in compiled
+    assert "replace(users.highest_rank, :replace_3, :replace_4)" in compiled
+    assert "replace(users.highest_rank, :replace_5, :replace_6)" in compiled
+    assert "replace(users.highest_rank, :replace_7, :replace_8)" in compiled
+    assert "replace(users.highest_rank, :replace_9, :replace_10)" in compiled
+    assert "replace(users.highest_rank, :replace_11, :replace_12)" in compiled
 
+
+
+def test_participants_rank_priority_orders_rank_sort_before_created_at() -> None:
+    fake_db = _FakeDB(users=[])
+
+    asyncio.run(web.participants(request=_fake_request(), view="baskets", rank_priority=Basket.QUEEN.value, db=fake_db))
+
+    compiled = str(fake_db.last_statement)
+    order_by_idx = compiled.find("ORDER BY")
+    created_at_idx = compiled.find("users.created_at", order_by_idx)
+    highest_rank_idx = compiled.find("users.highest_rank LIKE :highest_rank_1", order_by_idx)
+    assert order_by_idx >= 0
+    assert highest_rank_idx > order_by_idx
+    assert created_at_idx > highest_rank_idx
 
 
 def test_participants_invalid_rank_priority_falls_back_to_queen() -> None:
