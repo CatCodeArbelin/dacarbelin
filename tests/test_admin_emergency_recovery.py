@@ -117,6 +117,44 @@ class AdminEmergencyRecoveryTests(unittest.IsolatedAsyncioTestCase):
         log_entry = db.add.call_args.args[0]
         self.assertIsNone(log_entry.target_stage_id)
 
+
+    async def test_update_player_identity_updates_nickname_and_steam_id(self) -> None:
+        db = AsyncMock()
+        user = Mock(id=10, nickname="Old", steam_input="old", steam_id="76561198000000000")
+        db.get = AsyncMock(return_value=user)
+        db.scalar = AsyncMock(return_value=None)
+
+        with patch.object(web, "normalize_steam_id", new=AsyncMock(return_value="76561198000000001")):
+            response = await web.admin_emergency_update_player_identity(
+                user_id=10,
+                nickname="  New Nick  ",
+                steam_input=" 76561198000000001 ",
+                db=db,
+            )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"], "/admin/emergency?msg=msg_status_ok")
+        self.assertEqual(user.nickname, "New Nick")
+        self.assertEqual(user.steam_input, "76561198000000001")
+        self.assertEqual(user.steam_id, "76561198000000001")
+        db.commit.assert_awaited_once()
+
+    async def test_update_player_identity_rejects_invalid_steam(self) -> None:
+        db = AsyncMock()
+        user = Mock(id=10, nickname="Old", steam_input="old", steam_id="76561198000000000")
+        db.get = AsyncMock(return_value=user)
+
+        with patch.object(web, "normalize_steam_id", new=AsyncMock(return_value=None)):
+            response = await web.admin_emergency_update_player_identity(
+                user_id=10,
+                nickname="New",
+                steam_input="bad-steam",
+                db=db,
+            )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"], "/admin/emergency?msg=msg_invalid_steam_id")
+        db.commit.assert_not_awaited()
     async def test_playoff_move_supports_group_transfers(self) -> None:
         request = AsyncMock()
         request.cookies = {web.ADMIN_SESSION_COOKIE: "root-admin"}

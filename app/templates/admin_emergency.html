@@ -94,6 +94,22 @@
 
   <hr>
 
+  <h4 class="mt-3">Изменить Ник и Steam ID участника</h4>
+  <form action="/admin/emergency/update-player" method="post" class="row g-2 mb-3">
+    {% if manual_draw_users|length > 0 %}
+    <div class="col-md-4"><select class="form-select" name="user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }} ({{ user.steam_id }})</option>{% endfor %}</select></div>
+    <div class="col-md-3"><input class="form-control" type="text" name="nickname" placeholder="Новый Никнейм" required></div>
+    <div class="col-md-3"><input class="form-control" type="text" name="steam_input" placeholder="Новый Steam ID / URL" required></div>
+    <div class="col-md-2"><button class="btn btn-outline-info w-100">Сохранить</button></div>
+    {% else %}
+    <div class="col-12">
+      <div class="alert alert-warning mb-0">Нет участников для редактирования.</div>
+    </div>
+    {% endif %}
+  </form>
+
+  <hr>
+
   <h4>Перемещение по группам</h4>
   <form action="/admin/playoff/move" method="post" class="row g-2 mb-2">
     {% if emergency_stages|length > 0 and has_draw_users %}
