@@ -1003,6 +1003,8 @@ async def _render_admin_emergency_page(
     ).all()
     manual_draw_reserve_users = [user for user in manual_draw_users if str(user.basket or "").endswith("_reserve")]
     playoff_stages = await get_playoff_stages_with_data(db)
+    group_stages = list((await db.scalars(select(TournamentGroup).order_by(TournamentGroup.name.asc(), TournamentGroup.id.asc()))).all())
+    emergency_stages = playoff_stages if playoff_stages else group_stages
     emergency_logs = (
         await db.scalars(select(EmergencyOperationLog).order_by(EmergencyOperationLog.created_at.desc(), EmergencyOperationLog.id.desc()).limit(30))
     ).all()
@@ -1012,6 +1014,7 @@ async def _render_admin_emergency_page(
         template_context(
             request,
             playoff_stages=playoff_stages,
+            emergency_stages=emergency_stages,
             manual_draw_users=manual_draw_users,
             manual_draw_reserve_users=manual_draw_reserve_users,
             emergency_logs=emergency_logs,
@@ -1480,21 +1483,27 @@ async def participants(
     )
 
     rank_tier_order_case = case(
-        (User.highest_rank.like("Queen#%"), 0),
-        (User.highest_rank.like("King-%"), 1),
-        (User.highest_rank.like("Rook-%"), 2),
-        (User.highest_rank.like("Bishop-%"), 3),
-        (User.highest_rank.like("Knight-%"), 4),
-        (User.highest_rank.like("Pawn-%"), 5),
+        (User.highest_rank.like("Queen%"), 0),
+        (User.highest_rank.like("King%"), 1),
+        (User.highest_rank.like("Rook%"), 2),
+        (User.highest_rank.like("Bishop%"), 3),
+        (User.highest_rank.like("Knight%"), 4),
+        (User.highest_rank.like("Pawn%"), 5),
         else_=999,
     )
     rank_division_order_case = case(
         (User.highest_rank.like("Queen#%"), func.coalesce(func.cast(func.replace(User.highest_rank, "Queen#", ""), Integer), 999999)),
-        (User.highest_rank.like("King-%"), func.coalesce(func.cast(func.replace(User.highest_rank, "King", ""), Integer), 0)),
-        (User.highest_rank.like("Rook-%"), func.coalesce(func.cast(func.replace(User.highest_rank, "Rook", ""), Integer), 0)),
-        (User.highest_rank.like("Bishop-%"), func.coalesce(func.cast(func.replace(User.highest_rank, "Bishop", ""), Integer), 0)),
-        (User.highest_rank.like("Knight-%"), func.coalesce(func.cast(func.replace(User.highest_rank, "Knight", ""), Integer), 0)),
-        (User.highest_rank.like("Pawn-%"), func.coalesce(func.cast(func.replace(User.highest_rank, "Pawn", ""), Integer), 0)),
+        (User.highest_rank == "Queen", 999999),
+        (User.highest_rank.like("King-%"), func.coalesce(func.cast(func.replace(User.highest_rank, "King-", ""), Integer), 0)),
+        (User.highest_rank.like("King%"), 0),
+        (User.highest_rank.like("Rook-%"), func.coalesce(func.cast(func.replace(User.highest_rank, "Rook-", ""), Integer), 0)),
+        (User.highest_rank.like("Rook%"), 0),
+        (User.highest_rank.like("Bishop-%"), func.coalesce(func.cast(func.replace(User.highest_rank, "Bishop-", ""), Integer), 0)),
+        (User.highest_rank.like("Bishop%"), 0),
+        (User.highest_rank.like("Knight-%"), func.coalesce(func.cast(func.replace(User.highest_rank, "Knight-", ""), Integer), 0)),
+        (User.highest_rank.like("Knight%"), 0),
+        (User.highest_rank.like("Pawn-%"), func.coalesce(func.cast(func.replace(User.highest_rank, "Pawn-", ""), Integer), 0)),
+        (User.highest_rank.like("Pawn%"), 0),
         else_=999999,
     )
 
@@ -3150,30 +3159,45 @@ async def admin_emergency_replace_player(
     confirm_final: bool = Form(default=False),
     db: AsyncSession = Depends(get_db),
 ):
-    if not await _playoff_stage_exists(db, stage_id):
-        return redirect_with_admin_msg("msg_invalid_playoff_stage")
     allowed, reason = await _check_emergency_safety_lock(db, confirm_final=confirm_final)
     if not allowed:
         return redirect_with_admin_msg("msg_operation_failed", details=reason)
 
-    participant = await db.scalar(
-        select(PlayoffParticipant).where(
-            PlayoffParticipant.stage_id == stage_id,
-            PlayoffParticipant.user_id == from_user_id,
-        )
-    )
-    reserve_user = await db.scalar(select(User).where(User.id == reserve_user_id))
-    reserve_participation = await db.scalar(
-        select(PlayoffParticipant).where(PlayoffParticipant.user_id == reserve_user_id)
-    )
+    stage_is_playoff = await _playoff_stage_exists(db, stage_id)
+    group_stage_exists = await db.scalar(select(TournamentGroup.id).where(TournamentGroup.id == stage_id)) is not None
+    if not stage_is_playoff and not group_stage_exists:
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
 
-    if not participant:
+    participant = None
+    group_member = None
+    if stage_is_playoff:
+        participant = await db.scalar(
+            select(PlayoffParticipant).where(
+                PlayoffParticipant.stage_id == stage_id,
+                PlayoffParticipant.user_id == from_user_id,
+            )
+        )
+    else:
+        group_member = await db.scalar(
+            select(GroupMember).where(
+                GroupMember.group_id == stage_id,
+                GroupMember.user_id == from_user_id,
+            )
+        )
+
+    reserve_user = await db.scalar(select(User).where(User.id == reserve_user_id))
+    reserve_playoff_participation = await db.scalar(select(PlayoffParticipant).where(PlayoffParticipant.user_id == reserve_user_id))
+    reserve_group_participation = await db.scalar(select(GroupMember).where(GroupMember.user_id == reserve_user_id))
+
+    if stage_is_playoff and not participant:
         return redirect_with_admin_msg("msg_operation_failed", details="source_participant_missing")
+    if not stage_is_playoff and not group_member:
+        return redirect_with_admin_msg("msg_operation_failed", details="source_group_member_missing")
     if not reserve_user:
         return redirect_with_admin_msg("msg_operation_failed", details="reserve_user_missing")
     if not str(reserve_user.basket or "").endswith("_reserve"):
         return redirect_with_admin_msg("msg_operation_failed", details="replacement_requires_reserve_user")
-    if reserve_participation:
+    if reserve_playoff_participation or reserve_group_participation:
         return redirect_with_admin_msg("msg_operation_failed", details="replacement_user_already_in_playoff")
 
     preview = {
@@ -3183,7 +3207,10 @@ async def admin_emergency_replace_player(
         "dry_run": False,
     }
 
-    participant.user_id = reserve_user_id
+    if stage_is_playoff:
+        participant.user_id = reserve_user_id
+    else:
+        group_member.user_id = reserve_user_id
 
     await _log_emergency_action(
         db,
@@ -3316,14 +3343,34 @@ async def admin_move_playoff_player(
     allowed, reason = await _check_emergency_safety_lock(db, confirm_final=confirm_final)
     if not allowed:
         return redirect_with_admin_msg("msg_operation_failed", details=reason)
-    if not await _playoff_stage_exists(db, from_stage_id) or not await _playoff_stage_exists(db, to_stage_id):
+    from_is_playoff = await _playoff_stage_exists(db, from_stage_id)
+    to_is_playoff = await _playoff_stage_exists(db, to_stage_id)
+    if from_is_playoff != to_is_playoff:
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
+
+    from_group_exists = await db.scalar(select(TournamentGroup.id).where(TournamentGroup.id == from_stage_id)) is not None
+    to_group_exists = await db.scalar(select(TournamentGroup.id).where(TournamentGroup.id == to_stage_id)) is not None
+    if not from_is_playoff and (not from_group_exists or not to_group_exists):
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
+
     try:
-        await move_user_to_stage(db, from_stage_id, to_stage_id, user_id)
+        if from_is_playoff:
+            await move_user_to_stage(db, from_stage_id, to_stage_id, user_id)
+            action_type = "playoff_move"
+        else:
+            member = await db.scalar(select(GroupMember).where(GroupMember.group_id == from_stage_id, GroupMember.user_id == user_id))
+            if not member:
+                return redirect_with_admin_msg("msg_operation_failed", details="source_group_member_missing")
+            exists_in_target = await db.scalar(select(GroupMember).where(GroupMember.group_id == to_stage_id, GroupMember.user_id == user_id))
+            if exists_in_target:
+                return redirect_with_admin_msg("msg_operation_failed", details="target_group_has_user")
+            member.group_id = to_stage_id
+            action_type = "group_move"
+
         await _log_emergency_action(
             db,
             request=request,
-            action_type="playoff_move",
+            action_type=action_type,
             dry_run=False,
             target_stage_id=to_stage_id,
             details={

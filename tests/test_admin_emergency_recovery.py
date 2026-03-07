@@ -20,10 +20,12 @@ class AdminEmergencyRecoveryTests(unittest.IsolatedAsyncioTestCase):
 
         db.scalar = AsyncMock(
             side_effect=[
-                11,
                 SiteSetting(key="tournament_finished", value="0"),
+                11,
+                None,
                 participant,
                 reserve_user,
+                None,
                 None,
             ]
         )
@@ -51,6 +53,8 @@ class AdminEmergencyRecoveryTests(unittest.IsolatedAsyncioTestCase):
                 SiteSetting(key="tournament_finished", value="0"),
                 1,
                 2,
+                None,
+                None,
             ]
         )
 
@@ -70,6 +74,77 @@ class AdminEmergencyRecoveryTests(unittest.IsolatedAsyncioTestCase):
         log_entry = db.add.call_args.args[0]
         self.assertEqual(log_entry.action_type, "playoff_move")
         self.assertFalse(log_entry.dry_run)
+        db.commit.assert_awaited_once()
+
+
+    async def test_replace_player_supports_group_stage_members(self) -> None:
+        request = AsyncMock()
+        request.cookies = {}
+        db = AsyncMock()
+        db.add = Mock()
+
+        group_member = Mock(group_id=5, user_id=101)
+        reserve_user = Mock(id=202, basket="bishop_reserve")
+
+        db.scalar = AsyncMock(
+            side_effect=[
+                SiteSetting(key="tournament_finished", value="0"),
+                None,
+                5,
+                group_member,
+                reserve_user,
+                None,
+                None,
+            ]
+        )
+
+        response = await web.admin_emergency_replace_player(
+            request=request,
+            stage_id=5,
+            from_user_id=101,
+            reserve_user_id=202,
+            confirm_final=False,
+            db=db,
+        )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(group_member.user_id, 202)
+        db.commit.assert_awaited_once()
+
+    async def test_playoff_move_supports_group_transfers(self) -> None:
+        request = AsyncMock()
+        request.cookies = {web.ADMIN_SESSION_COOKIE: "root-admin"}
+        db = AsyncMock()
+        db.add = Mock()
+
+        moving_member = Mock(group_id=1, user_id=77)
+
+        db.scalar = AsyncMock(
+            side_effect=[
+                SiteSetting(key="tournament_finished", value="0"),
+                None,
+                None,
+                1,
+                2,
+                moving_member,
+                None,
+            ]
+        )
+
+        response = await web.admin_move_playoff_player(
+            request=request,
+            from_stage_id=1,
+            to_stage_id=2,
+            user_id=77,
+            confirm_final=False,
+            db=db,
+        )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(moving_member.group_id, 2)
+        db.add.assert_called_once()
+        log_entry = db.add.call_args.args[0]
+        self.assertEqual(log_entry.action_type, "group_move")
         db.commit.assert_awaited_once()
 
 

@@ -79,8 +79,8 @@
   {% set has_draw_users = manual_draw_users|length > 0 %}
   {% set has_reserve_users = manual_draw_reserve_users|length > 0 %}
   <form action="/admin/emergency/replace-player" method="post" class="row g-2 mb-3">
-    {% if has_playoff_stages and has_draw_users and has_reserve_users %}
-    <div class="col-md-3"><select class="form-select" name="stage_id" required>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
+    {% if emergency_stages|length > 0 and has_draw_users and has_reserve_users %}
+    <div class="col-md-3"><select class="form-select" name="stage_id" required>{% for stage in emergency_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
     <div class="col-md-3"><select class="form-select" name="from_user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">out: {{ user.nickname }} ({{ user.id }})</option>{% endfor %}</select></div>
     <div class="col-md-3"><select class="form-select" name="reserve_user_id" required>{% for user in manual_draw_reserve_users %}<option value="{{ user.id }}">reserve: {{ user.nickname }} ({{ user.id }})</option>{% endfor %}</select></div>
     <div class="col-md-3"><button class="btn btn-outline-info w-100">Replace</button></div>
@@ -96,9 +96,9 @@
 
   <h4>Перемещение по группам</h4>
   <form action="/admin/playoff/move" method="post" class="row g-2 mb-2">
-    {% if has_playoff_stages and has_draw_users %}
-    <div class="col-md-4"><select class="form-select" name="from_stage_id" required><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
-    <div class="col-md-4"><select class="form-select" name="to_stage_id" required><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in playoff_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
+    {% if emergency_stages|length > 0 and has_draw_users %}
+    <div class="col-md-4"><select class="form-select" name="from_stage_id" required><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in emergency_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
+    <div class="col-md-4"><select class="form-select" name="to_stage_id" required><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in emergency_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
     <div class="col-md-4"><select class="form-select" name="user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
     <div class="col-md-3"><button class="btn btn-outline-warning w-100">{{ tr('admin_manual_transfer') }}</button></div>
     {% else %}
