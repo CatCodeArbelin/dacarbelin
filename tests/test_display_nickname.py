@@ -18,7 +18,7 @@ def _make_user(**overrides) -> User:
     return User(**payload)
 
 
-def test_display_nickname_prefers_game_nickname_with_highest_rank() -> None:
+def test_display_nickname_uses_profile_nickname_in_tournament_view() -> None:
     user = _make_user(
         nickname="SiteNick",
         game_nickname="ArenaNick",
@@ -26,7 +26,7 @@ def test_display_nickname_prefers_game_nickname_with_highest_rank() -> None:
         highest_rank="Immortal",
     )
 
-    assert tournament_display_nickname(user, "42") == "ArenaNick (Immortal)"
+    assert tournament_display_nickname(user, "42") == "SiteNick (Immortal)"
     assert web_display_nickname(user, "42") == "ArenaNick (Immortal)"
 
 
