@@ -48,12 +48,21 @@ PRIMARY_BASKETS = [
     Basket.LOW_RANK_RESERVE.value,
 ]
 
-PRIMARY_DRAW_BASKETS_WITH_RESERVE = {
-    Basket.QUEEN.value: Basket.QUEEN_RESERVE.value,
-    Basket.KING.value: Basket.KING_RESERVE.value,
-    Basket.ROOK.value: Basket.ROOK_RESERVE.value,
-    Basket.BISHOP.value: Basket.BISHOP_RESERVE.value,
-}
+STAGE_I_AUTO_DRAW_MAIN_BASKETS = [
+    Basket.QUEEN_TOP.value,
+    Basket.QUEEN.value,
+    Basket.KING.value,
+    Basket.ROOK.value,
+    Basket.BISHOP.value,
+    Basket.LOW_RANK.value,
+]
+
+PRIMARY_DRAW_BASKETS = [
+    Basket.QUEEN.value,
+    Basket.KING.value,
+    Basket.ROOK.value,
+    Basket.BISHOP.value,
+]
 
 
 class ManualDrawValidationError(ValueError):
@@ -82,7 +91,7 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
         (
             await db.scalars(
                 select(User)
-                .where(User.basket.in_(PRIMARY_BASKETS))
+                .where(User.basket.in_(STAGE_I_AUTO_DRAW_MAIN_BASKETS))
                 .order_by(User.created_at)
             )
         ).all()
@@ -111,21 +120,15 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
         assigned_by_group: list[list[User]] = []
         for _ in range(expected_group_count):
             picked: list[User] = []
-            for basket, reserve_basket in PRIMARY_DRAW_BASKETS_WITH_RESERVE.items():
+            for basket in PRIMARY_DRAW_BASKETS:
                 for _ in range(2):
-                    source_basket = basket
-                    if not by_basket[source_basket] and by_basket[reserve_basket]:
-                        source_basket = reserve_basket
-
-                    if by_basket[source_basket]:
-                        picked.append(by_basket[source_basket].pop())
+                    if by_basket[basket]:
+                        picked.append(by_basket[basket].pop())
                 if len(picked) >= stage_group_size:
                     break
 
             fallback_pool: list[User] = []
-            for basket in PRIMARY_BASKETS:
-                if basket == Basket.INVITED.value:
-                    continue
+            for basket in STAGE_I_AUTO_DRAW_MAIN_BASKETS:
                 fallback_pool.extend(by_basket[basket])
             random.shuffle(fallback_pool)
             while len(picked) < stage_group_size and fallback_pool:
