@@ -80,8 +80,8 @@
   {% set has_reserve_users = manual_draw_reserve_users|length > 0 %}
   <form action="/admin/emergency/replace-player" method="post" class="row g-2 mb-3">
     {% if emergency_stages|length > 0 and has_draw_users and has_reserve_users %}
-    <div class="col-md-3"><select class="form-select" name="stage_id" required>{% for stage in emergency_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
-    <div class="col-md-3"><select class="form-select" name="from_user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">out: {{ user.nickname }} ({{ user.id }})</option>{% endfor %}</select></div>
+    <div class="col-md-3"><select class="form-select" name="stage_id" id="emergency-stage-id" required>{% for stage in emergency_stages %}<option value="{{ stage.id }}">{{ stage.title if stage.title is defined else stage.name }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><select class="form-select" name="from_user_id" id="emergency-from-user-id" required></select></div>
     <div class="col-md-3"><select class="form-select" name="reserve_user_id" required>{% for user in manual_draw_reserve_users %}<option value="{{ user.id }}">reserve: {{ user.nickname }} ({{ user.id }})</option>{% endfor %}</select></div>
     <div class="col-md-3"><button class="btn btn-outline-info w-100">Replace</button></div>
     {% else %}
@@ -97,8 +97,8 @@
   <h4>Перемещение по группам</h4>
   <form action="/admin/playoff/move" method="post" class="row g-2 mb-2">
     {% if emergency_stages|length > 0 and has_draw_users %}
-    <div class="col-md-4"><select class="form-select" name="from_stage_id" required><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in emergency_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
-    <div class="col-md-4"><select class="form-select" name="to_stage_id" required><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in emergency_stages %}<option value="{{ stage.id }}">{{ stage.title }}</option>{% endfor %}</select></div>
+    <div class="col-md-4"><select class="form-select" name="from_stage_id" required><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in emergency_stages %}<option value="{{ stage.id }}">{{ stage.title if stage.title is defined else stage.name }}</option>{% endfor %}</select></div>
+    <div class="col-md-4"><select class="form-select" name="to_stage_id" required><option value="" selected disabled>{{ tr('admin_select_stage') }}</option>{% for stage in emergency_stages %}<option value="{{ stage.id }}">{{ stage.title if stage.title is defined else stage.name }}</option>{% endfor %}</select></div>
     <div class="col-md-4"><select class="form-select" name="user_id" required>{% for user in manual_draw_users %}<option value="{{ user.id }}">{{ user.nickname }}</option>{% endfor %}</select></div>
     <div class="col-md-3"><button class="btn btn-outline-warning w-100">{{ tr('admin_manual_transfer') }}</button></div>
     {% else %}
@@ -142,6 +142,51 @@
 
   inviteType.addEventListener("change", updateState);
   updateState();
+})();
+
+(() => {
+  const stageSelect = document.getElementById("emergency-stage-id");
+  const userSelect = document.getElementById("emergency-from-user-id");
+  if (!stageSelect || !userSelect) return;
+
+  const stages = {{ emergency_stages_payload | tojson }};
+  const membersByStage = {{ emergency_stage_members | tojson }};
+
+  const ensureFallbackOption = () => {
+    userSelect.innerHTML = "";
+    const fallback = document.createElement("option");
+    fallback.value = "";
+    fallback.textContent = "Нет участников на этом этапе";
+    fallback.disabled = true;
+    fallback.selected = true;
+    userSelect.appendChild(fallback);
+  };
+
+  const renderUsers = () => {
+    const stageId = Number.parseInt(stageSelect.value, 10);
+    const stageMembers = Number.isNaN(stageId) ? [] : (membersByStage[stageId] || []);
+    if (!stageMembers.length) {
+      ensureFallbackOption();
+      userSelect.disabled = true;
+      return;
+    }
+
+    userSelect.disabled = false;
+    userSelect.innerHTML = "";
+    stageMembers.forEach((member) => {
+      const option = document.createElement("option");
+      option.value = String(member.user_id);
+      option.textContent = `out: ${member.nickname} (${member.user_id})`;
+      userSelect.appendChild(option);
+    });
+  };
+
+  if (!stageSelect.value && stages.length > 0) {
+    stageSelect.value = String(stages[0].id);
+  }
+
+  stageSelect.addEventListener("change", renderUsers);
+  renderUsers();
 })();
 </script>
 {% endblock %}

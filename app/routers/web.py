@@ -1008,9 +1008,51 @@ async def _render_admin_emergency_page(
         )
     ).all()
     manual_draw_reserve_users = [user for user in manual_draw_users if str(user.basket or "").endswith("_reserve")]
+    user_rows = (await db.execute(select(User.id, User.nickname))).all()
+    users_by_id = {user_id: nickname for user_id, nickname in user_rows}
     playoff_stages = await get_playoff_stages_with_data(db)
     group_stages = list((await db.scalars(select(TournamentGroup).order_by(TournamentGroup.name.asc(), TournamentGroup.id.asc()))).all())
     emergency_stages = playoff_stages if playoff_stages else group_stages
+    emergency_stage_members: dict[int, list[dict[str, object]]] = {}
+    if playoff_stages:
+        for stage in playoff_stages:
+            participants = sorted(
+                list(stage.participants),
+                key=lambda participant: (participant.seed, participant.user_id),
+            )
+            emergency_stage_members[stage.id] = [
+                {
+                    "user_id": participant.user_id,
+                    "nickname": users_by_id.get(participant.user_id, f"#{participant.user_id}"),
+                }
+                for participant in participants
+            ]
+    else:
+        for group in group_stages:
+            members = list(
+                (
+                    await db.scalars(
+                        select(GroupMember)
+                        .where(GroupMember.group_id == group.id)
+                        .order_by(GroupMember.seat.asc(), GroupMember.id.asc())
+                    )
+                ).all()
+            )
+            emergency_stage_members[group.id] = [
+                {
+                    "user_id": member.user_id,
+                    "nickname": users_by_id.get(member.user_id, f"#{member.user_id}"),
+                }
+                for member in members
+            ]
+
+    emergency_stages_payload = [
+        {
+            "id": stage.id,
+            "title": stage.title if hasattr(stage, "title") else stage.name,
+        }
+        for stage in emergency_stages
+    ]
     emergency_logs = (
         await db.scalars(select(EmergencyOperationLog).order_by(EmergencyOperationLog.created_at.desc(), EmergencyOperationLog.id.desc()).limit(30))
     ).all()
@@ -1021,6 +1063,8 @@ async def _render_admin_emergency_page(
             request,
             playoff_stages=playoff_stages,
             emergency_stages=emergency_stages,
+            emergency_stages_payload=emergency_stages_payload,
+            emergency_stage_members=emergency_stage_members,
             manual_draw_users=manual_draw_users,
             manual_draw_reserve_users=manual_draw_reserve_users,
             emergency_logs=emergency_logs,
