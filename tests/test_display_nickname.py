@@ -18,22 +18,27 @@ def _make_user(**overrides) -> User:
     return User(**payload)
 
 
-def test_display_nickname_prefers_game_nickname_with_rank() -> None:
-    user = _make_user(nickname="SiteNick", game_nickname="ArenaNick", current_rank="Legend")
+def test_display_nickname_prefers_game_nickname_with_highest_rank() -> None:
+    user = _make_user(
+        nickname="SiteNick",
+        game_nickname="ArenaNick",
+        current_rank="Legend",
+        highest_rank="Immortal",
+    )
 
-    assert tournament_display_nickname(user, "42") == "ArenaNick (Legend)"
-    assert web_display_nickname(user, "42") == "ArenaNick (Legend)"
+    assert tournament_display_nickname(user, "42") == "ArenaNick (Immortal)"
+    assert web_display_nickname(user, "42") == "ArenaNick (Immortal)"
 
 
-def test_display_nickname_fallbacks_for_empty_game_nickname_and_rank() -> None:
-    user = _make_user(nickname="SiteNick", game_nickname="  ", current_rank=" ")
+def test_display_nickname_fallbacks_for_empty_game_nickname_and_highest_rank() -> None:
+    user = _make_user(nickname="SiteNick", game_nickname="  ", highest_rank=" ")
 
     assert tournament_display_nickname(user, "42") == "SiteNick (-)"
     assert web_display_nickname(user, "42") == "SiteNick (-)"
 
 
 def test_display_nickname_fallbacks_to_external_value_when_names_empty() -> None:
-    user = _make_user(nickname=" ", game_nickname=" ", current_rank=" ")
+    user = _make_user(nickname=" ", game_nickname=" ", highest_rank=" ")
 
     assert tournament_display_nickname(user, "42") == "42 (-)"
     assert web_display_nickname(user, "42") == "42 (-)"

@@ -34,6 +34,7 @@ class DonationLink(Base):
     title_ru: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     title_en: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     url: Mapped[str] = mapped_column(String(512), nullable=False)
+    category: Mapped[str] = mapped_column(String(50), nullable=False, default="general")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
