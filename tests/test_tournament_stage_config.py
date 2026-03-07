@@ -108,6 +108,8 @@ class TournamentStageConfigTests(unittest.TestCase):
         self.assertEqual(normalize_stage_key("stage_4"), "stage_final")
         self.assertEqual(normalize_stage_key("stage4"), "stage_final")
         self.assertEqual(normalize_stage_key("stage_4_final"), "stage_final")
+        self.assertEqual(normalize_stage_key("stage_1_8"), "stage_2")
+        self.assertEqual(normalize_stage_key("stage_3"), "stage_1_4")
 
         legacy_final_config = get_admin_playoff_stage_config("final")
         legacy_stage_4_config = get_admin_playoff_stage_config("stage_4")

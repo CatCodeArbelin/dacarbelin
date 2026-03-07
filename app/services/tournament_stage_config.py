@@ -95,6 +95,10 @@ LIMITED_PLAYOFF_STAGE_KEYS = {
     if stage_key != "group_stage" and stage_spec.get("game_limit") is not None
 }
 LEGACY_STAGE_KEY_ALIASES: Mapping[str, str] = {
+    "stage_1": "group_stage",
+    "stage_1_8": "stage_2",
+    "stage_3": "stage_1_4",
+    "stage3": "stage_1_4",
     "final": "stage_final",
     "stage_4": "stage_final",
     "stage4": "stage_final",
