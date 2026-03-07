@@ -345,17 +345,11 @@ if (visualDrawRoot) {
   const form = document.getElementById('visual-draw-form');
   const maxGroups = 8;
   const maxMembersPerGroup = 8;
-  const usersMain = [
-    {% for user in manual_draw_users_main %}
-    { id: {{ user.id }}, nickname: {{ user.nickname|tojson }}, steam: {{ user.steam_id|tojson }}, bucket: 'main' },
+  const users = [
+    {% for user in manual_draw_users %}
+    { id: {{ user.id }}, nickname: {{ user.nickname|tojson }}, steam: {{ user.steam_id|tojson }} },
     {% endfor %}
   ];
-  const usersReserve = [
-    {% for user in manual_draw_users_reserve %}
-    { id: {{ user.id }}, nickname: {{ user.nickname|tojson }}, steam: {{ user.steam_id|tojson }}, bucket: 'reserve' },
-    {% endfor %}
-  ];
-  const users = [...usersMain, ...usersReserve];
   const initialGroups = [
     {% for group in draw_groups|sort(attribute='name') %}
     {
@@ -377,19 +371,11 @@ if (visualDrawRoot) {
           group_index: index,
           members: [],
         })),
-    unassigned_main: [],
-    unassigned_reserve: [],
+    unassigned: [],
   };
 
   const assignedIds = new Set(state.groups.flatMap((group) => group.members));
-  state.unassigned_main = usersMain.filter((user) => !assignedIds.has(user.id)).map((user) => user.id);
-  state.unassigned_reserve = usersReserve.filter((user) => !assignedIds.has(user.id)).map((user) => user.id);
-
-  function getUnassignedKeyByUserId(userId) {
-    const user = users.find((item) => item.id === userId);
-    if (!user) return null;
-    return user.bucket === 'reserve' ? 'unassigned_reserve' : 'unassigned_main';
-  }
+  state.unassigned = users.filter((user) => !assignedIds.has(user.id)).map((user) => user.id);
 
   function nextGroupLabel() {
     const suffix = String.fromCharCode(65 + state.groups.length);
@@ -403,10 +389,8 @@ if (visualDrawRoot) {
 
   function moveUserWithinZone(zoneKey, userId, direction) {
     if (!direction) return;
-    const members = zoneKey === 'unassigned_main'
-      ? state.unassigned_main
-      : zoneKey === 'unassigned_reserve'
-        ? state.unassigned_reserve
+    const members = zoneKey === 'unassigned'
+      ? state.unassigned
       : state.groups[Number.parseInt(zoneKey.replace('group:', ''), 10)]?.members;
     if (!members) return;
 
@@ -437,11 +421,10 @@ if (visualDrawRoot) {
     };
 
     state.groups.forEach((group, index) => makeColumn(group.group_label, `group:${index}`, group.members, true));
-    makeColumn('Нераспределённые (Основа)', 'unassigned_main', state.unassigned_main);
-    makeColumn('Нераспределённые (Резерв)', 'unassigned_reserve', state.unassigned_reserve);
+    makeColumn('Нераспределённые', 'unassigned', state.unassigned);
 
     const hasOverflow = state.groups.some((group) => group.members.length > maxMembersPerGroup);
-    const hasUnassigned = state.unassigned_main.length > 0 || state.unassigned_reserve.length > 0;
+    const hasUnassigned = state.unassigned.length > 0;
     overflowAlert.classList.toggle('d-none', !hasOverflow);
     unassignedAlert?.classList.toggle('d-none', !hasUnassigned);
 
@@ -504,12 +487,11 @@ if (visualDrawRoot) {
         if (sourceGroupIndex >= 0) {
           state.groups[sourceGroupIndex].members = state.groups[sourceGroupIndex].members.filter((id) => id !== userId);
         } else {
-          state.unassigned_main = state.unassigned_main.filter((id) => id !== userId);
-          state.unassigned_reserve = state.unassigned_reserve.filter((id) => id !== userId);
+          state.unassigned = state.unassigned.filter((id) => id !== userId);
         }
 
-        if (targetZone === 'unassigned_main' || targetZone === 'unassigned_reserve') {
-          state[targetZone].push(userId);
+        if (targetZone === 'unassigned') {
+          state.unassigned.push(userId);
           render();
           return;
         }
@@ -524,10 +506,7 @@ if (visualDrawRoot) {
           if (sourceGroupIndex >= 0) {
             state.groups[sourceGroupIndex].members.push(userId);
           } else {
-            const fallbackZone = getUnassignedKeyByUserId(userId);
-            if (fallbackZone) {
-              state[fallbackZone].push(userId);
-            }
+            state.unassigned.push(userId);
           }
           render();
           return;
@@ -558,12 +537,7 @@ if (visualDrawRoot) {
     if (lastGroup.members.length > 0) {
       const shouldMoveMembers = window.confirm(`Группа ${lastGroup.group_label} не пуста. Перенести её участников в «Нераспределённые» и удалить группу?`);
       if (!shouldMoveMembers) return;
-      lastGroup.members.forEach((userId) => {
-        const targetZone = getUnassignedKeyByUserId(userId);
-        if (targetZone) {
-          state[targetZone].push(userId);
-        }
-      });
+      state.unassigned.push(...lastGroup.members);
     }
 
     state.groups.pop();
@@ -577,7 +551,7 @@ if (visualDrawRoot) {
       return;
     }
 
-    if (state.unassigned_main.length > 0 || state.unassigned_reserve.length > 0) {
+    if (state.unassigned.length > 0) {
       const confirmed = window.confirm('Есть нераспределённые участники. Сохранить раскладку в текущем виде?');
       if (!confirmed) {
         event.preventDefault();
