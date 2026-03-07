@@ -96,12 +96,8 @@ def test_participants_rank_priority_uses_universal_highest_rank_sort_keys() -> N
     assert "users.highest_rank LIKE :highest_rank_4" in compiled
     assert "users.highest_rank LIKE :highest_rank_5" in compiled
     assert "users.highest_rank LIKE :highest_rank_6" in compiled
-    assert "replace(users.highest_rank, :replace_1, :replace_2)" in compiled
-    assert "replace(users.highest_rank, :replace_3, :replace_4)" in compiled
-    assert "replace(users.highest_rank, :replace_5, :replace_6)" in compiled
-    assert "replace(users.highest_rank, :replace_7, :replace_8)" in compiled
-    assert "replace(users.highest_rank, :replace_9, :replace_10)" in compiled
-    assert "replace(users.highest_rank, :replace_11, :replace_12)" in compiled
+    assert "users.highest_rank = " in compiled
+    assert compiled.count("replace(users.highest_rank, :replace_") >= 6
 
 
 
