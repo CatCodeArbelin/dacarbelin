@@ -2270,8 +2270,11 @@ async def admin_reassign_user(
         user.basket = next_basket
 
     if not normalized_target_stage_id:
-        await db.commit()
-        return redirect_with_admin_users_msg("msg_status_ok")
+        if quick_move in {"to_main", "to_reserve"}:
+            await db.commit()
+            return redirect_with_admin_users_msg("msg_status_ok")
+        await db.rollback()
+        return redirect_with_admin_users_msg("msg_operation_failed", details="target_stage_id_required")
 
     target_stage = await db.get(PlayoffStage, normalized_target_stage_id)
     if not target_stage:
