@@ -791,15 +791,7 @@ body {
 .home-right-column #chat {
   width: 100%;
   max-width: 460px;
-}
-
-.home-right-column .prize-pool-card {
-  min-height: 240px;
-  max-width: 430px;
-}
-
-.home-right-column #chat {
-  min-height: 550px;
+  min-height: 360px;
 }
 
 .home-right-column #chat .chat-box {
@@ -810,11 +802,8 @@ body {
 @media (max-width: 991.98px) {
   .home-right-column .prize-pool-card,
   .home-right-column #chat {
+    width: 100%;
     max-width: 100%;
-  }
-
-  .home-right-column .prize-pool-card,
-  .home-right-column #chat {
     min-height: auto;
   }
 
