@@ -1258,67 +1258,151 @@ class ContentLocalePayload(BaseModel):
     rules_body: str
 
 
-DEFAULT_RULES_BODY_RU = """<p><strong>Перед участием внимательно ознакомьтесь с полными правилами.</strong> Регистрируясь, вы подтверждаете согласие с регламентом и решениями организаторов.</p>
-<h2>Вводный блок</h2>
-<p>Турнир проходит онлайн. Все расписание публикуется заранее, а актуальные объявления размещаются в официальных каналах проекта.</p>
-<h2>Расписание этапов</h2>
+DEFAULT_RULES_BODY_RU = """<h2>Loyrens Tournament: Правила и Регламент</h2>
+<p>Привет, дорогой любитель Dota Auto Chess! Приглашаем принять участие в нашем турнире! Участие полностью бесплатное, а стартовый призовой фонд составляет <strong>15 000 рублей</strong> (добавлено от организатора).</p>
+<p>Организатор берет комиссию <strong>15%</strong> от общего призового фонда.</p>
+<h2>РАСПИСАНИЕ ЭТАПОВ</h2>
+<p>Турнир пройдет в 4 игровых дня:</p>
 <ul>
-  <li><strong>I этап:</strong> групповой формат, отбор в следующий раунд по итогам очков.</li>
-  <li><strong>II этап:</strong> усиленный групповой этап с direct invite участниками.</li>
-  <li><strong>III этап:</strong> финальный групповой этап перед решающими матчами.</li>
-  <li><strong>Финал:</strong> матчи за итоговые места турнира.</li>
+  <li><strong>25.04.2026 в 14:00 (Мск)</strong> — ⅛ финала</li>
+  <li><strong>26.04.2026 в 14:00 (Мск)</strong> — ¼ финала</li>
+  <li><strong>2.05.2026 в 14:00 (Мск)</strong> — Полуфиналы</li>
+  <li><strong>3.05.2026 в 14:00 (Мск)</strong> — Финал</li>
 </ul>
-<h2>Участники и инвайты</h2>
-<p>Участники распределяются по корзинам и этапам согласно турнирной сетке. Для direct invite слотов используются отдельные правила допуска.</p>
-<h2>Система очков</h2>
-<p>Очки начисляются за занятые места и итог матчей. При равенстве очков применяются тай-брейки из раздела ниже.</p>
-<h2>Структура турнира</h2>
-<p>Каждый этап имеет фиксированное число групп и проходных мест. Состав следующего этапа формируется автоматически по итоговой таблице.</p>
-<h2>Правила матчей</h2>
+<h2>УЧАСТНИКИ И ИНВАЙТЫ</h2>
+<p>Общее количество участников: <strong>64 игрока</strong>.</p>
+<p>По решению организатора, <strong>11 игроков</strong> получают прямой инвайт в ¼ финала (минуя стадию ⅛):</p>
+<p><strong>Rondo_Mandarin, envy_chilling, crazyyypanda, Cadis, Dark, xdDfl, Аскорбинка, el_classico, dumpstered95, theFancyPants, Corekid94</strong></p>
+<p>Остальные места распределяются между зарегистрировавшимися игроками.</p>
+<h2>ОБЩАЯ СИСТЕМА НАЧИСЛЕНИЯ ОЧКОВ</h2>
+<p>На всех этапах действует стандартная система начисления очков за место в каждой игре:</p>
+<ul>
+  <li>1 место — 8 очков</li>
+  <li>2 место — 6 очков</li>
+  <li>3 место — 5 очков</li>
+  <li>4 место — 4 очка</li>
+  <li>5 место — 3 очка</li>
+  <li>6 место — 2 очка</li>
+  <li>7 место — 1 очко</li>
+  <li>8 место — 0 очков</li>
+</ul>
+<h2>СТРУКТУРА ТУРНИРА</h2>
+<h3>I ЭТАП — ⅛ финала (25.04.2026)</h3>
+<p><strong>Участники:</strong> 56 человек (все, кроме инвайтов).</p>
+<p><strong>Формат:</strong> 7 групп по 8 игроков. Каждая группа играет 3 игры.</p>
+<p><strong>Выход в следующий этап:</strong> 3 лучших из каждой группы.</p>
+<p><strong>Итог:</strong> 21 участник проходят в ¼ финала.</p>
+<h3>II ЭТАП — ¼ финала (26.04.2026)</h3>
+<p><strong>Участники:</strong> 32 человека (21 прошедший с ⅛ + 11 приглашенных).</p>
+<p><strong>Формат:</strong> 4 группы по 8 игроков. Каждая группа играет 3 игры.</p>
+<p><strong>Выход в следующий этап:</strong> 4 лучших из каждой группы.</p>
+<p><strong>Итог:</strong> 16 участников проходят в полуфинал.</p>
+<h3>III ЭТАП — Полуфиналы (2.05.2026)</h3>
+<p><strong>Участники:</strong> 16 человек.</p>
+<p><strong>Формат:</strong> 2 группы по 8 игроков. Каждая группа играет 3 игры.</p>
+<p><strong>Выход в финал:</strong> 4 лучших из каждой группы.</p>
+<p><strong>Итог:</strong> 8 финалистов.</p>
+<h3>IV ЭТАП — ФИНАЛ (3.05.2026)</h3>
+<p><strong>Участники:</strong> 8 финалистов.</p>
+<p><strong>Формат:</strong> Система «Доминирования» (до 22 очков + победа).</p>
+<p>Игроки играют до тех пор, пока один из участников не наберет 22 очка.</p>
+<p>После достижения порога в 22 очка, турнир не заканчивается сразу. Игрок, перешагнувший порог, должен дополнительно занять 1-е место в любой из последующих игр.</p>
+<p>Как только игрок выполняет оба условия (22+ очков и 1 место), он объявляется победителем.</p>
+<p><strong>Итоговые места:</strong> 2-е и 3-е место определяются по сумме очков на момент завершения финала.</p>
+<p><strong>Призовые:</strong> Получают участники, занявшие 1, 2 и 3 места.</p>
+<h2>ПРАВИЛА ПРОВЕДЕНИЯ МАТЧЕЙ</h2>
+<p>Каждый игрок имеет право стримить свои игры, необходимо указать <strong>"Tournament by https://www.twitch.tv/loyrensss"</strong> в названии трансляции.</p>
+<p><strong>Регистрация и никнейм:</strong><br>Регистрация на сайте <a href="https://dotaautochess.site" target="_blank" rel="noopener noreferrer">dotaautochess.site</a>. Никнейм на сайте обязательно должен совпадать с основным игровым никнеймом в Steam на начало турнира. Это необходимо для жеребьевки, удобства поиска игроков и удобства просмотра игр. В случае несоответствия игрок не будет допущен к турниру.</p>
+<p><strong>Настройки лобби:</strong><br>Все игры проводятся на сервере Австрия, режим 1x8Ob, Casual mode.</p>
+<p><strong>После каждой игры:</strong><br>Победителю лобби необходимо выслать скриншот в группу в Telegram.</p>
+<p><strong>Честная игра:</strong><br>Запрещены читы, багоюзы (использование ошибок игры) и договорные матчи. Любое нарушение карается дисквалификацией и баном на будущие турниры.</p>
+<p><strong>Поведение:</strong><br>Уважайте соперников и организаторов. Оскорбления и издевательства в чате запрещены и ведут к дисквалификации.</p>
+<p><strong>Технические моменты:</strong><br>В случае вылета игрока ставится пауза. Время ожидания на реконнект — 5 минут. Все спорные моменты решаются с судьей или организатором турнира: <a href="https://t.me/l0yrensss" target="_blank" rel="noopener noreferrer">https://t.me/l0yrensss</a>.</p>
+<h2>ПРАВИЛА ОПРЕДЕЛЕНИЯ ПОБЕДИТЕЛЯ ПРИ РАВЕНСТВЕ ОЧКОВ</h2>
+<p>Если в группе (⅛, ¼, полуфинал) у игроков одинаковая сумма очков, применяются следующие критерии (по убыванию важности):</p>
 <ol>
-  <li>Все матчи играются в указанные администрацией временные окна.</li>
-  <li>Спорные ситуации рассматриваются только при наличии подтверждений.</li>
-  <li>Организаторы вправе назначить переигровку при технических сбоях.</li>
+  <li>Наибольшее количество первых мест.</li>
+  <li>Наибольшее количество попаданий в Top-4.</li>
+  <li>Более высокое место, занятое в последней игре группы.</li>
 </ol>
-<h2>Тай-брейки</h2>
-<ul>
-  <li>Сначала учитывается количество очков.</li>
-  <li>Далее — результаты личных встреч и дополнительные критерии этапа.</li>
-  <li>При необходимости применяется решение судейской панели.</li>
-</ul>
-<h2>Запасные игроки</h2>
-<p>Запасные участники могут быть добавлены в турнир при освобождении слотов до начала соответствующего этапа.</p>"""
+<h2>ЗАПАСНЫЕ ИГРОКИ</h2>
+<p>Если количество зарегистрировавшихся превышает 64, все остальные автоматически попадают в список запасных.</p>
+<p>В случае неявки кого-то из основных игроков на старте турнира, замена производится из списка запасных.</p>
+<p>Приоритет в замене получает игрок, который раньше остальных подал заявку на участие.</p>
+<p><strong>Наслаждайтесь игрой. Удачи и приятной игры!</strong></p>"""
 
-DEFAULT_RULES_BODY_EN = """<p><strong>Please review the full rules before participating.</strong> By registering, you confirm acceptance of the tournament regulations and organizer decisions.</p>
-<h2>Introduction</h2>
-<p>The tournament is played online. The schedule is published in advance, and all updates are posted in official project channels.</p>
-<h2>Stage schedule</h2>
+DEFAULT_RULES_BODY_EN = """<h2>Loyrens Tournament: Rules and Regulations</h2>
+<p>Hello, dear Dota Auto Chess fans! We invite you to participate in our tournament! Participation is completely free, and the starting prize pool is <strong>15,000 rubles</strong> (added by the organizer).</p>
+<p>The organizer takes a commission of <strong>15%</strong> of the total prize fund.</p>
+<h2>SCHEDULE OF STAGES</h2>
+<p>The tournament will be held over 4 game days:</p>
 <ul>
-  <li><strong>Stage I:</strong> group format with qualification based on total points.</li>
-  <li><strong>Stage II:</strong> advanced group stage including direct invite participants.</li>
-  <li><strong>Stage III:</strong> final group stage before decisive matches.</li>
-  <li><strong>Final:</strong> matches for final tournament placement.</li>
+  <li><strong>April 25, 2026, 2:00 PM (Moscow time)</strong> — Round of 16</li>
+  <li><strong>April 26, 2026, 2:00 PM (Moscow time)</strong> — Quarter-finals</li>
+  <li><strong>May 2, 2026, 2:00 PM (Moscow time)</strong> — Semi-finals</li>
+  <li><strong>May 3, 2026, 2:00 PM (Moscow time)</strong> — Final</li>
 </ul>
-<h2>Participants and invites</h2>
-<p>Participants are assigned to baskets and stages according to the tournament bracket. Direct invite slots follow dedicated admission rules.</p>
-<h2>Scoring system</h2>
-<p>Points are awarded for placement and match outcomes. If points are tied, tie-breakers from the section below are applied.</p>
-<h2>Tournament structure</h2>
-<p>Each stage has a fixed number of groups and qualification slots. The next stage lineup is generated automatically from standings.</p>
-<h2>Match rules</h2>
+<h2>PARTICIPANTS AND INVITES</h2>
+<p>Total number of participants: <strong>64 players</strong>.</p>
+<p>According to the organizer's decision, <strong>11 players</strong> receive a direct invitation to the quarter-finals (skipping the first stage):</p>
+<p><strong>Rondo_Mandarin, envy_chilling, crazyyypanda, Cadis, Dark, xdDfl, Askorbinka, el_classico, dumpstered95, theFancyPants, Corekid9</strong></p>
+<p>The remaining places are distributed among registered players.</p>
+<h2>GENERAL SCORING SYSTEM</h2>
+<p>At all stages, a standard system of scoring points for placement in each game applies:</p>
+<ul>
+  <li>1st place — 8 points</li>
+  <li>2nd place — 6 points</li>
+  <li>3rd place — 5 points</li>
+  <li>4th place — 4 points</li>
+  <li>5th place — 3 points</li>
+  <li>6th place — 2 points</li>
+  <li>7th place — 1 point</li>
+  <li>8th place — 0 points</li>
+</ul>
+<h2>TOURNAMENT STRUCTURE</h2>
+<h3>Stage I — Round of 16 (April 25, 2026)</h3>
+<p><strong>Participants:</strong> 56 people (all except invites).</p>
+<p><strong>Format:</strong> 7 groups of 8 players. Each group plays 3 games.</p>
+<p><strong>Advancement:</strong> Top 3 from each group.</p>
+<p><strong>Result:</strong> 21 participants advance to the quarter-finals.</p>
+<h3>Stage II — Quarter-finals (April 26, 2026)</h3>
+<p><strong>Participants:</strong> 32 people (21 who advanced from Stage I + 11 invited).</p>
+<p><strong>Format:</strong> 4 groups of 8 players. Each group plays 3 games.</p>
+<p><strong>Advancement:</strong> Top 4 from each group.</p>
+<p><strong>Result:</strong> 16 participants advance to the semi-finals.</p>
+<h3>Stage III — Semi-finals (May 2, 2026)</h3>
+<p><strong>Participants:</strong> 16 people.</p>
+<p><strong>Format:</strong> 2 groups of 8 players. Each group plays 3 games.</p>
+<p><strong>Advancement:</strong> Top 4 from each group.</p>
+<p><strong>Result:</strong> 8 finalists.</p>
+<h3>Stage IV — Final (May 3, 2026)</h3>
+<p><strong>Participants:</strong> 8 finalists.</p>
+<p><strong>Format:</strong> Domination system (up to 22 points + win).</p>
+<p>Players continue playing until one of the participants reaches 22 points.</p>
+<p>The tournament does not end immediately after reaching the 22-point threshold. The player who crosses the threshold must additionally finish 1st in any subsequent game.</p>
+<p>As soon as a player fulfills both conditions (22+ points and 1st place), they are declared the winner.</p>
+<p><strong>Final placements:</strong> 2nd and 3rd places are determined by total points at the end of the final.</p>
+<p><strong>Prizes:</strong> Awarded to participants who finish 1st, 2nd, and 3rd.</p>
+<h2>MATCH RULES</h2>
+<p>Every player has the right to stream their games; the stream title must include <strong>"Tournament by https://www.twitch.tv/loyrensss"</strong>.</p>
+<p><strong>Registration and nickname:</strong><br>Registration is available at <a href="https://dotaautochess.site" target="_blank" rel="noopener noreferrer">dotaautochess.site</a>. The website nickname must match the player's primary Steam in-game nickname at the start of the tournament. This is required for the draw, easier player lookup, and easier game viewing. If it does not match, the player will not be admitted to the tournament.</p>
+<p><strong>Lobby settings:</strong><br>All games are played on the Austria server, 1x8Ob, Casual mode.</p>
+<p><strong>After each game:</strong><br>The winner of the lobby must send a screenshot to the Telegram group.</p>
+<p><strong>Fair play:</strong><br>Cheating, bug abuse (exploiting game errors), and match-fixing are prohibited. Any violation results in disqualification and a ban from future tournaments.</p>
+<p><strong>Behavior:</strong><br>Respect opponents and organizers. Insults and bullying in chat are prohibited and lead to disqualification.</p>
+<p><strong>Technical points:</strong><br>If a player disconnects, the game is paused. Reconnect timeout is 5 minutes. All disputed situations are resolved with the judge or tournament organizer: <a href="https://t.me/l0yrensss" target="_blank" rel="noopener noreferrer">https://t.me/l0yrensss</a>.</p>
+<h2>RULES FOR DETERMINING A WINNER IN CASE OF A TIE</h2>
+<p>If players in a group (Stage I, quarter-final, semi-final) have the same number of points, the following criteria are applied in descending order of importance:</p>
 <ol>
-  <li>All matches must be played within administration-approved time windows.</li>
-  <li>Disputes are reviewed only when supporting evidence is provided.</li>
-  <li>Organizers may assign a rematch in case of confirmed technical issues.</li>
+  <li>Greatest number of 1st places.</li>
+  <li>Greatest number of Top-4 finishes.</li>
+  <li>Higher placement in the last game of the group.</li>
 </ol>
-<h2>Tie-breakers</h2>
-<ul>
-  <li>Total points are considered first.</li>
-  <li>Then head-to-head results and additional stage criteria are used.</li>
-  <li>If required, a final ruling is made by the judging panel.</li>
-</ul>
-<h2>Substitute players</h2>
-<p>Substitute participants may be added when slots become available before the corresponding stage begins.</p>"""
+<h2>SUBSTITUTE PLAYERS</h2>
+<p>If the number of registered participants exceeds 64, all additional players are automatically placed on the reserve list.</p>
+<p>If one of the main players does not appear at the start of the tournament, a replacement is made from the reserve list.</p>
+<p>Replacement priority is given to the player who submitted their application earlier than others.</p>
+<p><strong>Enjoy the game. Good luck and happy gaming!</strong></p>"""
 
 
 def localized_attr(entity: object, base_name: str, lang: str) -> str:

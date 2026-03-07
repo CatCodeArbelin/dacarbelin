@@ -36,15 +36,12 @@
   </div>
 </nav>
 <div class="page-content-shell">
-  <div class="page-content-shell__decor page-content-shell__decor--left" aria-hidden="true">
-    <div class="matrix-rain" data-matrix-scope="sidebar"></div>
+  <div class="page-content-shell__matrix" aria-hidden="true">
+    <div class="matrix-rain" data-matrix-scope="ambient"></div>
   </div>
-  <div class="container pb-5 page-content-shell__main">
+  <main class="container pb-5 page-content-shell__main">
     {% block content %}{% endblock %}
-  </div>
-  <div class="page-content-shell__decor page-content-shell__decor--right" aria-hidden="true">
-    <div class="matrix-rain" data-matrix-scope="sidebar"></div>
-  </div>
+  </main>
 </div>
 <footer class="site-footer mt-auto">
   <div class="container site-footer__inner">

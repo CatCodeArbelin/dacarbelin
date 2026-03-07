@@ -781,6 +781,8 @@ body {
 
 .page-content-shell {
   position: relative;
+  min-height: calc(100vh - 120px);
+  isolation: isolate;
 }
 
 .page-content-shell__main {
@@ -788,21 +790,11 @@ body {
   z-index: 2;
 }
 
-.page-content-shell__decor {
+.page-content-shell__matrix {
   position: fixed;
-  top: 0;
-  bottom: 0;
-  width: min(15vw, 220px);
+  inset: 72px 0 56px;
   pointer-events: none;
   z-index: 0;
-}
-
-.page-content-shell__decor--left {
-  left: 0;
-}
-
-.page-content-shell__decor--right {
-  right: 0;
 }
 
 .matrix-rain {
@@ -812,7 +804,7 @@ body {
   pointer-events: none;
   z-index: 0;
   border-radius: inherit;
-  background: linear-gradient(180deg, rgba(2, 10, 8, 0.12), rgba(3, 12, 9, 0.4));
+  background: linear-gradient(180deg, rgba(2, 10, 8, 0.08), rgba(3, 12, 9, 0.36));
   backdrop-filter: blur(1.2px);
 }
 
@@ -820,7 +812,7 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at center, rgba(0, 255, 133, 0.1), rgba(0, 0, 0, 0.12) 65%);
+  background: radial-gradient(circle at center, rgba(0, 255, 133, 0.08), rgba(0, 0, 0, 0.14) 65%);
   opacity: 0.75;
 }
 
@@ -841,7 +833,7 @@ body {
 }
 
 .matrix-rain--reduced {
-  background: linear-gradient(180deg, rgba(2, 10, 8, 0.05), rgba(3, 12, 9, 0.18));
+  background: linear-gradient(180deg, rgba(2, 10, 8, 0.04), rgba(3, 12, 9, 0.14));
 }
 
 .matrix-rain--reduced .matrix-rain__column {
@@ -858,21 +850,11 @@ body {
   }
 }
 
-@media (max-width: 1199.98px) {
-  .page-content-shell__decor {
-    width: min(11vw, 140px);
-  }
-}
-
 @media (max-width: 991.98px) {
-  .page-content-shell__decor {
-    display: none;
+  .page-content-shell__matrix {
+    inset: 64px 0 52px;
   }
 }
-
-
-
-
 
 .home-right-column {
   position: relative;
@@ -1641,6 +1623,29 @@ textarea:focus {
 .site-footer__author {
   color: var(--matrix-lime);
   text-shadow: 0 0 8px rgba(157, 255, 87, 0.75);
+}
+
+
+.page-content-shell__main .card,
+.page-content-shell__main .donate-section,
+.page-content-shell__main .rules-page,
+.page-content-shell__main .participants-page__table,
+.page-content-shell__main .tournament-stage-card,
+.page-content-shell__main .playoff-round,
+.page-content-shell__main .archive-tree-match {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.page-content-shell__main .card:hover,
+.page-content-shell__main .donate-section:hover,
+.page-content-shell__main .rules-page:hover,
+.page-content-shell__main .participants-page__table:hover,
+.page-content-shell__main .tournament-stage-card:hover,
+.page-content-shell__main .playoff-round:hover,
+.page-content-shell__main .archive-tree-match:hover {
+  transform: translateY(-2px);
+  border-color: rgba(157, 255, 87, 0.72) !important;
+  box-shadow: 0 0 20px rgba(0, 255, 133, 0.32), 0 0 34px rgba(61, 155, 255, 0.26);
 }
 
 @media (prefers-reduced-motion: reduce) {
