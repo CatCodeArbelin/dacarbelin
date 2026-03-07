@@ -511,9 +511,9 @@ def test_stage_2_preview_without_stage_and_invites_returns_four_empty_groups() -
 def test_stage_2_preview_without_stage_keeps_four_groups_with_partial_invites() -> None:
     direct_invite_ids = [101, 102, 103]
     user_by_id = {
-        101: SimpleNamespace(id=101, nickname="Alpha", game_nickname=""),
-        102: SimpleNamespace(id=102, nickname="Bravo", game_nickname=""),
-        103: SimpleNamespace(id=103, nickname="Charlie", game_nickname=""),
+        101: SimpleNamespace(id=101, nickname="Alpha", game_nickname="", highest_rank=""),
+        102: SimpleNamespace(id=102, nickname="Bravo", game_nickname="", highest_rank=""),
+        103: SimpleNamespace(id=103, nickname="Charlie", game_nickname="", highest_rank=""),
     }
 
     columns = build_bracket_columns(
@@ -534,7 +534,50 @@ def test_stage_2_preview_without_stage_keeps_four_groups_with_partial_invites() 
         expected_by_group[group_label].append(
             {
                 "user_id": invited["user_id"],
-                "nickname": user.nickname,
+                "nickname": f"{user.nickname} (-)",
+                "is_direct_invite_preview": True,
+            }
+        )
+
+    assert participants_by_group == expected_by_group
+
+
+def test_stage_2_preview_with_existing_stage_and_empty_participants_shows_direct_invites() -> None:
+    direct_invite_ids = [101, 102, 103]
+    direct_invite_groups = {101: 1, 102: 2, 103: 4}
+    user_by_id = {
+        101: SimpleNamespace(id=101, nickname="Alpha", game_nickname="", highest_rank=""),
+        102: SimpleNamespace(id=102, nickname="Bravo", game_nickname="", highest_rank=""),
+        103: SimpleNamespace(id=103, nickname="Charlie", game_nickname="", highest_rank=""),
+    }
+    stage = SimpleNamespace(
+        key="stage_2",
+        stage_size=32,
+        participants=[],
+        matches=[],
+    )
+
+    columns = build_bracket_columns(
+        groups=[],
+        playoff_stages=[stage],
+        user_by_id=user_by_id,
+        direct_invite_ids=direct_invite_ids,
+        direct_invite_groups=direct_invite_groups,
+    )
+
+    stage_2_column = next(column for column in columns if column["key"] == "stage_2")
+    participants_by_group = {match["group_label"]: match["participants"] for match in stage_2_column["matches"]}
+
+    expected_by_group: dict[str, list[dict[str, object]]] = {"A": [], "B": [], "C": [], "D": []}
+    for invited in build_stage_2_direct_invite_preview(
+        direct_invite_ids,
+        direct_invite_groups=direct_invite_groups,
+    ):
+        group_label = web.get_stage_group_label("stage_2", invited["group_number"])
+        expected_by_group[group_label].append(
+            {
+                "user_id": invited["user_id"],
+                "nickname": f"{user_by_id[invited['user_id']].nickname} (-)",
                 "is_direct_invite_preview": True,
             }
         )
