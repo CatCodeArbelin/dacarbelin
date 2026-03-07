@@ -350,6 +350,64 @@ def sanitize_content_html(raw_html: str | None) -> str:
     return sanitizer.get_html()
 
 
+def format_rules_body(raw_body: str | None) -> str:
+    """Преобразует простой текст правил в структурированный HTML для публичной страницы."""
+    source = (raw_body or "").strip()
+    if not source:
+        return ""
+
+    if "<" in source and ">" in source:
+        return sanitize_content_html(source)
+
+    lines = [line.strip() for line in source.splitlines()]
+    chunks: list[str] = []
+    in_list = False
+
+    def flush_list() -> None:
+        nonlocal in_list
+        if in_list:
+            chunks.append("</ul>")
+            in_list = False
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            flush_list()
+            continue
+
+        safe_line = escape(line)
+        normalized = line.rstrip(":")
+        uppercase_ratio = sum(1 for char in normalized if char.isupper()) / max(len([char for char in normalized if char.isalpha()]), 1)
+        is_heading = len(normalized) >= 4 and uppercase_ratio >= 0.66
+
+        if is_heading:
+            flush_list()
+            chunks.append(f"<h3>{safe_line}</h3>")
+            continue
+
+        if re.match(r"^[•\-]\s+", line):
+            if not in_list:
+                chunks.append("<ul>")
+                in_list = True
+            item = re.sub(r"^[•\-]\s+", "", safe_line)
+            chunks.append(f"<li>{item}</li>")
+            continue
+
+        if re.match(r"^\d+[\.)]\s+", line):
+            if not in_list:
+                chunks.append("<ul>")
+                in_list = True
+            item = re.sub(r"^\d+[\.)]\s+", "", safe_line)
+            chunks.append(f"<li>{item}</li>")
+            continue
+
+        flush_list()
+        chunks.append(f"<p>{safe_line}</p>")
+
+    flush_list()
+    return sanitize_content_html("".join(chunks))
+
+
 def _strip_html_tags(raw: str) -> str:
     text = re.sub(r"<[^>]+>", "", raw)
     return unescape(text).strip()
@@ -1785,6 +1843,8 @@ async def participants(
 
     direct_invite_users: list[User] = []
     users: list[User] = []
+    main_users: list[User] = []
+    reserve_users: list[User] = []
 
     if view == "direct_invites":
         invited_users = (
@@ -1799,19 +1859,23 @@ async def participants(
         direct_invite_users = list(invited_users)
     else:
         view = "baskets"
-        users = (
-            await db.scalars(
-                select(User).order_by(
-                    rank_tier_order_case,
-                    rank_division_order_case,
-                    basket_order_case,
-                    User.created_at,
-                    User.id,
+        users = list(
+            (
+                await db.scalars(
+                    select(User).order_by(
+                        rank_tier_order_case,
+                        rank_division_order_case,
+                        basket_order_case,
+                        User.created_at,
+                        User.id,
+                    )
                 )
-            )
-        ).all()
+            ).all()
+        )
+        main_users = [user for user in users if not str(user.basket or "").endswith("_reserve")]
+        reserve_users = [user for user in users if str(user.basket or "").endswith("_reserve")]
 
-    is_empty = not direct_invite_users if view == "direct_invites" else not users
+    is_empty = not direct_invite_users if view == "direct_invites" else (not main_users and not reserve_users)
 
     return templates.TemplateResponse(
         request,
@@ -1824,6 +1888,8 @@ async def participants(
             basket_pairs=basket_pairs,
             basket_tabs=rank_tabs,
             users=users,
+            main_users=main_users,
+            reserve_users=reserve_users,
             direct_invite_users=direct_invite_users,
             is_empty=is_empty,
         ),
@@ -2035,7 +2101,7 @@ async def rules_page(request: Request, db: AsyncSession = Depends(get_db)):
         template_context(
             request,
             rules_content=rules_content,
-            rules_content_html=sanitize_content_html(localized_attr(rules_content, "body", get_lang(request.cookies.get("lang")))),
+            rules_content_html=format_rules_body(localized_attr(rules_content, "body", get_lang(request.cookies.get("lang")))),
         ),
     )
 

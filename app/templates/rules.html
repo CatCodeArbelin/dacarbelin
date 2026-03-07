@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
-<h2 class="page-title-neon">{{ tr('rules_title') }}</h2>
-<div class="content-html">{{ rules_content_html|safe }}</div>
+<section class="rules-page wow-rules">
+  <div class="rules-page__matrix" aria-hidden="true"></div>
+  <h2 class="page-title-neon rules-page__title">{{ tr('rules_title') }}</h2>
+  <article class="content-html rules-page__content">{{ rules_content_html|safe }}</article>
+</section>
 {% endblock %}
