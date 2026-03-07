@@ -59,6 +59,7 @@ def test_admin_template_visual_draw_has_main_reserve_sources_without_invited() -
     assert "targetZone === 'unassigned:main'" in template
     assert "targetZone === 'unassigned:reserve'" in template
     assert "targetZone === 'unassigned'" not in template
+    assert "Нераспределённые участники допустимы" in template
 
 
 def test_admin_users_template_has_group_sections() -> None:
@@ -73,6 +74,18 @@ def test_admin_users_template_has_group_sections() -> None:
     assert "user-reassign-" not in template
     assert "replace_from_user_id" not in template
     assert 'colspan="11"' in template
+
+
+def test_admin_emergency_template_uses_stage_bound_replace_participants() -> None:
+    template = Path("app/templates/admin_emergency.html").read_text(encoding="utf-8")
+    router = Path("app/routers/web.py").read_text(encoding="utf-8")
+
+    assert 'id="emergency-stage-id"' in template
+    assert 'id="emergency-from-user-id"' in template
+    assert "membersByStage" in template
+    assert "Нет участников на этом этапе" in template
+    assert "emergency_stages_payload" in router
+    assert "emergency_stage_members" in router
 
 
 def test_tournament_template_has_empty_active_stage_alert() -> None:
