@@ -145,3 +145,9 @@ def test_archive_page_highlights_group_and_final_podium_in_archive_tree():
     assert response.text.index("Winner", final_stage_idx) > gold_idx
     assert response.text.index("Second", final_stage_idx) > silver_idx
     assert response.text.index("Third", final_stage_idx) > bronze_idx
+
+    final_stage_slice = response.text[final_stage_idx:]
+    assert final_stage_slice.count("archive-tree-participant-gold") == 1
+    assert final_stage_slice.count("archive-tree-participant-silver") == 1
+    assert final_stage_slice.count("archive-tree-participant-bronze") == 1
+    assert "archive-tree-participant-purple" not in final_stage_slice
