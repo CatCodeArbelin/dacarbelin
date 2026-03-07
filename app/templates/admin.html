@@ -345,11 +345,17 @@ if (visualDrawRoot) {
   const form = document.getElementById('visual-draw-form');
   const maxGroups = 8;
   const maxMembersPerGroup = 8;
-  const users = [
-    {% for user in manual_draw_users %}
+  const mainUsers = [
+    {% for user in manual_draw_main_users %}
     { id: {{ user.id }}, nickname: {{ user.nickname|tojson }}, steam: {{ user.steam_id|tojson }} },
     {% endfor %}
   ];
+  const reserveUsers = [
+    {% for user in manual_draw_reserve_users %}
+    { id: {{ user.id }}, nickname: {{ user.nickname|tojson }}, steam: {{ user.steam_id|tojson }} },
+    {% endfor %}
+  ];
+  const users = [...mainUsers, ...reserveUsers];
   const initialGroups = [
     {% for group in draw_groups|sort(attribute='name') %}
     {
@@ -371,11 +377,15 @@ if (visualDrawRoot) {
           group_index: index,
           members: [],
         })),
-    unassigned: [],
+    mainUnassigned: [],
+    reserveUnassigned: [],
   };
 
+  const mainIds = new Set(mainUsers.map((user) => user.id));
+  const reserveIds = new Set(reserveUsers.map((user) => user.id));
   const assignedIds = new Set(state.groups.flatMap((group) => group.members));
-  state.unassigned = users.filter((user) => !assignedIds.has(user.id)).map((user) => user.id);
+  state.mainUnassigned = mainUsers.filter((user) => !assignedIds.has(user.id)).map((user) => user.id);
+  state.reserveUnassigned = reserveUsers.filter((user) => !assignedIds.has(user.id)).map((user) => user.id);
 
   function nextGroupLabel() {
     const suffix = String.fromCharCode(65 + state.groups.length);
@@ -389,9 +399,11 @@ if (visualDrawRoot) {
 
   function moveUserWithinZone(zoneKey, userId, direction) {
     if (!direction) return;
-    const members = zoneKey === 'unassigned'
-      ? state.unassigned
-      : state.groups[Number.parseInt(zoneKey.replace('group:', ''), 10)]?.members;
+    const members = zoneKey === 'unassigned:main'
+      ? state.mainUnassigned
+      : zoneKey === 'unassigned:reserve'
+        ? state.reserveUnassigned
+        : state.groups[Number.parseInt(zoneKey.replace('group:', ''), 10)]?.members;
     if (!members) return;
 
     const currentIndex = members.indexOf(userId);
@@ -420,11 +432,12 @@ if (visualDrawRoot) {
       columnsContainer.appendChild(col);
     };
 
+    makeColumn('Main', 'unassigned:main', state.mainUnassigned);
+    makeColumn('Reserve', 'unassigned:reserve', state.reserveUnassigned);
     state.groups.forEach((group, index) => makeColumn(group.group_label, `group:${index}`, group.members, true));
-    makeColumn('Нераспределённые', 'unassigned', state.unassigned);
 
     const hasOverflow = state.groups.some((group) => group.members.length > maxMembersPerGroup);
-    const hasUnassigned = state.unassigned.length > 0;
+    const hasUnassigned = state.mainUnassigned.length > 0 || state.reserveUnassigned.length > 0;
     overflowAlert.classList.toggle('d-none', !hasOverflow);
     unassignedAlert?.classList.toggle('d-none', !hasUnassigned);
 
@@ -487,11 +500,26 @@ if (visualDrawRoot) {
         if (sourceGroupIndex >= 0) {
           state.groups[sourceGroupIndex].members = state.groups[sourceGroupIndex].members.filter((id) => id !== userId);
         } else {
-          state.unassigned = state.unassigned.filter((id) => id !== userId);
+          state.mainUnassigned = state.mainUnassigned.filter((id) => id !== userId);
+          state.reserveUnassigned = state.reserveUnassigned.filter((id) => id !== userId);
         }
 
-        if (targetZone === 'unassigned') {
-          state.unassigned.push(userId);
+        if (targetZone === 'unassigned:main') {
+          if (mainIds.has(userId)) {
+            state.mainUnassigned.push(userId);
+          } else if (reserveIds.has(userId)) {
+            state.reserveUnassigned.push(userId);
+          }
+          render();
+          return;
+        }
+
+        if (targetZone === 'unassigned:reserve') {
+          if (reserveIds.has(userId)) {
+            state.reserveUnassigned.push(userId);
+          } else if (mainIds.has(userId)) {
+            state.mainUnassigned.push(userId);
+          }
           render();
           return;
         }
@@ -505,8 +533,10 @@ if (visualDrawRoot) {
         if (state.groups[targetGroupIndex].members.length >= maxMembersPerGroup) {
           if (sourceGroupIndex >= 0) {
             state.groups[sourceGroupIndex].members.push(userId);
-          } else {
-            state.unassigned.push(userId);
+          } else if (mainIds.has(userId)) {
+            state.mainUnassigned.push(userId);
+          } else if (reserveIds.has(userId)) {
+            state.reserveUnassigned.push(userId);
           }
           render();
           return;
@@ -537,7 +567,11 @@ if (visualDrawRoot) {
     if (lastGroup.members.length > 0) {
       const shouldMoveMembers = window.confirm(`Группа ${lastGroup.group_label} не пуста. Перенести её участников в «Нераспределённые» и удалить группу?`);
       if (!shouldMoveMembers) return;
-      state.unassigned.push(...lastGroup.members);
+      const membersToMove = [...lastGroup.members];
+      const mainToMove = membersToMove.filter((userId) => mainIds.has(userId));
+      const reserveToMove = membersToMove.filter((userId) => reserveIds.has(userId));
+      state.mainUnassigned.push(...mainToMove);
+      state.reserveUnassigned.push(...reserveToMove);
     }
 
     state.groups.pop();
@@ -551,7 +585,7 @@ if (visualDrawRoot) {
       return;
     }
 
-    if (state.unassigned.length > 0) {
+    if (state.mainUnassigned.length > 0 || state.reserveUnassigned.length > 0) {
       const confirmed = window.confirm('Есть нераспределённые участники. Сохранить раскладку в текущем виде?');
       if (!confirmed) {
         event.preventDefault();

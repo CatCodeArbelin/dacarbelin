@@ -1821,8 +1821,10 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             select(User)
             .where(User.basket != Basket.INVITED.value)
             .order_by(User.nickname.asc(), User.created_at.desc())
-    )
+        )
     ).all()
+    manual_draw_main_users = [user for user in manual_draw_users if not str(user.basket or "").endswith("_reserve")]
+    manual_draw_reserve_users = [user for user in manual_draw_users if str(user.basket or "").endswith("_reserve")]
     user_rows = (await db.execute(select(User.id, User.nickname))).all()
     users_by_id = {user_id: nickname for user_id, nickname in user_rows}
     stages = (await db.scalars(select(TournamentStage).order_by(TournamentStage.id))).all()
@@ -2051,6 +2053,8 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
             chat_messages=chat_messages,
             judge_login_url=judge_login_url,
             manual_draw_users=manual_draw_users,
+            manual_draw_main_users=manual_draw_main_users,
+            manual_draw_reserve_users=manual_draw_reserve_users,
             group_user_choices=group_user_choices,
             group_stage_table_members=group_stage_table_members,
             playoff_stage_participants=playoff_stage_participants,

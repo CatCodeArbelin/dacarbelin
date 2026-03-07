@@ -44,6 +44,23 @@ def test_admin_template_has_playoff_hint_without_manual_stage_controls() -> None
     assert "/admin/group/member/swap" not in template
 
 
+def test_admin_template_visual_draw_has_main_reserve_sources_without_invited() -> None:
+    template = Path("app/templates/admin.html").read_text(encoding="utf-8")
+    router = Path("app/routers/web.py").read_text(encoding="utf-8")
+
+    assert "manual_draw_main_users" in router
+    assert "manual_draw_reserve_users" in router
+    assert "User.basket != Basket.INVITED.value" in router
+
+    assert "const mainUsers = [" in template
+    assert "const reserveUsers = [" in template
+    assert "makeColumn('Main', 'unassigned:main'" in template
+    assert "makeColumn('Reserve', 'unassigned:reserve'" in template
+    assert "targetZone === 'unassigned:main'" in template
+    assert "targetZone === 'unassigned:reserve'" in template
+    assert "targetZone === 'unassigned'" not in template
+
+
 def test_admin_users_template_has_group_sections() -> None:
     template = Path("app/templates/admin_users.html").read_text(encoding="utf-8")
 
