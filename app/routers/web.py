@@ -1001,6 +1001,7 @@ async def _render_admin_emergency_page(
             .order_by(User.nickname.asc(), User.created_at.desc())
         )
     ).all()
+    manual_draw_reserve_users = [user for user in manual_draw_users if str(user.basket or "").endswith("_reserve")]
     playoff_stages = await get_playoff_stages_with_data(db)
     emergency_logs = (
         await db.scalars(select(EmergencyOperationLog).order_by(EmergencyOperationLog.created_at.desc(), EmergencyOperationLog.id.desc()).limit(30))
@@ -1012,6 +1013,7 @@ async def _render_admin_emergency_page(
             request,
             playoff_stages=playoff_stages,
             manual_draw_users=manual_draw_users,
+            manual_draw_reserve_users=manual_draw_reserve_users,
             emergency_logs=emergency_logs,
             preview_title=preview_title,
             preview_payload=preview_payload,
@@ -3126,6 +3128,148 @@ async def admin_emergency_bulk_move(
         return await _render_admin_emergency_page(request, db, preview_title="Dry-run: bulk move", preview_payload=preview)
     await db.commit()
     return redirect_with_admin_msg("msg_status_ok", details=f"bulk_moved:{len(moved)}")
+
+
+@router.post("/admin/emergency/replace-player")
+async def admin_emergency_replace_player(
+    request: Request,
+    stage_id: int = Form(...),
+    from_user_id: int = Form(...),
+    reserve_user_id: int = Form(...),
+    dry_run: bool = Form(default=False),
+    confirm_final: bool = Form(default=False),
+    db: AsyncSession = Depends(get_db),
+):
+    if not await _playoff_stage_exists(db, stage_id):
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
+    allowed, reason = await _check_emergency_safety_lock(db, confirm_final=confirm_final)
+    if not allowed:
+        return redirect_with_admin_msg("msg_operation_failed", details=reason)
+
+    participant = await db.scalar(
+        select(PlayoffParticipant).where(
+            PlayoffParticipant.stage_id == stage_id,
+            PlayoffParticipant.user_id == from_user_id,
+        )
+    )
+    reserve_user = await db.scalar(select(User).where(User.id == reserve_user_id))
+    reserve_participation = await db.scalar(
+        select(PlayoffParticipant).where(PlayoffParticipant.user_id == reserve_user_id)
+    )
+
+    if not participant:
+        return redirect_with_admin_msg("msg_operation_failed", details="source_participant_missing")
+    if not reserve_user:
+        return redirect_with_admin_msg("msg_operation_failed", details="reserve_user_missing")
+    if not str(reserve_user.basket or "").endswith("_reserve"):
+        return redirect_with_admin_msg("msg_operation_failed", details="replacement_requires_reserve_user")
+    if reserve_participation:
+        return redirect_with_admin_msg("msg_operation_failed", details="replacement_user_already_in_playoff")
+
+    preview = {
+        "stage_id": stage_id,
+        "from_user_id": from_user_id,
+        "reserve_user_id": reserve_user_id,
+        "dry_run": dry_run,
+    }
+
+    if not dry_run:
+        participant.user_id = reserve_user_id
+
+    await _log_emergency_action(
+        db,
+        request=request,
+        action_type="replace_player",
+        dry_run=dry_run,
+        target_stage_id=stage_id,
+        details=preview,
+    )
+    if dry_run:
+        await db.flush()
+        return await _render_admin_emergency_page(
+            request,
+            db,
+            preview_title="Dry-run: replace participant",
+            preview_payload=preview,
+        )
+    await db.commit()
+    return redirect_with_admin_emergency_msg("msg_player_replaced")
+
+
+@router.post("/admin/emergency/swap-participants")
+async def admin_emergency_swap_participants(
+    request: Request,
+    left_stage_id: int = Form(...),
+    left_user_id: int = Form(...),
+    right_stage_id: int = Form(...),
+    right_user_id: int = Form(...),
+    dry_run: bool = Form(default=False),
+    confirm_final: bool = Form(default=False),
+    db: AsyncSession = Depends(get_db),
+):
+    if not await _playoff_stage_exists(db, left_stage_id) or not await _playoff_stage_exists(db, right_stage_id):
+        return redirect_with_admin_msg("msg_invalid_playoff_stage")
+    allowed, reason = await _check_emergency_safety_lock(db, confirm_final=confirm_final)
+    if not allowed:
+        return redirect_with_admin_msg("msg_operation_failed", details=reason)
+    if left_stage_id == right_stage_id and left_user_id == right_user_id:
+        return redirect_with_admin_msg("msg_operation_failed", details="swap_same_participant")
+
+    left_participant = await db.scalar(
+        select(PlayoffParticipant).where(
+            PlayoffParticipant.stage_id == left_stage_id,
+            PlayoffParticipant.user_id == left_user_id,
+        )
+    )
+    right_participant = await db.scalar(
+        select(PlayoffParticipant).where(
+            PlayoffParticipant.stage_id == right_stage_id,
+            PlayoffParticipant.user_id == right_user_id,
+        )
+    )
+    if not left_participant or not right_participant:
+        return redirect_with_admin_msg("msg_operation_failed", details="swap_participant_missing")
+
+    preview = {
+        "left": {
+            "stage_id": left_stage_id,
+            "user_id": left_user_id,
+            "seed": left_participant.seed,
+        },
+        "right": {
+            "stage_id": right_stage_id,
+            "user_id": right_user_id,
+            "seed": right_participant.seed,
+        },
+        "dry_run": dry_run,
+    }
+
+    if not dry_run:
+        left_target_stage_id, left_target_seed = right_participant.stage_id, right_participant.seed
+        right_target_stage_id, right_target_seed = left_participant.stage_id, left_participant.seed
+        left_participant.stage_id = left_target_stage_id
+        left_participant.seed = left_target_seed
+        right_participant.stage_id = right_target_stage_id
+        right_participant.seed = right_target_seed
+
+    await _log_emergency_action(
+        db,
+        request=request,
+        action_type="swap_participants",
+        dry_run=dry_run,
+        target_stage_id=left_stage_id,
+        details=preview,
+    )
+    if dry_run:
+        await db.flush()
+        return await _render_admin_emergency_page(
+            request,
+            db,
+            preview_title="Dry-run: swap participants",
+            preview_payload=preview,
+        )
+    await db.commit()
+    return redirect_with_admin_emergency_msg("msg_player_moved", details="participants_swapped")
 
 
 @router.post("/admin/emergency/diagnostics")
