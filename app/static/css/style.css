@@ -3,6 +3,79 @@ body {
   color: #ffffff;
   text-shadow: 0 0 4px rgba(255, 255, 255, 0.38);
 }
+
+
+body {
+  font-family: "Orbitron", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.content-html,
+.rules-page__content {
+  font-family: "Share Tech Mono", "Consolas", "Courier New", monospace;
+  letter-spacing: 0.02em;
+}
+
+.matrix-rain {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: clamp(48px, 7vw, 90px);
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  opacity: 0.28;
+}
+
+.matrix-rain--left {
+  left: 0;
+}
+
+.matrix-rain--right {
+  right: 0;
+}
+
+.matrix-rain__stream {
+  position: absolute;
+  top: -120%;
+  width: 2px;
+  height: 220%;
+  background: linear-gradient(
+    180deg,
+    rgba(125, 255, 173, 0),
+    rgba(125, 255, 173, 0.22) 25%,
+    rgba(87, 230, 138, 0.55) 60%,
+    rgba(125, 255, 173, 0) 100%
+  );
+  filter: drop-shadow(0 0 5px rgba(86, 255, 140, 0.28));
+  animation: matrix-rain-fall linear infinite;
+}
+
+.matrix-rain__stream::before {
+  content: "0101011010010110010101110100110101011010011010110";
+  position: absolute;
+  top: 0;
+  left: -10px;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  color: rgba(152, 255, 189, 0.6);
+  font-family: "Share Tech Mono", monospace;
+  font-size: clamp(10px, 0.9vw, 12px);
+  letter-spacing: 1px;
+}
+
+.matrix-rain__stream:nth-child(1) { left: 14%; animation-duration: 8.5s; animation-delay: -2s; }
+.matrix-rain__stream:nth-child(2) { left: 38%; animation-duration: 10.2s; animation-delay: -6s; }
+.matrix-rain__stream:nth-child(3) { left: 62%; animation-duration: 9.1s; animation-delay: -3.5s; }
+.matrix-rain__stream:nth-child(4) { left: 84%; animation-duration: 11.4s; animation-delay: -7.5s; }
+
+.container,
+.navbar,
+.site-footer {
+  position: relative;
+  z-index: 1;
+}
 .container, .form-check-label, .navbar-brand, h1, h2, h3, h4, h5, h6, label, small, strong {
   color: #ffffff;
 }
@@ -1355,16 +1428,16 @@ a[href^="http"]:hover,
 .rules-page {
   position: relative;
   padding: clamp(1rem, 2.5vw, 2rem);
-  border: 1px solid rgba(255, 138, 76, 0.45);
+  border: 1px solid rgba(94, 255, 158, 0.4);
   border-radius: 16px;
   background:
-    radial-gradient(circle at 15% 10%, rgba(255, 102, 36, 0.16), transparent 42%),
-    radial-gradient(circle at 80% 0%, rgba(255, 55, 84, 0.14), transparent 48%),
-    linear-gradient(180deg, rgba(8, 16, 30, 0.95), rgba(3, 8, 17, 0.96));
+    radial-gradient(circle at 18% 12%, rgba(74, 201, 148, 0.16), transparent 45%),
+    radial-gradient(circle at 82% 0%, rgba(0, 229, 255, 0.12), transparent 52%),
+    linear-gradient(180deg, rgba(6, 20, 23, 0.95), rgba(3, 10, 14, 0.97));
   box-shadow:
-    0 0 22px rgba(255, 123, 69, 0.25),
-    0 0 50px rgba(255, 48, 80, 0.18),
-    inset 0 0 46px rgba(0, 18, 32, 0.75);
+    0 0 22px rgba(78, 230, 151, 0.21),
+    0 0 50px rgba(0, 229, 255, 0.14),
+    inset 0 0 46px rgba(0, 24, 28, 0.7);
   overflow: hidden;
 }
 
@@ -1382,11 +1455,11 @@ a[href^="http"]:hover,
 
 .rules-page__title {
   margin-bottom: 1.1rem;
-  color: #fff2ea !important;
+  color: #ecfff5 !important;
   text-shadow:
-    0 0 8px rgba(255, 176, 120, 0.88),
-    0 0 24px rgba(255, 75, 61, 0.68),
-    0 0 42px rgba(255, 58, 98, 0.5);
+    0 0 8px rgba(121, 255, 186, 0.84),
+    0 0 24px rgba(70, 227, 255, 0.62),
+    0 0 42px rgba(121, 255, 186, 0.42);
 }
 
 .rules-page__content {
@@ -1403,15 +1476,15 @@ a[href^="http"]:hover,
   margin-top: 1.5rem;
   margin-bottom: 0.8rem;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: #ffe9dd;
-  text-shadow: 0 0 9px rgba(255, 145, 74, 0.78), 0 0 22px rgba(255, 48, 80, 0.5);
+  letter-spacing: 0.045em;
+  color: #defff0;
+  text-shadow: 0 0 8px rgba(97, 255, 173, 0.68), 0 0 20px rgba(70, 227, 255, 0.42);
 }
 
 .rules-page__content p,
 .rules-page__content li {
-  color: #fef6ef;
-  text-shadow: 0 0 8px rgba(255, 150, 120, 0.18);
+  color: #e6fff2;
+  text-shadow: 0 0 8px rgba(86, 255, 179, 0.16);
 }
 
 .rules-page__content ul,
@@ -1461,4 +1534,10 @@ a[href^="http"]:hover,
 @keyframes matrix-shift {
   from { background-position: center, 0 0; }
   to { background-position: center, -80px 180px; }
+}
+
+
+@keyframes matrix-rain-fall {
+  from { transform: translateY(-36%); }
+  to { transform: translateY(38%); }
 }
