@@ -1,6 +1,8 @@
 """Проверяет подсветку проходящих участников на турнирной странице."""
 
-from app.services.tournament_view import _apply_stage_highlight_rules
+from types import SimpleNamespace
+
+from app.services.tournament_view import _apply_stage_highlight_rules, build_playoff_standings
 
 
 def _participants(points: list[int]) -> list[dict]:
@@ -85,3 +87,39 @@ def test_stage_2_highlights_disabled_until_first_game_played() -> None:
     colors = [row.get("highlight_color") for row in rows]
     assert highlighted == [False, False, False, False]
     assert colors == [None, None, None, None]
+
+
+def test_build_playoff_standings_skips_participants_without_user() -> None:
+    stage = SimpleNamespace(
+        key="stage_2",
+        title="Stage II",
+        matches=[],
+        participants=[
+            SimpleNamespace(
+                user_id=101,
+                seed=1,
+                points=10,
+                wins=1,
+                top4_finishes=1,
+                top8_finishes=1,
+                eighth_places=0,
+                last_place=1,
+            ),
+            SimpleNamespace(
+                user_id=999,
+                seed=2,
+                points=9,
+                wins=1,
+                top4_finishes=1,
+                top8_finishes=1,
+                eighth_places=0,
+                last_place=2,
+            ),
+        ],
+    )
+    user = SimpleNamespace(nickname="Visible", game_nickname="VisibleGame", highest_rank="Queen#1")
+
+    standings = build_playoff_standings([stage], {101: user})
+
+    assert len(standings) == 1
+    assert [row["user_id"] for row in standings[0]["participants"]] == [101]
