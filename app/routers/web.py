@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, Form, Query, Request
 from pydantic import BaseModel
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import Integer, case, delete, desc, func, select, update
+from sqlalchemy import Integer, case, delete, desc, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -1541,13 +1541,25 @@ async def participants(
         else_=len(basket_order_map),
     )
 
+    rank_group_tokens_by_priority = {
+        Basket.QUEEN.value: (("Queen",), ("King",), ("Rook",), ("Bishop",), ("Knight", "Pawn")),
+        Basket.KING.value: (("King",), ("Rook",), ("Bishop",), ("Knight", "Pawn"), ("Queen",)),
+        Basket.ROOK.value: (("Rook",), ("Bishop",), ("Knight", "Pawn"), ("Queen",), ("King",)),
+        Basket.BISHOP.value: (("Bishop",), ("Knight", "Pawn"), ("Queen",), ("King",), ("Rook",)),
+        Basket.LOW_RANK.value: (("Knight", "Pawn"), ("Queen",), ("King",), ("Rook",), ("Bishop",)),
+    }
+    ordered_rank_groups = rank_group_tokens_by_priority.get(
+        selected_priority,
+        rank_group_tokens_by_priority[Basket.QUEEN.value],
+    )
     rank_tier_order_case = case(
-        (User.highest_rank.like("Queen%"), 0),
-        (User.highest_rank.like("King%"), 1),
-        (User.highest_rank.like("Rook%"), 2),
-        (User.highest_rank.like("Bishop%"), 3),
-        (User.highest_rank.like("Knight%"), 4),
-        (User.highest_rank.like("Pawn%"), 5),
+        *[
+            (
+                or_(*[User.highest_rank.like(f"{token}%") for token in tokens]),
+                group_index,
+            )
+            for group_index, tokens in enumerate(ordered_rank_groups)
+        ],
         else_=999,
     )
     rank_division_order_case = case(
@@ -1585,9 +1597,9 @@ async def participants(
         users = (
             await db.scalars(
                 select(User).order_by(
-                    basket_order_case,
                     rank_tier_order_case,
                     rank_division_order_case,
+                    basket_order_case,
                     User.created_at,
                     User.id,
                 )
