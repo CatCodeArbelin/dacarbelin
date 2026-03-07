@@ -20,11 +20,10 @@
   </div>
 
   <h5>{{ tr('admin_rules_content') }}</h5>
-  <p class="small text-contrast-muted mb-2">{{ tr('admin_rules_html_hint') }}</p>
+  <p class="small text-contrast-muted mb-2">Редактирование текста правил в выбранной локали (RU/EN).</p>
   <form action="/admin/rules" method="post" class="mb-4" id="rules-content-form">
     <input type="hidden" id="rules-content-lang" name="content_lang" value="{{ selected_content_lang }}">
-    <textarea class="form-control mb-2 d-none" id="rules-body-source" name="body" rows="8"></textarea>
-    <div class="form-control mb-2" id="rules-editor-root" style="min-height: 260px;"></div>
+    <textarea class="form-control mb-2 admin-rules-textarea" id="rules-body-source" name="body" rows="18" spellcheck="false"></textarea>
     <button class="btn btn-primary">{{ tr('admin_save_rules') }}</button>
   </form>
 
@@ -191,7 +190,6 @@
   </div>
   {% endfor %}
 </div></div>
-<script src="https://cdn.tiny.cloud/1/{{ tiny_mce_api_key|e }}/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
   (function () {
     const langSelector = document.getElementById('content-lang-selector');
@@ -200,38 +198,16 @@
     const rulesSource = document.getElementById('rules-body-source');
     const contentByLang = {{ content_by_lang|tojson }};
 
-    if (!langSelector || !window.tinymce) return;
+    if (!langSelector || !rulesSource) return;
 
     function applyLang(lang) {
       const payload = contentByLang[lang] || contentByLang.ru || {};
-      const value = payload.rules_body || '';
-      rulesSource.value = value;
-      const editor = tinymce.get('rules-editor-root');
-      if (editor) {
-        editor.setContent(value || '<p>{{ tr("admin_wysiwyg_placeholder") }}</p>');
-      }
+      rulesSource.value = payload.rules_body || '';
       langInputs.forEach((input) => { input.value = lang; });
       if (rulesLangInput) rulesLangInput.value = lang;
     }
 
-    tinymce.init({
-      selector: '#rules-editor-root',
-      menubar: 'file edit view insert format table tools help',
-      plugins: 'advlist autolink lists link image charmap preview anchor searchreplace visualblocks code fullscreen insertdatetime media table help wordcount quickbars',
-      toolbar: 'undo redo | styles | bold italic underline strikethrough forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table image media link blockquote hr | removeformat code',
-      toolbar_sticky: true,
-      min_height: 260,
-      skin: 'oxide',
-      content_css: 'default',
-      content_style: 'body { color: #000000; background-color: #ffffff; font-size: 14px; }',
-      image_title: true,
-      automatic_uploads: false,
-      convert_urls: false,
-      branding: false,
-      setup(editor) {
-        editor.on('init', () => applyLang(langSelector.value || 'ru'));
-      }
-    });
+    applyLang(langSelector.value || 'ru');
 
     langSelector.addEventListener('change', function () {
       const currentLang = langSelector.value || 'ru';
@@ -239,11 +215,6 @@
       params.set('content_lang', currentLang);
       window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
       applyLang(currentLang);
-    });
-
-    document.getElementById('rules-content-form').addEventListener('submit', function () {
-      const editor = tinymce.get('rules-editor-root');
-      if (editor) rulesSource.value = editor.getContent();
     });
   })();
 </script>
