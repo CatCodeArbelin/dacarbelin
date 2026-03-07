@@ -2192,15 +2192,34 @@ async def _find_group_seed_for_stage(
     raise ValueError("target_group_is_full")
 
 
+def _normalize_optional_int_form_value(value: str | None, field_name: str) -> int | None:
+    if value is None:
+        return None
+    normalized_value = value.strip()
+    if normalized_value == "":
+        return None
+    try:
+        return int(normalized_value)
+    except ValueError as exc:
+        raise ValueError(f"invalid_{field_name}") from exc
+
+
 @router.post("/admin/user/reassign")
 async def admin_reassign_user(
     user_id: int = Form(...),
-    target_stage_id: int | None = Form(default=None),
-    target_group_number: int | None = Form(default=None),
-    replace_from_user_id: int | None = Form(default=None),
+    target_stage_id: str | None = Form(default=None),
+    target_group_number: str | None = Form(default=None),
+    replace_from_user_id: str | None = Form(default=None),
     quick_move: str | None = Form(default=None),
     db: AsyncSession = Depends(get_db),
 ):
+    try:
+        normalized_target_stage_id = _normalize_optional_int_form_value(target_stage_id, "target_stage_id")
+        normalized_target_group_number = _normalize_optional_int_form_value(target_group_number, "target_group_number")
+        normalized_replace_from_user_id = _normalize_optional_int_form_value(replace_from_user_id, "replace_from_user_id")
+    except ValueError as exc:
+        return redirect_with_admin_users_msg("msg_operation_failed", details=str(exc))
+
     user = await db.get(User, user_id)
     if not user:
         return redirect_with_admin_users_msg("msg_operation_failed", details="user_not_found")
@@ -2209,17 +2228,17 @@ async def admin_reassign_user(
     if next_basket and next_basket != user.basket:
         user.basket = next_basket
 
-    if not target_stage_id:
+    if not normalized_target_stage_id:
         await db.commit()
         return redirect_with_admin_users_msg("msg_status_ok")
 
-    target_stage = await db.get(PlayoffStage, target_stage_id)
+    target_stage = await db.get(PlayoffStage, normalized_target_stage_id)
     if not target_stage:
         return redirect_with_admin_users_msg("msg_invalid_playoff_stage")
 
-    if target_group_number is not None:
+    if normalized_target_group_number is not None:
         allowed_group_numbers = set(range(1, max(1, math.ceil(int(target_stage.stage_size or 0) / 8)) + 1))
-        if target_group_number not in allowed_group_numbers:
+        if normalized_target_group_number not in allowed_group_numbers:
             return redirect_with_admin_users_msg("msg_operation_failed", details="invalid_target_group")
 
     existing_memberships = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.user_id == user_id))).all())
@@ -2228,35 +2247,35 @@ async def admin_reassign_user(
     current_membership = existing_memberships[0] if existing_memberships else None
 
     try:
-        if current_membership and current_membership.stage_id != target_stage_id:
-            await move_user_to_stage(db, current_membership.stage_id, target_stage_id, user_id)
+        if current_membership and current_membership.stage_id != normalized_target_stage_id:
+            await move_user_to_stage(db, current_membership.stage_id, normalized_target_stage_id, user_id)
         elif not current_membership:
             group_member = await db.scalar(select(GroupMember).where(GroupMember.user_id == user_id).order_by(GroupMember.id))
             if group_member:
-                await promote_group_member_to_stage(db, group_member.group_id, user_id, target_stage_id)
-            elif replace_from_user_id:
-                await replace_stage_player(db, target_stage_id, replace_from_user_id, user_id)
+                await promote_group_member_to_stage(db, group_member.group_id, user_id, normalized_target_stage_id)
+            elif normalized_replace_from_user_id:
+                await replace_stage_player(db, normalized_target_stage_id, normalized_replace_from_user_id, user_id)
             else:
-                stage_participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == target_stage_id))).all())
+                stage_participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == normalized_target_stage_id))).all())
                 if any(participant.user_id == user_id for participant in stage_participants):
                     raise ValueError("duplicate_membership")
                 if len(stage_participants) >= int(target_stage.stage_size or 0):
                     raise ValueError("target_stage_is_full")
                 next_seed = max((participant.seed for participant in stage_participants), default=0) + 1
-                db.add(PlayoffParticipant(stage_id=target_stage_id, user_id=user_id, seed=next_seed))
+                db.add(PlayoffParticipant(stage_id=normalized_target_stage_id, user_id=user_id, seed=next_seed))
                 await db.commit()
 
         target_membership = await db.scalar(
-            select(PlayoffParticipant).where(PlayoffParticipant.stage_id == target_stage_id, PlayoffParticipant.user_id == user_id)
+            select(PlayoffParticipant).where(PlayoffParticipant.stage_id == normalized_target_stage_id, PlayoffParticipant.user_id == user_id)
         )
         if not target_membership:
             return redirect_with_admin_users_msg("msg_operation_failed", details="target_membership_not_found")
 
-        if target_group_number is not None:
+        if normalized_target_group_number is not None:
             target_membership.seed = await _find_group_seed_for_stage(
                 db,
-                stage_id=target_stage_id,
-                group_number=target_group_number,
+                stage_id=normalized_target_stage_id,
+                group_number=normalized_target_group_number,
                 stage_size=int(target_stage.stage_size or 0),
             )
 
