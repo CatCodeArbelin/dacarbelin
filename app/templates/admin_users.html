@@ -69,23 +69,27 @@
             <td>{{ user.telegram or 'None' }}</td>
             <td>
               {% set playoff_state = user_playoff_state.get(user.id) %}
-              <form id="user-reassign-{{ user.id }}" action="/admin/user/reassign" method="post" class="d-flex flex-column gap-1">
+              <form
+                id="user-reassign-{{ user.id }}"
+                action="/admin/user/reassign"
+                method="post"
+                class="d-flex flex-column gap-1 user-reassign-form"
+              >
                 <input type="hidden" name="user_id" value="{{ user.id }}">
-                <select class="form-select form-select-sm" name="target_stage_id">
+                <select class="form-select form-select-sm user-reassign-stage" name="target_stage_id">
                   <option value="">- stage -</option>
                   {% for stage in playoff_stages %}
-                  <option value="{{ stage.id }}" {% if playoff_state and playoff_state.stage_id == stage.id %}selected{% endif %}>{{ stage.title }} ({{ stage.key }})</option>
+                  <option value="{{ stage.id }}" {% if playoff_state and playoff_state.stage_id == stage.id %}selected{% endif %}>Stage {{ stage.stage_order + 1 }} — {{ stage.title }}</option>
                   {% endfor %}
                 </select>
-                <select class="form-select form-select-sm" name="target_group_number">
+                <select class="form-select form-select-sm user-reassign-group" name="target_group_number">
                   <option value="">- group -</option>
-                  {% for stage in playoff_stages %}
-                    {% for group_number in stage_group_options.get(stage.id, []) %}
-                    <option value="{{ group_number }}" {% if playoff_state and playoff_state.stage_id == stage.id and playoff_state.group_number == group_number %}selected{% endif %}>{{ stage.key }} / G{{ group_number }}</option>
+                  {% if playoff_state %}
+                    {% for group_number in stage_group_options.get(playoff_state.stage_id, []) %}
+                    <option value="{{ group_number }}" {% if playoff_state.group_number == group_number %}selected{% endif %}>Group {{ group_number }}</option>
                     {% endfor %}
-                  {% endfor %}
+                  {% endif %}
                 </select>
-                <input class="form-control form-control-sm" type="number" min="1" name="replace_from_user_id" placeholder="replace user id (opt)">
                 <div class="btn-group btn-group-sm" role="group">
                   <button class="btn btn-outline-secondary" type="submit" name="quick_move" value="to_main">→ Main</button>
                   <button class="btn btn-outline-secondary" type="submit" name="quick_move" value="to_reserve">→ Reserve</button>
@@ -116,4 +120,39 @@
   </div>
   {% endfor %}
 </div></div>
+
+<script>
+  (() => {
+    const stageGroupOptions = {{ stage_group_options | tojson }};
+    document.querySelectorAll('.user-reassign-form').forEach((form) => {
+      const stageSelect = form.querySelector('.user-reassign-stage');
+      const groupSelect = form.querySelector('.user-reassign-group');
+      if (!stageSelect || !groupSelect) {
+        return;
+      }
+
+      const fillGroupOptions = () => {
+        const selectedStage = stageSelect.value;
+        const currentValue = groupSelect.value;
+        const groups = selectedStage ? (stageGroupOptions[selectedStage] || []) : [];
+        groupSelect.innerHTML = '<option value="">- group -</option>';
+        groups.forEach((groupNumber) => {
+          const option = document.createElement('option');
+          option.value = String(groupNumber);
+          option.textContent = `Group ${groupNumber}`;
+          if (String(groupNumber) === currentValue) {
+            option.selected = true;
+          }
+          groupSelect.appendChild(option);
+        });
+      };
+
+      stageSelect.addEventListener('change', () => {
+        groupSelect.value = '';
+        fillGroupOptions();
+      });
+      fillGroupOptions();
+    });
+  })();
+</script>
 {% endblock %}
