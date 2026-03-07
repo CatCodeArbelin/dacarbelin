@@ -366,6 +366,29 @@ def build_bracket_columns(
 
         normalized_stage_key = normalize_stage_key(stage.key)
         participants_by_group = _participants_for_playoff_members(stage.participants, user_by_id)
+
+        if normalized_stage_key == "stage_2":
+            preview_direct_invites = build_stage_2_direct_invite_preview(
+                direct_invite_ids,
+                promoted_count=stage_1_promoted_count,
+                stage_2_size=stage_2_size,
+                direct_invite_groups=direct_invite_groups,
+            )
+            real_user_ids = {participant.user_id for participant in stage.participants}
+            real_direct_invite_user_ids = real_user_ids & set(direct_invite_ids)
+            for invited in preview_direct_invites:
+                user_id = invited["user_id"]
+                if user_id in real_direct_invite_user_ids or user_id in real_user_ids:
+                    continue
+                user = user_by_id.get(user_id)
+                participants_by_group.setdefault(invited["group_number"], []).append(
+                    {
+                        "user_id": user_id,
+                        "nickname": _display_nickname(user, str(user_id)),
+                        "is_direct_invite_preview": True,
+                    }
+                )
+
         matches_by_group = {match.group_number: match for match in sorted(stage.matches, key=lambda item: item.group_number)}
         final_match_winner_user_id = tournament_winner_user_id
         if normalized_stage_key == "stage_final":
@@ -389,7 +412,7 @@ def build_bracket_columns(
                         "game_number": 1,
                         "schedule_text": "TBD",
                         "lobby_password": "TBD",
-                        "participants": [],
+                        "participants": [dict(participant) for participant in participants_by_group.get(group_number, [])],
                         "state": "pending",
                     }
                 )
