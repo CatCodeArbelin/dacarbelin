@@ -1343,6 +1343,80 @@ a[href^="http"]:hover,
   --matrix-red: #ff3f4f;
   --matrix-text: #eafff2;
   --matrix-muted: #b5e5cd;
+  --matrix-rain-opacity: 0.26;
+}
+
+.page-content-shell__main :is(
+  .card,
+  .donate-section,
+  .rules-page,
+  .tournament-stage-card,
+  .playoff-round,
+  .tournament-tree-stage,
+  .archive-tree-stage,
+  .tournament-tree-match,
+  .archive-tree-match,
+  .archive-bracket-match-card,
+  .participants-page__table,
+  .participants-page__empty
+) {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.page-content-shell__main :is(
+  .card,
+  .donate-section,
+  .rules-page,
+  .tournament-stage-card,
+  .playoff-round,
+  .tournament-tree-stage,
+  .archive-tree-stage,
+  .tournament-tree-match,
+  .archive-tree-match,
+  .archive-bracket-match-card,
+  .participants-page__table,
+  .participants-page__empty
+)::before {
+  content: "";
+  position: absolute;
+  inset: -45% 0;
+  pointer-events: none;
+  opacity: var(--matrix-rain-opacity);
+  filter: brightness(1.05);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='320' viewBox='0 0 220 320'%3E%3Cg fill='none' font-family='monospace' font-size='13' font-weight='700'%3E%3Ctext x='8' y='18' fill='rgba(0,255,133,0.65)'%3E01011010%3C/text%3E%3Ctext x='8' y='50' fill='rgba(157,255,87,0.75)'%3E10100101%3C/text%3E%3Ctext x='8' y='82' fill='rgba(0,229,255,0.58)'%3E00111010%3C/text%3E%3Ctext x='8' y='114' fill='rgba(0,255,133,0.72)'%3E11001001%3C/text%3E%3Ctext x='8' y='146' fill='rgba(61,155,255,0.52)'%3E01101100%3C/text%3E%3Ctext x='8' y='178' fill='rgba(157,255,87,0.68)'%3E10010110%3C/text%3E%3Ctext x='8' y='210' fill='rgba(0,255,133,0.7)'%3E00101101%3C/text%3E%3Ctext x='8' y='242' fill='rgba(61,155,255,0.55)'%3E11100010%3C/text%3E%3Ctext x='8' y='274' fill='rgba(157,255,87,0.72)'%3E01010101%3C/text%3E%3Ctext x='8' y='306' fill='rgba(0,255,133,0.64)'%3E10111000%3C/text%3E%3C/g%3E%3C/svg%3E");
+  background-size: 220px 320px;
+  background-repeat: repeat;
+  animation: matrix-rain-fall 16s linear infinite;
+  z-index: 0;
+}
+
+.page-content-shell__main :is(
+  .card,
+  .donate-section,
+  .rules-page,
+  .tournament-stage-card,
+  .playoff-round,
+  .tournament-tree-stage,
+  .archive-tree-stage,
+  .tournament-tree-match,
+  .archive-tree-match,
+  .archive-bracket-match-card,
+  .participants-page__table,
+  .participants-page__empty
+) > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes matrix-rain-fall {
+  from {
+    transform: translate3d(0, -6%, 0);
+  }
+  to {
+    transform: translate3d(0, 6%, 0);
+  }
 }
 
 html[lang="ru"] body {
@@ -1634,4 +1708,3 @@ textarea:focus {
   border-color: rgba(157, 255, 87, 0.72) !important;
   box-shadow: 0 0 20px rgba(0, 255, 133, 0.32), 0 0 34px rgba(61, 155, 255, 0.26);
 }
-
