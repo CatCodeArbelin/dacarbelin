@@ -184,6 +184,52 @@ async def test_admin_reassign_user_returns_no_changes_when_stage_and_group_same(
     assert db.commit.await_count == 0
 
 
+
+@pytest.mark.asyncio
+async def test_admin_reassign_user_rolls_back_stage_change_if_group_assignment_fails(monkeypatch) -> None:
+    user = User(id=92, nickname="rollback", basket=Basket.ROOK.value)
+    source_stage = PlayoffStage(id=35, key="stage_2", title="Stage 2", stage_size=32, stage_order=1)
+    target_stage = PlayoffStage(id=36, key="stage_1_4", title="Quarter", stage_size=16, stage_order=2)
+    membership = PlayoffParticipant(stage_id=35, user_id=92, seed=2)
+    db = _FakeDB(user=user, stage=target_stage, memberships=[membership])
+
+    snapshot = [(item.stage_id, item.user_id, item.seed) for item in db.memberships]
+
+    async def fake_move_user_to_stage(db, from_stage_id: int, to_stage_id: int, user_id: int):
+        participant = next(item for item in db.memberships if item.user_id == user_id and item.stage_id == from_stage_id)
+        participant.stage_id = to_stage_id
+
+    async def fake_find_group_seed_for_stage(*args, **kwargs):
+        raise ValueError("target_group_is_full")
+
+    async def rollback_with_restore():
+        db.memberships[:] = [
+            PlayoffParticipant(stage_id=stage_id, user_id=member_user_id, seed=seed)
+            for stage_id, member_user_id, seed in snapshot
+        ]
+
+    monkeypatch.setattr(web, "move_user_to_stage", fake_move_user_to_stage)
+    monkeypatch.setattr(web, "_find_group_seed_for_stage", fake_find_group_seed_for_stage)
+    db.rollback = AsyncMock(side_effect=rollback_with_restore)
+
+    response = await web.admin_reassign_user(
+        user_id=92,
+        target_stage_id="36",
+        target_group_number="1",
+        replace_from_user_id="",
+        quick_move=None,
+        reassign_action="move_stage",
+        db=db,
+    )
+
+    assert response.status_code == 303
+    assert "msg_operation_failed" in response.headers["location"]
+    assert "details=target_group_is_full" in response.headers["location"]
+    assert any(member.stage_id == 35 and member.user_id == 92 for member in db.memberships)
+    assert db.commit.await_count == 0
+    assert db.rollback.await_count == 1
+
+
 def test_admin_users_page_fetches_all_users_without_limit(monkeypatch) -> None:
     captured = {}
 
