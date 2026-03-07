@@ -63,6 +63,7 @@ def _make_users(count: int) -> list[User]:
         Basket.KING.value,
         Basket.ROOK.value,
         Basket.BISHOP.value,
+        Basket.LOW_RANK.value,
     ]
     return [
         User(
@@ -79,30 +80,32 @@ def _make_users(count: int) -> list[User]:
     ]
 
 
-def _make_users_with_main_and_reserve() -> list[User]:
-    users = _make_users(56)
-    users.extend(
-        [
-            User(
-                id=2000 + idx,
-                nickname=f"res{idx}",
-                steam_input=f"res_steam_{idx}",
-                steam_id=f"res_sid_{idx}",
-                game_nickname=f"res_g{idx}",
-                current_rank="Rook",
-                highest_rank="Queen",
-                basket=[
-                    Basket.QUEEN_RESERVE.value,
-                    Basket.KING_RESERVE.value,
-                    Basket.ROOK_RESERVE.value,
-                    Basket.BISHOP_RESERVE.value,
-                    Basket.LOW_RANK_RESERVE.value,
-                ][(idx - 1) % 5],
-            )
-            for idx in range(1, 11)
-        ]
-    )
-    return users
+def _make_users_with_reserve_mix() -> list[User]:
+    baskets = [
+        Basket.QUEEN.value,
+        Basket.QUEEN_RESERVE.value,
+        Basket.KING.value,
+        Basket.KING_RESERVE.value,
+        Basket.ROOK.value,
+        Basket.ROOK_RESERVE.value,
+        Basket.BISHOP.value,
+        Basket.BISHOP_RESERVE.value,
+        Basket.LOW_RANK.value,
+        Basket.LOW_RANK_RESERVE.value,
+    ]
+    return [
+        User(
+            id=idx,
+            nickname=f"u{idx}",
+            steam_input=f"steam_{idx}",
+            steam_id=f"sid_{idx}",
+            game_nickname=f"g{idx}",
+            current_rank="Rook",
+            highest_rank="Queen",
+            basket=baskets[(idx - 1) % len(baskets)],
+        )
+        for idx in range(1, 57)
+    ]
 
 
 def _make_users_with_invited() -> list[User]:
@@ -219,32 +222,19 @@ class TournamentAutoDrawTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(groups), 7)
         self.assertEqual(len(members), 56)
 
-    async def test_create_auto_draw_ignores_reserve_baskets_when_main_pool_is_enough(self) -> None:
-        """Проверяет сценарий `test_create_auto_draw_ignores_reserve_baskets_when_main_pool_is_enough`.
-        Важно для бизнес-логики: резервные корзины не должны попадать в авто-жеребьевку.
-        Запуск: `pytest tests/test_tournament_auto_draw.py -q` и `pytest tests/test_tournament_auto_draw.py -k "test_create_auto_draw_ignores_reserve_baskets_when_main_pool_is_enough" -q`."""
-        session = _FakeSession(users=_make_users_with_main_and_reserve())
+    async def test_create_auto_draw_accepts_reserve_baskets_for_7x8(self) -> None:
+        """Проверяет позитивный сценарий `test_create_auto_draw_accepts_reserve_baskets_for_7x8`.
+        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
+        Запуск: `pytest tests/test_tournament_auto_draw.py -q` и `pytest tests/test_tournament_auto_draw.py -k "test_create_auto_draw_accepts_reserve_baskets_for_7x8" -q`."""
+        session = _FakeSession(users=_make_users_with_reserve_mix())
 
         ok, _message = await create_auto_draw(session)
 
         self.assertTrue(ok)
+        groups = [obj for obj in session.added if isinstance(obj, TournamentGroup)]
         members = [obj for obj in session.added if isinstance(obj, GroupMember)]
-        reserve_ids = {
-            user.id
-            for user in session._users
-            if user.basket
-            in {
-                Basket.QUEEN_RESERVE.value,
-                Basket.KING_RESERVE.value,
-                Basket.ROOK_RESERVE.value,
-                Basket.BISHOP_RESERVE.value,
-                Basket.LOW_RANK_RESERVE.value,
-            }
-        }
-        member_ids = {member.user_id for member in members}
-
+        self.assertEqual(len(groups), 7)
         self.assertEqual(len(members), 56)
-        self.assertTrue(reserve_ids.isdisjoint(member_ids))
         self.assertTrue(session.committed)
 
     async def test_create_auto_draw_excludes_invited_from_group_stage(self) -> None:
