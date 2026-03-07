@@ -116,6 +116,78 @@ class AdminEmergencyRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(participants[0].seed, 10)
         db.execute.assert_not_awaited()
 
+    async def test_replace_player_dry_run_only_renders_preview(self) -> None:
+        request = AsyncMock()
+        request.cookies = {}
+        db = AsyncMock()
+        db.add = Mock()
+
+        participant = PlayoffParticipant(stage_id=11, user_id=100, seed=1)
+        reserve_user = Mock(id=200, basket="rook_reserve")
+
+        db.scalar = AsyncMock(
+            side_effect=[
+                11,
+                SiteSetting(key="tournament_finished", value="0"),
+                participant,
+                reserve_user,
+                None,
+            ]
+        )
+
+        with patch.object(web, "_render_admin_emergency_page", new=AsyncMock(return_value="ok")) as render_mock:
+            response = await web.admin_emergency_replace_player(
+                request=request,
+                stage_id=11,
+                from_user_id=100,
+                reserve_user_id=200,
+                dry_run=True,
+                confirm_final=False,
+                db=db,
+            )
+
+        self.assertEqual(response, "ok")
+        self.assertEqual(participant.user_id, 100)
+        db.commit.assert_not_awaited()
+        render_mock.assert_awaited_once()
+
+    async def test_swap_participants_commits_swapped_stage_and_seed(self) -> None:
+        request = AsyncMock()
+        request.cookies = {}
+        db = AsyncMock()
+        db.add = Mock()
+
+        left = PlayoffParticipant(stage_id=10, user_id=100, seed=2)
+        right = PlayoffParticipant(stage_id=20, user_id=200, seed=7)
+
+        db.scalar = AsyncMock(
+            side_effect=[
+                10,
+                20,
+                SiteSetting(key="tournament_finished", value="0"),
+                left,
+                right,
+            ]
+        )
+
+        response = await web.admin_emergency_swap_participants(
+            request=request,
+            left_stage_id=10,
+            left_user_id=100,
+            right_stage_id=20,
+            right_user_id=200,
+            dry_run=False,
+            confirm_final=False,
+            db=db,
+        )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(left.stage_id, 20)
+        self.assertEqual(left.seed, 7)
+        self.assertEqual(right.stage_id, 10)
+        self.assertEqual(right.seed, 2)
+        db.commit.assert_awaited_once()
+
 
 if __name__ == "__main__":
     unittest.main()
