@@ -4,7 +4,7 @@ from collections import defaultdict
 import json
 import random
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -92,6 +92,7 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
             await db.scalars(
                 select(User)
                 .where(User.basket.in_(STAGE_I_AUTO_DRAW_MAIN_BASKETS))
+                .where(or_(User.direct_invite_stage.is_(None), User.direct_invite_stage != "stage_2"))
                 .order_by(User.created_at)
             )
         ).all()
@@ -104,7 +105,8 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
     if len(users) < expected_participants:
         return False, (
             "Автожеребьевка недоступна: требуется минимум "
-            f"{expected_participants} валидных участников (формат {expected_group_count}x{stage_group_size}). "
+            f"{expected_participants} участников, доступных для Stage I, "
+            f"(формат {expected_group_count}x{stage_group_size}); сейчас доступно {len(users)}. "
             "Доступна только ручная жеребьевка."
         )
 
