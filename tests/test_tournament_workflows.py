@@ -262,8 +262,11 @@ def test_tournament_page_shows_tree_structure_before_start(monkeypatch) -> None:
     async def fake_get_tournament_started(db):
         return False
 
+    called = {"playoff_loaded": False}
+
     async def fake_get_playoff_stages_with_data(db):
-        raise AssertionError("Playoff data must stay hidden before tournament start")
+        called["playoff_loaded"] = True
+        return []
 
     monkeypatch.setattr(web, "get_draw_applied", fake_get_draw_applied)
     monkeypatch.setattr(web, "get_tournament_started", fake_get_tournament_started)
@@ -280,6 +283,7 @@ def test_tournament_page_shows_tree_structure_before_start(monkeypatch) -> None:
     assert "Сетка турнира" in response.text
     assert "Group A" in response.text
     assert "Group Final" in response.text
+    assert called["playoff_loaded"] is True
 
 
 
