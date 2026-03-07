@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, Form, Query, Request
 from pydantic import BaseModel
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import delete, desc, func, select, update
+from sqlalchemy import Integer, case, delete, desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -1438,43 +1438,56 @@ async def chat_stream(request: Request):
 async def participants(
     request: Request,
     basket: str = Query(Basket.QUEEN.value),
+    rank_priority: str | None = Query(None),
     view: str = Query("baskets"),
     db: AsyncSession = Depends(get_db),
 ):
-    # Показываем участников по паре корзин: основной состав + резерв.
-    basket_tabs = [
-        {
-            "main_basket": Basket.QUEEN.value,
-            "reserve_basket": Basket.QUEEN_RESERVE.value,
-            "label": "Queen",
-        },
-        {
-            "main_basket": Basket.KING.value,
-            "reserve_basket": Basket.KING_RESERVE.value,
-            "label": "King",
-        },
-        {
-            "main_basket": Basket.ROOK.value,
-            "reserve_basket": Basket.ROOK_RESERVE.value,
-            "label": "Rook",
-        },
-        {
-            "main_basket": Basket.BISHOP.value,
-            "reserve_basket": Basket.BISHOP_RESERVE.value,
-            "label": "Bishop",
-        },
-        {
-            "main_basket": Basket.LOW_RANK.value,
-            "reserve_basket": Basket.LOW_RANK_RESERVE.value,
-            "label": "Low Rank",
-        },
+    # Показываем участников единым списком с приоритетом выбранного ранга.
+    rank_tabs = [
+        {"main_basket": Basket.QUEEN.value, "reserve_basket": Basket.QUEEN_RESERVE.value, "label": "Queen"},
+        {"main_basket": Basket.KING.value, "reserve_basket": Basket.KING_RESERVE.value, "label": "King"},
+        {"main_basket": Basket.ROOK.value, "reserve_basket": Basket.ROOK_RESERVE.value, "label": "Rook"},
+        {"main_basket": Basket.BISHOP.value, "reserve_basket": Basket.BISHOP_RESERVE.value, "label": "Bishop"},
+        {"main_basket": Basket.LOW_RANK.value, "reserve_basket": Basket.LOW_RANK_RESERVE.value, "label": "Low Rank"},
     ]
     basket_pairs = BASKET_PAIRS
-    basket_to_pair = {basket_name: pair for pair in basket_pairs for basket_name in pair}
-    selected_pair = basket_to_pair.get(basket, basket_pairs[0])
-    main_basket, reserve_basket = selected_pair
+    base_rank_order = [
+        Basket.QUEEN.value,
+        Basket.KING.value,
+        Basket.ROOK.value,
+        Basket.BISHOP.value,
+        Basket.LOW_RANK.value,
+    ]
+    allowed_priorities = set(base_rank_order)
+
+    selected_priority = rank_priority or basket
+    if selected_priority not in allowed_priorities:
+        selected_priority = Basket.QUEEN.value
+
+    ordered_base_ranks = [selected_priority, *[rank for rank in base_rank_order if rank != selected_priority]]
+    basket_order: list[str] = []
+    for rank_name in ordered_base_ranks:
+        for main_basket, reserve_basket in basket_pairs:
+            if rank_name == main_basket:
+                basket_order.extend([main_basket, reserve_basket])
+                break
+    basket_order_map = {basket_name: index for index, basket_name in enumerate(basket_order)}
+    basket_order_case = case(
+        *( (User.basket == basket_name, index) for basket_name, index in basket_order_map.items() ),
+        else_=len(basket_order_map),
+    )
+
+    queen_rank_numeric = case(
+        (User.highest_rank.like("Queen#%"), func.cast(func.substr(User.highest_rank, 7), Integer)),
+        else_=None,
+    )
+    queen_pair_order_case = case(
+        (User.basket.in_([Basket.QUEEN.value, Basket.QUEEN_RESERVE.value]), func.coalesce(queen_rank_numeric, 999999)),
+        else_=999999,
+    )
 
     direct_invite_users: list[User] = []
+    users: list[User] = []
 
     if view == "direct_invites":
         invited_users = (
@@ -1487,34 +1500,32 @@ async def participants(
             )
         ).all()
         direct_invite_users = list(invited_users)
-        main_users = []
-        reserve_users = []
     else:
         view = "baskets"
-        main_users = (
-            await db.scalars(select(User).where(User.basket == main_basket).order_by(User.created_at))
-        ).all()
-        reserve_users = (
-            await db.scalars(select(User).where(User.basket == reserve_basket).order_by(User.created_at))
+        users = (
+            await db.scalars(
+                select(User).order_by(
+                    basket_order_case,
+                    queen_pair_order_case,
+                    User.created_at,
+                    User.id,
+                )
+            )
         ).all()
 
-    is_empty = (
-        not direct_invite_users
-        if view == "direct_invites"
-        else (not main_users and not reserve_users)
-    )
+    is_empty = not direct_invite_users if view == "direct_invites" else not users
 
     return templates.TemplateResponse(
         request,
         "participants.html",
         template_context(
             request,
-            basket=main_basket,
+            basket=selected_priority,
+            rank_priority=selected_priority,
             view=view,
             basket_pairs=basket_pairs,
-            basket_tabs=basket_tabs,
-            main_users=main_users,
-            reserve_users=reserve_users,
+            basket_tabs=rank_tabs,
+            users=users,
             direct_invite_users=direct_invite_users,
             is_empty=is_empty,
         ),
