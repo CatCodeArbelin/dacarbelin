@@ -3147,7 +3147,6 @@ async def admin_emergency_replace_player(
     stage_id: int = Form(...),
     from_user_id: int = Form(...),
     reserve_user_id: int = Form(...),
-    dry_run: bool = Form(default=False),
     confirm_final: bool = Form(default=False),
     db: AsyncSession = Depends(get_db),
 ):
@@ -3181,28 +3180,19 @@ async def admin_emergency_replace_player(
         "stage_id": stage_id,
         "from_user_id": from_user_id,
         "reserve_user_id": reserve_user_id,
-        "dry_run": dry_run,
+        "dry_run": False,
     }
 
-    if not dry_run:
-        participant.user_id = reserve_user_id
+    participant.user_id = reserve_user_id
 
     await _log_emergency_action(
         db,
         request=request,
         action_type="replace_player",
-        dry_run=dry_run,
+        dry_run=False,
         target_stage_id=stage_id,
         details=preview,
     )
-    if dry_run:
-        await db.flush()
-        return await _render_admin_emergency_page(
-            request,
-            db,
-            preview_title="Dry-run: replace participant",
-            preview_payload=preview,
-        )
     await db.commit()
     return redirect_with_admin_emergency_msg("msg_player_replaced")
 
@@ -3316,6 +3306,7 @@ async def admin_emergency_diagnostics(
 
 @router.post("/admin/playoff/move")
 async def admin_move_playoff_player(
+    request: Request,
     from_stage_id: int = Form(...),
     to_stage_id: int = Form(...),
     user_id: int = Form(...),
@@ -3329,6 +3320,20 @@ async def admin_move_playoff_player(
         return redirect_with_admin_msg("msg_invalid_playoff_stage")
     try:
         await move_user_to_stage(db, from_stage_id, to_stage_id, user_id)
+        await _log_emergency_action(
+            db,
+            request=request,
+            action_type="playoff_move",
+            dry_run=False,
+            target_stage_id=to_stage_id,
+            details={
+                "from_stage_id": from_stage_id,
+                "to_stage_id": to_stage_id,
+                "user_id": user_id,
+                "dry_run": False,
+            },
+        )
+        await db.commit()
         return redirect_with_admin_msg("msg_player_moved")
     except Exception as exc:  # noqa: BLE001
         return redirect_with_admin_msg("msg_operation_failed")
