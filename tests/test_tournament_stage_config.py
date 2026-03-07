@@ -254,6 +254,14 @@ class TournamentStageConfigTests(unittest.TestCase):
 
         self.assertEqual(statuses, ["promoted", "promoted", "promoted", "promoted"])
 
+    def test_resolve_current_stage_label_returns_group_stage_when_playoff_hidden(self) -> None:
+        stages = [
+            PlayoffStage(id=1, key="stage_2", title="Stage 2", stage_order=1, stage_size=32, is_started=False),
+            PlayoffStage(id=2, key="stage_1_4", title="Stage 3", stage_order=2, stage_size=16, is_started=False),
+        ]
+
+        self.assertEqual(resolve_current_stage_label("ru", stages, show_playoff=False), web.t("ru", "tournament_stage_group_stage_label"))
+
     def test_resolve_current_stage_label_supports_existing_stage_keys(self) -> None:
         stages = [
             PlayoffStage(id=1, key="stage_2", title="Stage 2", stage_order=1, stage_size=32, is_started=False),
