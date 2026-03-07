@@ -119,3 +119,51 @@ def test_admin_users_page_fetches_all_users_without_limit(monkeypatch) -> None:
     assert response.status_code == 200
     assert "users_query" in captured
     assert "LIMIT" not in captured["users_query"].upper()
+
+
+def test_admin_users_page_reassign_ui_does_not_require_manual_user_id(monkeypatch) -> None:
+    class _DB:
+        async def scalars(self, statement):
+            sql = str(statement)
+            if "FROM users" in sql:
+                return _ScalarResult([User(id=7, nickname="u7")])
+            if "FROM playoff_stages" in sql:
+                return _ScalarResult(
+                    [
+                        PlayoffStage(id=11, key="stage_1", title="Stage 1", stage_size=16, stage_order=0),
+                        PlayoffStage(id=12, key="stage_2", title="Stage 2", stage_size=16, stage_order=1),
+                    ]
+                )
+            if "FROM playoff_participants" in sql:
+                return _ScalarResult([])
+            if "FROM tournament_groups" in sql:
+                return _ScalarResult([])
+            return _ScalarResult([])
+
+        async def execute(self, statement):
+            return SimpleNamespace(all=lambda: [])
+
+    class _Req:
+        cookies = {}
+        query_params = {}
+
+    async def fake_get_draw_applied(db):
+        return False
+
+    async def fake_get_tournament_started(db):
+        return False
+
+    monkeypatch.setattr(web, "get_draw_applied", fake_get_draw_applied)
+    monkeypatch.setattr(web, "get_tournament_started", fake_get_tournament_started)
+
+    import asyncio
+
+    response = asyncio.run(web.admin_users_page(request=_Req(), db=_DB()))
+    html = response.body.decode("utf-8")
+
+    assert response.status_code == 200
+    assert "replace_from_user_id" not in html
+    assert "user-reassign-stage" in html
+    assert "user-reassign-group" in html
+    assert "Stage 1" in html
+    assert "Stage 2" in html
