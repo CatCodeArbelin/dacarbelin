@@ -294,7 +294,7 @@ def build_bracket_columns(
             "state": "pending",
         }
 
-    stage_by_key = {stage.key: stage for stage in playoff_stages}
+    stage_by_key = {normalize_stage_key(stage.key): stage for stage in playoff_stages}
     stage_columns: list[BracketColumnVM] = [
         {"key": "group_stage", "title": str(TOURNAMENT_FLOW_SPEC["group_stage"]["column_title"]), "matches": []}
     ]
@@ -364,16 +364,17 @@ def build_bracket_columns(
                 column["matches"] = [placeholder]
             continue
 
+        normalized_stage_key = normalize_stage_key(stage.key)
         participants_by_group = _participants_for_playoff_members(stage.participants, user_by_id)
         matches_by_group = {match.group_number: match for match in sorted(stage.matches, key=lambda item: item.group_number)}
         final_match_winner_user_id = tournament_winner_user_id
-        if stage.key == "stage_final":
+        if normalized_stage_key == "stage_final":
             final_match = next(iter(sorted(stage.matches, key=lambda item: item.group_number)), None)
             if final_match is not None:
                 final_match_winner_user_id = final_match.manual_winner_user_id or final_match.winner_user_id or final_match_winner_user_id
 
         stage_group_numbers = sorted({*participants_by_group.keys(), *matches_by_group.keys()})
-        if is_limited_stage(stage.key):
+        if is_limited_stage(normalized_stage_key):
             stage_size = getattr(stage, "stage_size", None) or 0
             if stage_size:
                 stage_group_numbers = list(range(1, max(stage_size // 8, 0) + 1))
@@ -395,7 +396,7 @@ def build_bracket_columns(
                 continue
 
             participant_rows = [dict(participant) for participant in participants_by_group.get(match.group_number, [])]
-            is_final_match = stage.key == "stage_final"
+            is_final_match = normalized_stage_key == "stage_final"
             winner_applied = False
             if is_final_match and final_match_winner_user_id:
                 for participant in participant_rows:
@@ -404,11 +405,11 @@ def build_bracket_columns(
                         winner_applied = True
                     participant["is_tournament_winner"] = is_winner
                     participant["winner_label_key"] = "tournament_winner" if is_winner else None
-            participant_rows = _apply_stage_highlight_rules(stage.key, participant_rows)
+            participant_rows = _apply_stage_highlight_rules(normalized_stage_key, participant_rows)
 
             matches_vm.append(
                 {
-                    "group_label": get_stage_group_label(stage.key, match.group_number),
+                    "group_label": get_stage_group_label(normalized_stage_key, match.group_number),
                     "game_number": match.game_number,
                     "schedule_text": _normalize_schedule(match.schedule_text),
                     "lobby_password": match.lobby_password,
@@ -525,10 +526,12 @@ def build_playoff_standings(
         participants_sorted = sorted(stage.participants, key=playoff_sort_key, reverse=True)
         stage_group_done: set[int] = set()
         for match in stage.matches:
-            if is_limited_stage(stage.key) and match.game_number > GROUP_STAGE_GAME_LIMIT:
+            normalized_stage_key = normalize_stage_key(stage.key)
+            if is_limited_stage(normalized_stage_key) and match.game_number > GROUP_STAGE_GAME_LIMIT:
                 stage_group_done.add(match.group_number)
 
-        promote_n = get_promote_top_n(stage.key)
+        normalized_stage_key = normalize_stage_key(stage.key)
+        promote_n = get_promote_top_n(normalized_stage_key)
         by_group_rank: dict[int, dict[int, int]] = {}
         for group_number in {get_stage_group_number_by_seed(p.seed) for p in participants_sorted}:
             group_sorted = [p for p in participants_sorted if get_stage_group_number_by_seed(p.seed) == group_number]
@@ -570,7 +573,7 @@ def resolve_current_stage_label(lang: str, playoff_stages: Sequence[PlayoffStage
     if current_stage is None:
         return default_display
 
-    display_key = get_stage_display_label_key(current_stage.key)
+    display_key = get_stage_display_label_key(normalize_stage_key(current_stage.key))
     if display_key is not None:
         return t(lang, display_key)
 

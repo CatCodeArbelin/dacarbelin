@@ -394,6 +394,39 @@ def test_build_bracket_columns_sorts_stage_2_participants_by_points_within_group
 
     assert [participant["user_id"] for participant in group_a["participants"]] == [10, 20, 30]
 
+
+
+def test_build_bracket_columns_supports_legacy_stage_key_alias_for_stage_2() -> None:
+    legacy_stage = SimpleNamespace(
+        key="stage_1_8",
+        stage_size=32,
+        participants=[
+            SimpleNamespace(user_id=501, seed=9, points=11, wins=1, top4_finishes=1, top8_finishes=1, last_place=2),
+        ],
+        matches=[
+            SimpleNamespace(group_number=2, game_number=2, schedule_text="Tomorrow", lobby_password="1234", state="started"),
+        ],
+    )
+
+    columns = build_bracket_columns(
+        groups=[],
+        playoff_stages=[legacy_stage],
+        user_by_id={},
+        direct_invite_ids=[],
+    )
+
+    stage_2_column = next(column for column in columns if column["key"] == "stage_2")
+    group_b = next(match for match in stage_2_column["matches"] if match["group_label"] == "B")
+
+    assert group_b["participants"]
+    assert group_b["participants"][0]["user_id"] == 501
+    assert group_b["state"] == "started"
+
+
+def test_resolve_current_stage_label_normalizes_legacy_stage_aliases() -> None:
+    legacy_stage = SimpleNamespace(key="stage4", title="Legacy Final", is_started=True)
+
+    assert resolve_current_stage_label("ru", [legacy_stage], show_playoff=True) == "Финал (8, правило 22+победа)"
 def test_build_bracket_columns_empty_tournament_has_all_stages_and_placeholders() -> None:
     columns = build_bracket_columns(
         groups=[],
