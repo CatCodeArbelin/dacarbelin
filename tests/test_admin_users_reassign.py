@@ -78,6 +78,27 @@ async def test_admin_reassign_user_moves_player_between_stages(monkeypatch) -> N
     assert any(member.stage_id == 20 and member.user_id == 55 for member in db.memberships)
 
 
+@pytest.mark.asyncio
+async def test_admin_reassign_user_promotes_reserve_basket_on_move() -> None:
+    user = User(id=56, nickname="reserve", basket=Basket.ROOK_RESERVE.value)
+    target_stage = PlayoffStage(id=20, key="stage_2", title="Stage 2", stage_size=16, stage_order=1)
+    target_membership = PlayoffParticipant(stage_id=20, user_id=56, seed=4)
+    db = _FakeDB(user=user, stage=target_stage, memberships=[target_membership])
+
+    response = await web.admin_reassign_user(
+        user_id=56,
+        target_stage_id=20,
+        target_group_number=None,
+        replace_from_user_id=None,
+        quick_move=None,
+        db=db,
+    )
+
+    assert response.status_code == 303
+    assert "msg_player_moved" in response.headers["location"]
+    assert user.basket == Basket.ROOK.value
+
+
 def test_admin_users_page_fetches_all_users_without_limit(monkeypatch) -> None:
     captured = {}
 

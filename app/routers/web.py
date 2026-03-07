@@ -134,6 +134,7 @@ BASKET_PAIRS = [
     (Basket.BISHOP.value, Basket.BISHOP_RESERVE.value),
     (Basket.LOW_RANK.value, Basket.LOW_RANK_RESERVE.value),
 ]
+RESERVE_TO_MAIN_BASKET = {reserve_basket: main_basket for main_basket, reserve_basket in BASKET_PAIRS}
 EXPECTED_32_PLAYER_STAGE_ORDER_PAIRS = [
     (0, "stage_2"),
     (1, "stage_1_4"),
@@ -2265,6 +2266,12 @@ def _resolve_basket_quick_move(current_basket: str | None, quick_move: str | Non
     return None
 
 
+def _promote_reserve_user_to_main_basket(user: User) -> None:
+    promoted_basket = RESERVE_TO_MAIN_BASKET.get(str(user.basket or ""))
+    if promoted_basket:
+        user.basket = promoted_basket
+
+
 async def _find_group_seed_for_stage(
     db: AsyncSession,
     *,
@@ -2341,6 +2348,8 @@ async def admin_reassign_user(
         )
         if not target_membership:
             return redirect_with_admin_users_msg("msg_operation_failed", details="target_membership_not_found")
+
+        _promote_reserve_user_to_main_basket(user)
 
         if target_group_number is not None:
             target_membership.seed = await _find_group_seed_for_stage(
@@ -3282,13 +3291,14 @@ async def admin_emergency_replace_player(
         participant.user_id = reserve_user_id
     else:
         group_member.user_id = reserve_user_id
+    _promote_reserve_user_to_main_basket(reserve_user)
 
     await _log_emergency_action(
         db,
         request=request,
         action_type="replace_player",
         dry_run=False,
-        target_stage_id=stage_id,
+        target_stage_id=stage_id if stage_is_playoff else None,
         details=preview,
     )
     await db.commit()
