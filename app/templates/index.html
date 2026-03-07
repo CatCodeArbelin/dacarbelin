@@ -70,7 +70,7 @@
       <div class="card-body">
         <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
           <h3 class="text-contrast-neon neon-text-outline mb-0">{{ tr('index_chat') }}</h3>
-          <button type="button" class="btn btn-outline-light btn-sm" id="chat-refresh-btn">Refresh</button>
+          <button type="button" class="btn btn-sm btn-chat-refresh" id="chat-refresh-btn">{{ tr('index_chat_refresh') }}</button>
         </div>
         <form action="/chat/send" method="post" class="mb-3" id="chat-form" data-cooldown-seconds="{{ chat_settings.cooldown_seconds }}">
           {% if not chat_settings.is_enabled %}<div class="alert alert-warning">{{ tr('msg_chat_disabled_admin') }}</div>{% endif %}
