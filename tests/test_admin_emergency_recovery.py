@@ -41,7 +41,10 @@ class AdminEmergencyRecoveryTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status_code, 303)
         self.assertEqual(participant.user_id, 200)
+        self.assertEqual(reserve_user.basket, "rook")
         db.commit.assert_awaited_once()
+        log_entry = db.add.call_args.args[0]
+        self.assertEqual(log_entry.target_stage_id, 11)
 
     async def test_playoff_move_executes_and_logs(self) -> None:
         request = AsyncMock()
@@ -109,7 +112,10 @@ class AdminEmergencyRecoveryTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status_code, 303)
         self.assertEqual(group_member.user_id, 202)
+        self.assertEqual(reserve_user.basket, "bishop")
         db.commit.assert_awaited_once()
+        log_entry = db.add.call_args.args[0]
+        self.assertIsNone(log_entry.target_stage_id)
 
     async def test_playoff_move_supports_group_transfers(self) -> None:
         request = AsyncMock()
