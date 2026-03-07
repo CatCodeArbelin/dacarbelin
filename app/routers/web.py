@@ -119,6 +119,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 DONATE_HIGHLIGHT_AMOUNT_SETTING_KEY = "donate_highlight_amount"
+DONATE_SUPPORT_AUTHOR_VISIBLE_SETTING_KEY = "donate_support_author_visible"
 RUB_PER_USD_RATE = Decimal("79")
 
 
@@ -1659,6 +1660,12 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
     highlight_amount_setting = await db.scalar(
         select(SiteSetting).where(SiteSetting.key == DONATE_HIGHLIGHT_AMOUNT_SETTING_KEY)
     )
+    support_author_visible_setting = await db.scalar(
+        select(SiteSetting).where(SiteSetting.key == DONATE_SUPPORT_AUTHOR_VISIBLE_SETTING_KEY)
+    )
+    show_support_author_block = True
+    if support_author_visible_setting:
+        show_support_author_block = (support_author_visible_setting.value or "").strip().lower() in {"1", "true", "yes", "on"}
     highlight_amount = (highlight_amount_setting.value or "").strip() if highlight_amount_setting else ""
     display_total_amount = parse_donor_amount(highlight_amount) if highlight_amount else total_sponsors_amount
     total_sponsors_amount_rub, total_sponsors_amount_usd = to_rub_and_usd_display_amounts(display_total_amount)
@@ -1706,6 +1713,7 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
             donation_links=donation_links_vm,
             bank_cards_links=bank_cards_vm,
             support_author_links=support_author_vm,
+            show_support_author_block=show_support_author_block,
             crypto_wallets=crypto_wallets_vm,
             donors=donors_vm,
         ),
@@ -2359,6 +2367,12 @@ async def admin_content_page(request: Request, db: AsyncSession = Depends(get_db
     donate_highlight_amount_setting = await db.scalar(
         select(SiteSetting).where(SiteSetting.key == DONATE_HIGHLIGHT_AMOUNT_SETTING_KEY)
     )
+    support_author_visible_setting = await db.scalar(
+        select(SiteSetting).where(SiteSetting.key == DONATE_SUPPORT_AUTHOR_VISIBLE_SETTING_KEY)
+    )
+    donate_support_author_visible = True
+    if support_author_visible_setting:
+        donate_support_author_visible = (support_author_visible_setting.value or "").strip().lower() in {"1", "true", "yes", "on"}
     selected_lang = get_lang(request.query_params.get("content_lang") or request.cookies.get("lang"))
     content_by_lang = {
         "ru": dump_admin_content_for_lang("ru", rules_content).model_dump(),
@@ -2376,6 +2390,7 @@ async def admin_content_page(request: Request, db: AsyncSession = Depends(get_db
             crypto_wallets=crypto_wallets,
             sponsors=donors,
             donate_highlight_amount=(donate_highlight_amount_setting.value if donate_highlight_amount_setting else ""),
+            donate_support_author_visible=donate_support_author_visible,
         ),
     )
 
@@ -3516,6 +3531,22 @@ async def admin_update_donate_highlight_amount(
         row.value = normalized_amount
     await db.commit()
     return RedirectResponse(url="/admin/content?msg=msg_prize_pool_saved", status_code=303)
+
+
+@router.post("/admin/donate-support-author-visibility")
+async def admin_update_donate_support_author_visibility(
+    visible: str = Form(default="0"),
+    db: AsyncSession = Depends(get_db),
+):
+    is_visible = (visible or "").strip().lower() in {"1", "true", "yes", "on"}
+    row = await db.scalar(select(SiteSetting).where(SiteSetting.key == DONATE_SUPPORT_AUTHOR_VISIBLE_SETTING_KEY))
+    if not row:
+        row = SiteSetting(key=DONATE_SUPPORT_AUTHOR_VISIBLE_SETTING_KEY, value="1" if is_visible else "0")
+        db.add(row)
+    else:
+        row.value = "1" if is_visible else "0"
+    await db.commit()
+    return RedirectResponse(url="/admin/content?msg=msg_content_saved", status_code=303)
 
 
 @router.post("/admin/crypto-wallets")
