@@ -795,6 +795,7 @@ body {
 
 .home-right-column .prize-pool-card {
   min-height: 240px;
+  max-width: 430px;
 }
 
 .home-right-column #chat {
@@ -824,7 +825,6 @@ body {
 }
 .prize-pool-card {
   background: radial-gradient(circle at top right, rgba(0, 183, 255, 0.16), rgba(0, 0, 0, 0.95));
-  max-width: 430px;
 }
 
 .prize-pool-card .page-title-neon {
@@ -866,6 +866,11 @@ body {
 .donate-page {
   display: grid;
   gap: 16px;
+}
+
+.donate-page .prize-pool-card {
+  width: 100%;
+  max-width: none;
 }
 
 .donate-section {
