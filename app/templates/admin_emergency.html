@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>{{ tr('admin_advanced_actions_title') }}</h2>
+<h2 class="page-title-neon">{{ tr('admin_advanced_actions_title') }}</h2>
 {% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}{% if request.query_params.get('details') %}: <span class="small">{{ request.query_params.get('details') }}</span>{% endif %}</div>{% endif %}
 <div class="d-flex justify-content-end align-items-center gap-2 mb-3">
   <a class="btn btn-sm btn-outline-secondary" href="/admin">{{ tr('admin_back_to_panel') }}</a>

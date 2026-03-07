@@ -1228,6 +1228,7 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
 
     total_sponsors_amount_rub = f"{int(total_sponsors_amount)}" if total_sponsors_amount == total_sponsors_amount.to_integral() else f"{total_sponsors_amount:.2f}"
     total_sponsors_amount_usd = f"{int(usd_amount)}" if usd_amount == usd_amount.to_integral() else f"{usd_amount:.2f}"
+    prize_pool_wave_enabled = total_sponsors_amount >= Decimal("1000")
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -1242,6 +1243,7 @@ async def index(request: Request, db: AsyncSession = Depends(get_db)):
             chat_settings=chat_settings,
             total_sponsors_amount_rub=total_sponsors_amount_rub,
             total_sponsors_amount_usd=total_sponsors_amount_usd,
+            prize_pool_wave_enabled=prize_pool_wave_enabled,
             chat_saved_nick=unquote((request.cookies.get("chat_nick") or "")).strip()[:120],
             chat_saved_nick_color=resolve_chat_nick_color(request.cookies.get("chat_nick_color")),
         ),
@@ -3419,7 +3421,7 @@ async def admin_delete_crypto_wallet(
 @router.post("/admin/donation-links/create")
 async def admin_create_donation_link(
     label: str = Form(...),
-    url: str = Form(...),
+    url: str = Form(default=""),
     is_active: bool = Form(default=False),
     content_lang: str = Form(default="ru"),
     category: str = Form(default="general"),
@@ -3428,7 +3430,10 @@ async def admin_create_donation_link(
     lang = get_lang(content_lang)
     max_sort_order = await db.scalar(select(func.max(DonationLink.sort_order)))
     normalized_category = category if category in {"general", "bank_cards", "support_author"} else "general"
-    row = DonationLink(url=(url or "").strip(), category=normalized_category, is_active=is_active, sort_order=(max_sort_order or -1) + 1)
+    normalized_url = (url or "").strip()
+    if normalized_category != "bank_cards" and not normalized_url:
+        return RedirectResponse(url=f"/admin/content?msg=msg_operation_failed&content_lang={lang}", status_code=303)
+    row = DonationLink(url=normalized_url, category=normalized_category, is_active=is_active, sort_order=(max_sort_order or -1) + 1)
     setattr(row, f"title_{lang}", (label or "").strip())
     db.add(row)
     await db.commit()
@@ -3439,7 +3444,7 @@ async def admin_create_donation_link(
 async def admin_update_donation_link(
     link_id: int,
     label: str = Form(...),
-    url: str = Form(...),
+    url: str = Form(default=""),
     is_active: bool = Form(default=False),
     content_lang: str = Form(default="ru"),
     category: str = Form(default="general"),
@@ -3449,8 +3454,12 @@ async def admin_update_donation_link(
     row = await db.get(DonationLink, link_id)
     if not row:
         return RedirectResponse(url=f"/admin/content?msg=msg_operation_failed&content_lang={lang}", status_code=303)
-    row.url = (url or "").strip()
-    row.category = category if category in {"general", "bank_cards", "support_author"} else "general"
+    normalized_category = category if category in {"general", "bank_cards", "support_author"} else "general"
+    normalized_url = (url or "").strip()
+    if normalized_category != "bank_cards" and not normalized_url:
+        return RedirectResponse(url=f"/admin/content?msg=msg_operation_failed&content_lang={lang}", status_code=303)
+    row.url = normalized_url
+    row.category = normalized_category
     row.is_active = is_active
     setattr(row, f"title_{lang}", (label or "").strip())
     await db.commit()

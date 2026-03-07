@@ -52,12 +52,12 @@
   <div class="col-lg-5">
     <div class="card bg-black neon-border-blue prize-pool-card">
       <div class="card-body">
-        <h3 class="prize-pool-title-neon">{{ tr('index_prize_pool') }}</h3>
-        <div class="prize-pool-amount">
+        <h3 class="prize-pool-title-neon page-title-neon">{{ tr('index_prize_pool') }}</h3>
+        <div class="prize-pool-amount{% if prize_pool_wave_enabled %} prize-pool-amount-wave{% endif %}">
           {% if lang == 'en' %}
-            $ {{ total_sponsors_amount_usd }}
+            {% for char in ('$ ' ~ total_sponsors_amount_usd) %}<span class="prize-pool-digit">{{ char }}</span>{% endfor %}
           {% else %}
-            {{ total_sponsors_amount_rub }} ₽
+            {% for char in (total_sponsors_amount_rub ~ ' ₽') %}<span class="prize-pool-digit">{{ char }}</span>{% endfor %}
           {% endif %}
         </div>
         <div>

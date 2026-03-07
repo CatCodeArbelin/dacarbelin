@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>{{ tr('admin_users_title') }}</h2>
+<h2 class="page-title-neon">{{ tr('admin_users_title') }}</h2>
 {% if request.query_params.get('msg') %}<div class="alert alert-contrast">{{ tr(request.query_params.get('msg')) }}{% if request.query_params.get('details') %}: <span class="small">{{ request.query_params.get('details') }}</span>{% endif %}</div>{% endif %}
 <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
   <form action="/admin/users/refresh-ranks" method="post" class="d-inline" onsubmit="return confirm('Обновить ранги всех участников? Запросы будут отправляться последовательно с паузой 1.5 секунды.');">
