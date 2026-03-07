@@ -323,6 +323,44 @@ def test_tournament_page_context_contains_expected_keys_when_started(monkeypatch
     assert response.context["stage_columns"] == [{"key": "group_stage"}, {"key": "stage_2"}]
     assert response.context["tournament_tree"]["stages"][0]["key"] == "group_stage"
 
+
+def test_tournament_page_shows_group_stage_label_when_tournament_started_but_playoff_not_started(monkeypatch) -> None:
+    fake_db = _FakeTournamentPageDB()
+
+    class _CaptureResponse:
+        def __init__(self, context):
+            self.context = context
+
+    async def fake_get_tournament_started(db):
+        return True
+
+    async def fake_get_playoff_stages_with_data(db):
+        return [
+            SimpleNamespace(key="stage_2", is_started=False, title="Stage 2"),
+            SimpleNamespace(key="stage_1_4", is_started=False, title="Stage 3"),
+            SimpleNamespace(key="stage_final", is_started=False, title="Final"),
+        ]
+
+    def fake_build_bracket_columns(groups, playoff_stages, user_by_id, direct_invite_ids, *args, **kwargs):
+        return [{"key": "group_stage"}, {"key": "stage_2"}]
+
+    def fake_build_tournament_tree_vm(groups, playoff_stages, user_by_id, direct_invite_ids, tournament_winner_user_id=None, *args, **kwargs):
+        return {"stages": [{"key": "group_stage", "title": "I этап", "level": 0, "matches": []}]}
+
+    def fake_template_response(request, template_name, context):
+        return _CaptureResponse(context)
+
+    monkeypatch.setattr(web, "get_tournament_started", fake_get_tournament_started)
+    monkeypatch.setattr(web, "get_playoff_stages_with_data", fake_get_playoff_stages_with_data)
+    monkeypatch.setattr(web, "build_bracket_columns", fake_build_bracket_columns)
+    monkeypatch.setattr(web, "build_tournament_tree_vm", fake_build_tournament_tree_vm)
+    monkeypatch.setattr(web.templates, "TemplateResponse", fake_template_response)
+
+    request = SimpleNamespace(cookies={"lang": "ru"})
+    response = __import__("asyncio").run(web.tournament_page(request, fake_db))
+
+    assert response.context["current_stage_display"] == web.t("ru", "tournament_stage_group_stage_label")
+
 def test_stage_order_constants_match_active_stage_progression_order() -> None:
     assert web.TOURNAMENT_STAGE_KEYS_ORDER == get_public_stage_display_sequence()
     assert web.PLAYOFF_STAGE_KEYS_ORDER == get_playoff_stage_sequence_keys()

@@ -1654,9 +1654,10 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
         )
 
     lang = get_lang(request.cookies.get("lang"))
+    has_started_playoff = any(stage.is_started for stage in playoff_stages)
     active_playoff_stage = next((stage for stage in playoff_stages if stage.is_started), None)
     active_stage_key = active_playoff_stage.key if active_playoff_stage else "group_stage"
-    current_stage_display = resolve_current_stage_label(lang, playoff_stages, tournament_started)
+    current_stage_display = resolve_current_stage_label(lang, playoff_stages, show_playoff=has_started_playoff)
     try:
         tournament_tree = build_tournament_tree_vm(
             groups,
