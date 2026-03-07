@@ -216,3 +216,50 @@ def test_admin_users_page_reassign_ui_does_not_require_manual_user_id(monkeypatc
     assert "user-reassign-group" in html
     assert "Stage 1" in html
     assert "Stage 2" in html
+
+
+def test_admin_users_page_reassign_ui_has_fallback_stage_options_when_playoff_stages_empty(monkeypatch) -> None:
+    class _DB:
+        async def scalars(self, statement):
+            sql = str(statement)
+            if "FROM users" in sql:
+                return _ScalarResult([User(id=9, nickname="u9")])
+            if "FROM playoff_stages" in sql:
+                return _ScalarResult([])
+            if "FROM playoff_participants" in sql:
+                return _ScalarResult([])
+            if "FROM tournament_groups" in sql:
+                return _ScalarResult([])
+            return _ScalarResult([])
+
+        async def execute(self, statement):
+            return SimpleNamespace(all=lambda: [])
+
+    class _Req:
+        cookies = {}
+        query_params = {}
+
+    async def fake_get_draw_applied(db):
+        return False
+
+    async def fake_get_tournament_started(db):
+        return False
+
+    monkeypatch.setattr(web, "get_draw_applied", fake_get_draw_applied)
+    monkeypatch.setattr(web, "get_tournament_started", fake_get_tournament_started)
+
+    import asyncio
+
+    response = asyncio.run(web.admin_users_page(request=_Req(), db=_DB()))
+    html = response.body.decode("utf-8")
+
+    assert response.status_code == 200
+    assert "- stage -" in html
+    assert "Stage 2" in html
+    assert "Stage 3" in html
+    assert "Final" in html
+    assert 'const stageGroupOptions = {' in html
+    assert '"stage_2": [1, 2, 3, 4]' in html
+    assert '"stage_1_4": [1, 2]' in html
+    assert '"stage_final": [1]' in html
+

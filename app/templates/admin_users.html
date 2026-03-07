@@ -78,14 +78,15 @@
                 <input type="hidden" name="user_id" value="{{ user.id }}">
                 <select class="form-select form-select-sm user-reassign-stage" name="target_stage_id">
                   <option value="">- stage -</option>
-                  {% for stage in playoff_stages %}
-                  <option value="{{ stage.id }}" {% if playoff_state and playoff_state.stage_id == stage.id %}selected{% endif %}>Stage {{ stage.stage_order + 1 }} — {{ stage.title }}</option>
+                  {% for stage_option in reassign_stage_options %}
+                  {% set stage_value = stage_option.id if stage_option.id is not none else stage_option.key %}
+                  <option value="{{ stage_value }}" {% if playoff_state and stage_option.id is not none and playoff_state.stage_id == stage_option.id %}selected{% endif %}>{{ stage_option.title }}</option>
                   {% endfor %}
                 </select>
                 <select class="form-select form-select-sm user-reassign-group" name="target_group_number">
                   <option value="">- group -</option>
                   {% if playoff_state %}
-                    {% for group_number in stage_group_options.get(playoff_state.stage_id, []) %}
+                    {% for group_number in stage_group_options.get(playoff_state.stage_id|string, []) %}
                     <option value="{{ group_number }}" {% if playoff_state.group_number == group_number %}selected{% endif %}>Group {{ group_number }}</option>
                     {% endfor %}
                   {% endif %}
