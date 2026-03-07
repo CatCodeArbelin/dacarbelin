@@ -1479,12 +1479,22 @@ async def participants(
         else_=len(basket_order_map),
     )
 
-    queen_rank_numeric = case(
-        (User.highest_rank.like("Queen#%"), func.cast(func.substr(User.highest_rank, 7), Integer)),
-        else_=None,
+    rank_tier_order_case = case(
+        (User.highest_rank.like("Queen#%"), 0),
+        (User.highest_rank.like("King-%"), 1),
+        (User.highest_rank.like("Rook-%"), 2),
+        (User.highest_rank.like("Bishop-%"), 3),
+        (User.highest_rank.like("Knight-%"), 4),
+        (User.highest_rank.like("Pawn-%"), 5),
+        else_=999,
     )
-    queen_pair_order_case = case(
-        (User.basket.in_([Basket.QUEEN.value, Basket.QUEEN_RESERVE.value]), func.coalesce(queen_rank_numeric, 999999)),
+    rank_division_order_case = case(
+        (User.highest_rank.like("Queen#%"), func.coalesce(func.cast(func.replace(User.highest_rank, "Queen#", ""), Integer), 999999)),
+        (User.highest_rank.like("King-%"), func.coalesce(func.cast(func.replace(User.highest_rank, "King", ""), Integer), 0)),
+        (User.highest_rank.like("Rook-%"), func.coalesce(func.cast(func.replace(User.highest_rank, "Rook", ""), Integer), 0)),
+        (User.highest_rank.like("Bishop-%"), func.coalesce(func.cast(func.replace(User.highest_rank, "Bishop", ""), Integer), 0)),
+        (User.highest_rank.like("Knight-%"), func.coalesce(func.cast(func.replace(User.highest_rank, "Knight", ""), Integer), 0)),
+        (User.highest_rank.like("Pawn-%"), func.coalesce(func.cast(func.replace(User.highest_rank, "Pawn", ""), Integer), 0)),
         else_=999999,
     )
 
@@ -1508,7 +1518,8 @@ async def participants(
             await db.scalars(
                 select(User).order_by(
                     basket_order_case,
-                    queen_pair_order_case,
+                    rank_tier_order_case,
+                    rank_division_order_case,
                     User.created_at,
                     User.id,
                 )
