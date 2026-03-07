@@ -1312,7 +1312,15 @@ a[href^="http"]:hover,
 }
 
 html[lang="ru"] body {
-  font-family: "Exo 2", "Rubik", "Segoe UI", sans-serif;
+  font-family: "Inter", "Rubik", "Exo 2", "Segoe UI", sans-serif;
+}
+
+html[lang="ru"] .content-html,
+html[lang="ru"] .content-html *,
+html[lang="ru"] .form-label,
+html[lang="ru"] .form-control,
+html[lang="ru"] .form-select {
+  line-height: 1.58;
 }
 
 html[lang="en"] body {
