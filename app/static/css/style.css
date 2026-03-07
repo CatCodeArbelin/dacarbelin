@@ -1323,6 +1323,80 @@ html[lang="ru"] .form-select {
   line-height: 1.58;
 }
 
+
+.rules-page {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 1.5rem;
+  border: 1px solid rgba(61, 155, 255, 0.55);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(6, 18, 14, 0.92), rgba(2, 8, 6, 0.94));
+  box-shadow: 0 0 18px rgba(61, 155, 255, 0.2), inset 0 0 24px rgba(0, 255, 133, 0.08);
+}
+
+.rules-page__header {
+  margin-bottom: 1rem;
+}
+
+.rules-page__content.content-html h2,
+.rules-page__content.content-html h3 {
+  margin-top: 1.4rem;
+  margin-bottom: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+.rules-page__content.content-html h2 {
+  text-transform: uppercase;
+  font-size: 1.08rem;
+  color: #9dff57;
+}
+
+.rules-page__content.content-html h3 {
+  font-size: 0.98rem;
+  color: #ddf8ff;
+}
+
+.rules-page__content.content-html p {
+  margin: 0 0 0.85rem;
+  line-height: 1.65;
+}
+
+.rules-page__content.content-html ul,
+.rules-page__content.content-html ol {
+  margin: 0.25rem 0 1rem;
+  padding-left: 1.35rem;
+}
+
+.rules-page__content.content-html li {
+  margin-bottom: 0.45rem;
+}
+
+.rules-page__content.content-html ul li::marker,
+.rules-page__content.content-html ol li::marker {
+  color: #00ff85;
+}
+
+.rules-page__content.content-html a,
+.rules-page__content.content-html a:visited {
+  color: #ddf8ff;
+  text-decoration-color: rgba(0, 229, 255, 0.92);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-shadow: 0 0 10px rgba(0, 229, 255, 0.45);
+}
+
+.rules-page__content.content-html a:hover,
+.rules-page__content.content-html a:focus-visible {
+  color: #ffffff;
+  text-decoration-color: rgba(255, 63, 79, 0.9);
+  text-shadow: 0 0 10px rgba(255, 63, 79, 0.78), 0 0 14px rgba(0, 229, 255, 0.45);
+}
+
+.rules-page__content.content-html strong {
+  color: #f5ffda;
+  font-weight: 700;
+}
+
 html[lang="en"] body {
   font-family: "Rubik", "Exo 2", "Segoe UI", sans-serif;
 }
