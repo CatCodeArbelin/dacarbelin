@@ -32,26 +32,14 @@
     </div>
     {% else %}
     <h4 class="participants-page__subtitle">{{ tr('participants_title') }}</h4>
-    <div class="table-responsive mb-4">
+    <div class="table-responsive">
       <table class="table table-dark table-striped participants-page__table">
         <tr><th>{{ tr('participants_nick') }}</th><th>{{ tr('participants_steam_id') }}</th><th>{{ tr('participants_game') }}</th><th>{{ tr('participants_current') }}</th><th>{{ tr('participants_highest') }}</th></tr>
-        {% for u in main_users %}
+        {% for u in users %}
         <tr><td>{{u.nickname}}</td><td>{{u.steam_id}}</td><td>{{u.game_nickname}}</td><td>{{u.current_rank}}</td><td>{{u.highest_rank}}</td></tr>
         {% endfor %}
       </table>
     </div>
-
-    {% if reserve_users %}
-    <h4 class="participants-page__subtitle participants-page__subtitle--reserve">{{ tr('participants_reserve_roster_title') }}</h4>
-    <div class="table-responsive">
-      <table class="table table-dark table-striped participants-page__table participants-page__table--reserve">
-        <tr><th>{{ tr('participants_nick') }}</th><th>{{ tr('participants_steam_id') }}</th><th>{{ tr('participants_game') }}</th><th>{{ tr('participants_current') }}</th><th>{{ tr('participants_highest') }}</th></tr>
-        {% for u in reserve_users %}
-        <tr><td>{{u.nickname}}</td><td>{{u.steam_id}}</td><td>{{u.game_nickname}}</td><td>{{u.current_rank}}</td><td>{{u.highest_rank}}</td></tr>
-        {% endfor %}
-      </table>
-    </div>
-    {% endif %}
     {% endif %}
   </div></div>
   {% endif %}
