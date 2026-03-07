@@ -2488,6 +2488,9 @@ async def _update_user_allowed_fields(
             continue
         setattr(user, field_name, field_value)
 
+    if validated_data.get("direct_invite_stage") is None:
+        user.direct_invite_group_number = None
+
     if manual_points is not None:
         normalized_points = max(0, int(manual_points))
         group_members = list((await db.scalars(select(GroupMember).where(GroupMember.user_id == user_id))).all())
@@ -2599,12 +2602,20 @@ async def admin_update_user(
     db: AsyncSession = Depends(get_db),
 ):
     # Атомарно обновляем разрешенные поля пользователя из админ-панели.
+    user = await db.get(User, user_id)
+    if not user:
+        return redirect_with_admin_users_msg("msg_operation_failed")
+
+    resolved_direct_invite_stage = direct_invite_stage
+    if resolved_direct_invite_stage is None:
+        resolved_direct_invite_stage = user.direct_invite_stage
+
     return await _update_user_allowed_fields(
         db,
         user_id=user_id,
         nickname=nickname,
         basket=basket,
-        direct_invite_stage=direct_invite_stage,
+        direct_invite_stage=resolved_direct_invite_stage,
         manual_points=manual_points,
     )
 
