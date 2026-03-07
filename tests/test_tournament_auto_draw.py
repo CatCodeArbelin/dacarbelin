@@ -80,32 +80,54 @@ def _make_users(count: int) -> list[User]:
     ]
 
 
-def _make_users_with_reserve_mix() -> list[User]:
-    baskets = [
+
+def _make_users_with_main_and_reserve(main_count: int, reserve_count: int) -> list[User]:
+    main_baskets = [
+        Basket.QUEEN_TOP.value,
         Basket.QUEEN.value,
-        Basket.QUEEN_RESERVE.value,
         Basket.KING.value,
-        Basket.KING_RESERVE.value,
         Basket.ROOK.value,
-        Basket.ROOK_RESERVE.value,
         Basket.BISHOP.value,
-        Basket.BISHOP_RESERVE.value,
         Basket.LOW_RANK.value,
+    ]
+    reserve_baskets = [
+        Basket.QUEEN_RESERVE.value,
+        Basket.KING_RESERVE.value,
+        Basket.ROOK_RESERVE.value,
+        Basket.BISHOP_RESERVE.value,
         Basket.LOW_RANK_RESERVE.value,
     ]
-    return [
-        User(
-            id=idx,
-            nickname=f"u{idx}",
-            steam_input=f"steam_{idx}",
-            steam_id=f"sid_{idx}",
-            game_nickname=f"g{idx}",
-            current_rank="Rook",
-            highest_rank="Queen",
-            basket=baskets[(idx - 1) % len(baskets)],
+
+    users: list[User] = []
+    for idx in range(1, main_count + 1):
+        users.append(
+            User(
+                id=idx,
+                nickname=f"m{idx}",
+                steam_input=f"msteam_{idx}",
+                steam_id=f"msid_{idx}",
+                game_nickname=f"mg{idx}",
+                current_rank="Rook",
+                highest_rank="Queen",
+                basket=main_baskets[(idx - 1) % len(main_baskets)],
+            )
         )
-        for idx in range(1, 57)
-    ]
+
+    for offset in range(1, reserve_count + 1):
+        user_id = main_count + offset
+        users.append(
+            User(
+                id=user_id,
+                nickname=f"r{offset}",
+                steam_input=f"rsteam_{offset}",
+                steam_id=f"rsid_{offset}",
+                game_nickname=f"rg{offset}",
+                current_rank="Rook",
+                highest_rank="Queen",
+                basket=reserve_baskets[(offset - 1) % len(reserve_baskets)],
+            )
+        )
+    return users
 
 
 def _make_users_with_invited() -> list[User]:
@@ -222,20 +244,16 @@ class TournamentAutoDrawTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(groups), 7)
         self.assertEqual(len(members), 56)
 
-    async def test_create_auto_draw_accepts_reserve_baskets_for_7x8(self) -> None:
-        """Проверяет позитивный сценарий `test_create_auto_draw_accepts_reserve_baskets_for_7x8`.
-        Важно для бизнес-логики: защищает ключевой турнирный/интеграционный поток от регрессий.
-        Запуск: `pytest tests/test_tournament_auto_draw.py -q` и `pytest tests/test_tournament_auto_draw.py -k "test_create_auto_draw_accepts_reserve_baskets_for_7x8" -q`."""
-        session = _FakeSession(users=_make_users_with_reserve_mix())
+    async def test_create_auto_draw_rejects_when_only_reserve_fills_missing_slots(self) -> None:
+        session = _FakeSession(users=_make_users_with_main_and_reserve(main_count=40, reserve_count=16))
 
-        ok, _message = await create_auto_draw(session)
+        ok, message = await create_auto_draw(session)
 
-        self.assertTrue(ok)
-        groups = [obj for obj in session.added if isinstance(obj, TournamentGroup)]
+        self.assertFalse(ok)
+        self.assertIn("требуется минимум 56", message)
         members = [obj for obj in session.added if isinstance(obj, GroupMember)]
-        self.assertEqual(len(groups), 7)
-        self.assertEqual(len(members), 56)
-        self.assertTrue(session.committed)
+        self.assertEqual(len(members), 0)
+        self.assertFalse(session.committed)
 
     async def test_create_auto_draw_excludes_invited_from_group_stage(self) -> None:
         """Проверяет негативный сценарий `test_create_auto_draw_excludes_invited_from_group_stage`.

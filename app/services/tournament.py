@@ -37,15 +37,10 @@ POINTS_BY_PLACE = {1: 8, 2: 6, 3: 5, 4: 4, 5: 3, 6: 2, 7: 1, 8: 0}
 PRIMARY_BASKETS = [
     Basket.QUEEN_TOP.value,
     Basket.QUEEN.value,
-    Basket.QUEEN_RESERVE.value,
     Basket.KING.value,
-    Basket.KING_RESERVE.value,
     Basket.ROOK.value,
-    Basket.ROOK_RESERVE.value,
     Basket.BISHOP.value,
-    Basket.BISHOP_RESERVE.value,
     Basket.LOW_RANK.value,
-    Basket.LOW_RANK_RESERVE.value,
 ]
 
 PRIMARY_DRAW_BASKETS_WITH_RESERVE = {
@@ -87,6 +82,7 @@ async def create_auto_draw(db: AsyncSession) -> tuple[bool, str]:
             )
         ).all()
     )
+    users = [user for user in users if user.basket in PRIMARY_BASKETS]
     profile_spec = await get_current_tournament_profile_spec(db)
     expected_group_count = int(profile_spec["stage_1_groups_count"])
     stage_group_size = int(TOURNAMENT_FLOW_SPEC["group_stage"]["group_size"])
