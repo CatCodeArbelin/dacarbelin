@@ -126,6 +126,13 @@ ALLOWED_USER_UPDATE_FIELDS = {"nickname", "basket", "direct_invite_stage"}
 ALLOWED_DIRECT_INVITE_STAGES = {None, *get_playoff_stage_sequence_keys()}
 TOURNAMENT_STAGE_KEYS_ORDER = get_public_stage_display_sequence()
 PLAYOFF_STAGE_KEYS_ORDER = TOURNAMENT_STAGE_KEYS_ORDER[1:]
+BASKET_PAIRS = [
+    (Basket.QUEEN.value, Basket.QUEEN_RESERVE.value),
+    (Basket.KING.value, Basket.KING_RESERVE.value),
+    (Basket.ROOK.value, Basket.ROOK_RESERVE.value),
+    (Basket.BISHOP.value, Basket.BISHOP_RESERVE.value),
+    (Basket.LOW_RANK.value, Basket.LOW_RANK_RESERVE.value),
+]
 EXPECTED_32_PLAYER_STAGE_ORDER_PAIRS = [
     (0, "stage_2"),
     (1, "stage_1_4"),
@@ -1462,7 +1469,7 @@ async def participants(
             "label": "Low Rank",
         },
     ]
-    basket_pairs = [(tab["main_basket"], tab["reserve_basket"]) for tab in basket_tabs]
+    basket_pairs = BASKET_PAIRS
     basket_to_pair = {basket_name: pair for pair in basket_pairs for basket_name in pair}
     selected_pair = basket_to_pair.get(basket, basket_pairs[0])
     main_basket, reserve_basket = selected_pair
@@ -1474,7 +1481,6 @@ async def participants(
             await db.scalars(
                 select(User)
                 .where(
-                    User.basket == Basket.INVITED.value,
                     User.direct_invite_stage == "stage_2",
                 )
                 .order_by(User.created_at)
@@ -2070,7 +2076,7 @@ async def admin_page(request: Request, db: AsyncSession = Depends(get_db)):
 
 @router.get("/admin/users", response_class=HTMLResponse)
 async def admin_users_page(request: Request, db: AsyncSession = Depends(get_db)):
-    users = (await db.scalars(select(User).order_by(desc(User.created_at)).limit(300))).all()
+    users = (await db.scalars(select(User).order_by(desc(User.created_at)))).all()
     allowed_direct_invite_stages = [
         "stage_2",
         "stage_final",
@@ -2088,6 +2094,21 @@ async def admin_users_page(request: Request, db: AsyncSession = Depends(get_db))
     show_group_sections = draw_applied and tournament_started
 
     users_by_id: dict[int, User] = {user.id: user for user in users}
+    playoff_stages = list((await db.scalars(select(PlayoffStage).order_by(PlayoffStage.stage_order, PlayoffStage.id))).all())
+    stage_group_options = {
+        stage.id: list(range(1, max(1, math.ceil(int(stage.stage_size or 0) / 8)) + 1))
+        for stage in playoff_stages
+    }
+    user_playoff_participants = (
+        await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.user_id.in_(list(users_by_id.keys()))))
+    ).all() if users_by_id else []
+    user_playoff_state = {
+        participant.user_id: {
+            "stage_id": participant.stage_id,
+            "group_number": get_stage_group_number_by_seed(participant.seed),
+        }
+        for participant in user_playoff_participants
+    }
     group_sections: list[dict[str, object]] = []
     grouped_user_ids: set[int] = set()
 
@@ -2124,8 +2145,119 @@ async def admin_users_page(request: Request, db: AsyncSession = Depends(get_db))
             allowed_direct_invite_stages=allowed_direct_invite_stages,
             group_sections=group_sections,
             show_group_sections=show_group_sections,
+            playoff_stages=playoff_stages,
+            stage_group_options=stage_group_options,
+            user_playoff_state=user_playoff_state,
+            basket_pairs=BASKET_PAIRS,
         ),
     )
+
+
+
+def _resolve_basket_quick_move(current_basket: str | None, quick_move: str | None) -> str | None:
+    if quick_move not in {"to_main", "to_reserve"}:
+        return None
+    for main_basket, reserve_basket in BASKET_PAIRS:
+        if current_basket in {main_basket, reserve_basket}:
+            return main_basket if quick_move == "to_main" else reserve_basket
+    return None
+
+
+async def _find_group_seed_for_stage(
+    db: AsyncSession,
+    *,
+    stage_id: int,
+    group_number: int,
+    stage_size: int,
+) -> int:
+    participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == stage_id))).all())
+    occupied = {participant.seed for participant in participants}
+    min_seed = ((group_number - 1) * 8) + 1
+    max_seed = min(stage_size, group_number * 8)
+    for candidate_seed in range(min_seed, max_seed + 1):
+        if candidate_seed not in occupied:
+            return candidate_seed
+    raise ValueError("target_group_is_full")
+
+
+@router.post("/admin/user/reassign")
+async def admin_reassign_user(
+    user_id: int = Form(...),
+    target_stage_id: int | None = Form(default=None),
+    target_group_number: int | None = Form(default=None),
+    replace_from_user_id: int | None = Form(default=None),
+    quick_move: str | None = Form(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await db.get(User, user_id)
+    if not user:
+        return redirect_with_admin_users_msg("msg_operation_failed", details="user_not_found")
+
+    next_basket = _resolve_basket_quick_move(user.basket, quick_move)
+    if next_basket and next_basket != user.basket:
+        user.basket = next_basket
+
+    if not target_stage_id:
+        await db.commit()
+        return redirect_with_admin_users_msg("msg_status_ok")
+
+    target_stage = await db.get(PlayoffStage, target_stage_id)
+    if not target_stage:
+        return redirect_with_admin_users_msg("msg_invalid_playoff_stage")
+
+    if target_group_number is not None:
+        allowed_group_numbers = set(range(1, max(1, math.ceil(int(target_stage.stage_size or 0) / 8)) + 1))
+        if target_group_number not in allowed_group_numbers:
+            return redirect_with_admin_users_msg("msg_operation_failed", details="invalid_target_group")
+
+    existing_memberships = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.user_id == user_id))).all())
+    if len(existing_memberships) > 1:
+        return redirect_with_admin_users_msg("msg_operation_failed", details="duplicate_membership")
+    current_membership = existing_memberships[0] if existing_memberships else None
+
+    try:
+        if current_membership and current_membership.stage_id != target_stage_id:
+            await move_user_to_stage(db, current_membership.stage_id, target_stage_id, user_id)
+        elif not current_membership:
+            group_member = await db.scalar(select(GroupMember).where(GroupMember.user_id == user_id).order_by(GroupMember.id))
+            if group_member:
+                await promote_group_member_to_stage(db, group_member.group_id, user_id, target_stage_id)
+            elif replace_from_user_id:
+                await replace_stage_player(db, target_stage_id, replace_from_user_id, user_id)
+            else:
+                stage_participants = list((await db.scalars(select(PlayoffParticipant).where(PlayoffParticipant.stage_id == target_stage_id))).all())
+                if any(participant.user_id == user_id for participant in stage_participants):
+                    raise ValueError("duplicate_membership")
+                if len(stage_participants) >= int(target_stage.stage_size or 0):
+                    raise ValueError("target_stage_is_full")
+                next_seed = max((participant.seed for participant in stage_participants), default=0) + 1
+                db.add(PlayoffParticipant(stage_id=target_stage_id, user_id=user_id, seed=next_seed))
+                await db.commit()
+
+        target_membership = await db.scalar(
+            select(PlayoffParticipant).where(PlayoffParticipant.stage_id == target_stage_id, PlayoffParticipant.user_id == user_id)
+        )
+        if not target_membership:
+            return redirect_with_admin_users_msg("msg_operation_failed", details="target_membership_not_found")
+
+        if target_group_number is not None:
+            target_membership.seed = await _find_group_seed_for_stage(
+                db,
+                stage_id=target_stage_id,
+                group_number=target_group_number,
+                stage_size=int(target_stage.stage_size or 0),
+            )
+
+        await db.commit()
+        return redirect_with_admin_users_msg("msg_player_moved")
+    except ValueError as exc:
+        await db.rollback()
+        details = str(exc) or "reassign_failed"
+        return redirect_with_admin_users_msg("msg_operation_failed", details=details)
+    except Exception:
+        await db.rollback()
+        logger.exception("Failed to reassign user from admin users page", extra={"user_id": user_id})
+        return redirect_with_admin_users_msg("msg_operation_failed", details="reassign_failed")
 
 
 async def _update_user_allowed_fields(
