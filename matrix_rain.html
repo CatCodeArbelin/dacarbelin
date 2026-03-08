@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Matrix Rain</title>
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #0f0;
+            z-index: 10;
+            text-align: center;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="matrix"></canvas>
+    <div class="content"><h1>Matrix Rain</h1></div>
+
+    <script>
+        const canvas = document.getElementById('matrix');
+        const ctx = canvas.getContext('2d');
+
+        const katakana = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
+        const latin = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const nums = '0123456789';
+        const alphabet = katakana + latin + nums;
+
+        const fontSize = 28; // крупнее символы
+        const columnGap = 2.4; // больше расстояние между полосками => их меньше
+        const stepX = fontSize * columnGap;
+        let columns = 0;
+        let rainDrops = [];
+
+        function initRain() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            columns = Math.floor(canvas.width / stepX);
+            rainDrops = new Array(columns).fill(1);
+        }
+
+        function draw() {
+            // более плотное затухание снижает визуальный шум и нагрузку
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.10)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#0F0';
+            ctx.font = `${fontSize}px monospace`;
+
+            for (let i = 0; i < rainDrops.length; i++) {
+                const text = alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+                const x = i * stepX;
+                const y = rainDrops[i] * fontSize;
+
+                ctx.fillText(text, x, y);
+
+                if (y > canvas.height && Math.random() > 0.97) {
+                    rainDrops[i] = 0;
+                }
+
+                rainDrops[i]++;
+            }
+        }
+
+        window.addEventListener('resize', initRain);
+        initRain();
+
+        // 24 FPS заметно легче для CPU, чем 33 FPS (30ms), но визуально почти так же
+        setInterval(draw, 1000 / 24);
+    </script>
+</body>
+</html>
