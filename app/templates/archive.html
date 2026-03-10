@@ -11,7 +11,7 @@
         <h4>{{ entry.title or 'Турнир' }}</h4>
         {% if entry.season %}<div class="text-contrast-muted mb-2">Сезон: {{ entry.season }}</div>{% endif %}
         {% if entry.winner_nickname %}<p><strong>Чемпион:</strong> <span class="archive-champion">★ {{ entry.winner_nickname }}</span></p>{% endif %}
-        {% if entry.created_at %}<div class="small text-contrast-muted mb-2">{{ entry.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</div>{% endif %}
+        {% if entry.created_at %}<div class="small text-contrast-muted mb-2">{{ format_msk_datetime(entry.created_at, '%Y-%m-%d %H:%M MSK') }}</div>{% endif %}
 
         {% if entry.bracket_tree %}
           {{ tree_ui.render_tournament_tree(entry.bracket_tree, tr, 'archive-tree') }}

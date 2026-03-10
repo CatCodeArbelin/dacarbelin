@@ -10,7 +10,7 @@ import re
 from html import escape, unescape
 from html.parser import HTMLParser
 from urllib.parse import quote, unquote, urlencode
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Form, Query, Request
@@ -122,6 +122,7 @@ templates = Jinja2Templates(directory="app/templates")
 DONATE_HIGHLIGHT_AMOUNT_SETTING_KEY = "donate_highlight_amount"
 DONATE_SUPPORT_AUTHOR_VISIBLE_SETTING_KEY = "donate_support_author_visible"
 RUB_PER_USD_RATE = Decimal("79")
+MSK_TIMEZONE = timezone(timedelta(hours=3))
 
 
 ALLOWED_USER_UPDATE_FIELDS = {"basket", "direct_invite_stage"}
@@ -176,6 +177,18 @@ def format_money_amount(amount: Decimal) -> str:
 def to_rub_and_usd_display_amounts(total_rub_amount: Decimal) -> tuple[str, str]:
     usd_amount = total_rub_amount / RUB_PER_USD_RATE
     return format_money_amount(total_rub_amount), format_money_amount(usd_amount)
+
+
+def to_msk_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    utc_value = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+    return utc_value.astimezone(MSK_TIMEZONE)
+
+
+def format_msk_datetime(value: datetime | None, fmt: str = "%d.%m.%y %H:%M:%S") -> str:
+    msk_value = to_msk_datetime(value)
+    return msk_value.strftime(fmt) if msk_value else ""
 
 
 def format_chat_message_source(
@@ -971,7 +984,7 @@ def _display_nickname(user: User | None, fallback: str) -> str:
 
 def template_context(request: Request, **extra):
     lang = get_lang(request.cookies.get("lang"))
-    context = {"request": request, "lang": lang, "tr": lambda key: t(lang, key)}
+    context = {"request": request, "lang": lang, "tr": lambda key: t(lang, key), "format_msk_datetime": format_msk_datetime}
     context.update(extra)
     return context
 
@@ -1310,7 +1323,7 @@ def _build_chat_messages_payload(chat_messages: list[ChatMessage]) -> list[dict[
             "message": msg.message,
             "nick_color": msg.nick_color or default_nick_color,
             "is_admin": msg.temp_nick == "@Admin",
-            "created_at_display": msg.created_at.strftime("%d.%m.%y %H:%M:%S"),
+            "created_at_display": format_msk_datetime(msg.created_at),
         }
         for msg in chat_messages
     ]
