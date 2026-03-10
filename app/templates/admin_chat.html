@@ -44,7 +44,7 @@
       {% for chat_message in chat_messages %}
       <tr>
         <td>{{ chat_message.id }}</td>
-        <td><input class="form-control form-control-sm" form="chat-message-update-{{ chat_message.id }}" name="temp_nick" value="{{ chat_message.temp_nick }}" maxlength="120" required></td>
+        <td><input class="form-control form-control-sm" form="chat-message-update-{{ chat_message.id }}" name="temp_nick" value="{{ chat_message.temp_nick }}" maxlength="120" required><div class="small text-contrast-muted mt-1">{{ chat_message.source_display }}</div></td>
         <td><textarea class="form-control form-control-sm" form="chat-message-update-{{ chat_message.id }}" name="message" rows="2" maxlength="{{ chat_settings.max_length }}" required>{{ chat_message.message }}</textarea></td>
         <td>{{ chat_message.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
         <td>

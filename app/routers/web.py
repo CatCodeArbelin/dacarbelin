@@ -177,6 +177,24 @@ def to_rub_and_usd_display_amounts(total_rub_amount: Decimal) -> tuple[str, str]
     return format_money_amount(total_rub_amount), format_money_amount(usd_amount)
 
 
+def format_chat_message_source(
+    temp_nick: str,
+    ip_address: str,
+    *,
+    city: str | None = None,
+    country: str | None = None,
+) -> str:
+    """Возвращает строку источника сообщения для админского списка чата."""
+    safe_nick = (temp_nick or "").strip() or "Unknown"
+    safe_ip = (ip_address or "").strip() or "unknown-ip"
+    city_value = (city or "").strip()
+    country_value = (country or "").strip()
+    geo_parts = [part for part in (city_value, country_value) if part]
+    if geo_parts:
+        return f"{safe_nick}({safe_ip} - {', '.join(geo_parts)})"
+    return f"{safe_nick} ({safe_ip})"
+
+
 class ChatEventBroker:
     """Публикует события чата и позволяет подписчикам ждать появления новых сообщений."""
 
@@ -2704,6 +2722,11 @@ async def admin_chat_page(request: Request, db: AsyncSession = Depends(get_db)):
     chat_messages = (
         await db.scalars(select(ChatMessage).order_by(desc(ChatMessage.id)).limit(100))
     ).all()
+    for chat_message in chat_messages:
+        chat_message.source_display = format_chat_message_source(
+            chat_message.temp_nick,
+            chat_message.ip_address,
+        )
     admin_ip = request.client.host if request.client else "admin"
     selected_sender = normalize_admin_chat_sender(request.cookies.get(ADMIN_CHAT_SENDER_COOKIE))
     if selected_sender == "@Admin" and not request.cookies.get(ADMIN_CHAT_SENDER_COOKIE):

@@ -1,5 +1,7 @@
 """Проверяет админ-операции редактирования и удаления сообщений чата."""
 
+from datetime import datetime
+
 from fastapi.testclient import TestClient
 
 from app.core.admin_session import ADMIN_SESSION_COOKIE, create_admin_session_cookie
@@ -375,3 +377,53 @@ def test_admin_send_chat_publishes_stream_event(monkeypatch) -> None:
     assert response.status_code == 303
     assert response.headers["location"] == "/admin?msg=msg_admin_chat_message_saved"
     assert state["published"] is True
+
+
+def test_format_chat_message_source_variants() -> None:
+    """Проверяет формат строки источника сообщения."""
+    assert web.format_chat_message_source("TempNick", "127.0.0.1") == "TempNick (127.0.0.1)"
+    assert (
+        web.format_chat_message_source("TempNick", "127.0.0.1", city="Moscow", country="RU")
+        == "TempNick(127.0.0.1 - Moscow, RU)"
+    )
+    assert web.format_chat_message_source("TempNick", "127.0.0.1", country="RU") == "TempNick(127.0.0.1 - RU)"
+
+
+def test_admin_chat_page_renders_source_display(monkeypatch) -> None:
+    """Проверяет вывод строки источника рядом с ником в админском чате."""
+
+    class _FakeMessage:
+        id = 11
+        temp_nick = "Guest"
+        message = "hello"
+        ip_address = "203.0.113.9"
+        created_at = datetime(2025, 1, 1, 12, 0, 0)
+
+    class _FakeScalarResult:
+        def __init__(self, items):
+            self._items = items
+
+        def all(self):
+            return self._items
+
+    class _FakeChatSettingsPage:
+        cooldown_seconds = 0
+        max_length = 120
+        is_enabled = True
+
+    async def fake_get_or_create_chat_settings(db):
+        return _FakeChatSettingsPage()
+
+    async def fake_scalars(self, statement):
+        return _FakeScalarResult([_FakeMessage()])
+
+    monkeypatch.setattr(web, "get_or_create_chat_settings", fake_get_or_create_chat_settings)
+    monkeypatch.setattr(web.AsyncSession, "scalars", fake_scalars, raising=False)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        client.cookies.set(web.ADMIN_CHAT_SENDER_COOKIE, "@Loyrensss")
+        response = client.get("/admin/chat")
+
+    assert response.status_code == 200
+    assert "Guest (203.0.113.9)" in response.text
