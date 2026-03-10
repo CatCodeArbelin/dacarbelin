@@ -73,7 +73,7 @@ def test_index_stage_progress_fallback_for_empty_tournament() -> None:
     assert response.status_code == 200
     assert 'id="registration-nickname"' not in response.text
     assert 'name="discord"' not in response.text
-    assert "Telegram (optional)" in response.text
+    assert "Telegram\\QQChat" in response.text
     assert "1 Stage (0%)" in response.text
     assert "2 Stage (0%)" in response.text
     assert "3 Stage (0%)" in response.text
