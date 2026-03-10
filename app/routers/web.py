@@ -153,6 +153,17 @@ ADMIN_CHAT_SENDERS = {
 }
 ADMIN_CHAT_SENDER_COOKIE = "admin_chat_sender"
 CHAT_SENDER_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
+SITE_VIEW_COOKIE = "site_view"
+SITE_VIEW_MODES = {"mobile", "full", "auto"}
+MOBILE_USER_AGENT_MARKERS = (
+    "android",
+    "iphone",
+    "ipad",
+    "ipod",
+    "mobile",
+    "windows phone",
+    "opera mini",
+)
 
 
 def parse_donor_amount(amount_raw: str) -> Decimal:
@@ -984,9 +995,35 @@ def _display_nickname(user: User | None, fallback: str) -> str:
 
 def template_context(request: Request, **extra):
     lang = get_lang(request.cookies.get("lang"))
-    context = {"request": request, "lang": lang, "tr": lambda key: t(lang, key), "format_msk_datetime": format_msk_datetime}
+    site_view = resolve_site_view(request.cookies.get(SITE_VIEW_COOKIE))
+    is_mobile_view = resolve_is_mobile_view(site_view=site_view, user_agent=request.headers.get("user-agent"))
+    switch_mode = "full" if is_mobile_view else "mobile"
+    context = {
+        "request": request,
+        "lang": lang,
+        "site_view": site_view,
+        "is_mobile_view": is_mobile_view,
+        "site_view_switch_mode": switch_mode,
+        "site_view_switch_label": t(lang, "base_view_full") if is_mobile_view else t(lang, "base_view_mobile"),
+        "tr": lambda key: t(lang, key),
+        "format_msk_datetime": format_msk_datetime,
+    }
     context.update(extra)
     return context
+
+
+def resolve_site_view(site_view_cookie: str | None) -> str:
+    normalized = (site_view_cookie or "").strip().lower()
+    return normalized if normalized in SITE_VIEW_MODES else "auto"
+
+
+def resolve_is_mobile_view(*, site_view: str, user_agent: str | None) -> bool:
+    if site_view == "mobile":
+        return True
+    if site_view == "full":
+        return False
+    user_agent_value = (user_agent or "").lower()
+    return any(marker in user_agent_value for marker in MOBILE_USER_AGENT_MARKERS)
 
 
 
@@ -1598,6 +1635,14 @@ async def set_lang(lang: str):
     response = RedirectResponse(url="/", status_code=302)
     selected_lang = lang if lang in {"ru", "en", "zh"} else "en"
     response.set_cookie("lang", selected_lang, max_age=60 * 60 * 24 * 365)
+    return response
+
+
+@router.get("/set-view/{mode}")
+async def set_view(mode: str):
+    response = RedirectResponse(url="/", status_code=302)
+    selected_mode = mode if mode in SITE_VIEW_MODES else "auto"
+    response.set_cookie(SITE_VIEW_COOKIE, selected_mode, max_age=60 * 60 * 24 * 365 * 5)
     return response
 
 
