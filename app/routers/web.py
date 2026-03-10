@@ -1,6 +1,7 @@
 """Содержит веб-маршруты для страниц турнира, админки и пользовательских действий."""
 
 import asyncio
+import ipaddress
 import json
 import logging
 import math
@@ -193,6 +194,49 @@ def format_chat_message_source(
     if geo_parts:
         return f"{safe_nick}({safe_ip} - {', '.join(geo_parts)})"
     return f"{safe_nick} ({safe_ip})"
+
+
+def _parse_forwarded_ip_candidate(raw_value: str | None) -> str | None:
+    candidate = (raw_value or "").strip().strip('"')
+    if not candidate or candidate.lower() == "unknown":
+        return None
+
+    if candidate.startswith("[") and "]" in candidate:
+        candidate = candidate[1:candidate.index("]")]
+    elif candidate.count(":") == 1:
+        host_part, port_part = candidate.rsplit(":", 1)
+        if port_part.isdigit():
+            candidate = host_part
+
+    try:
+        return str(ipaddress.ip_address(candidate))
+    except ValueError:
+        return None
+
+
+def get_request_ip_address(request: Request) -> str:
+    x_forwarded_for = request.headers.get("x-forwarded-for", "")
+    for part in x_forwarded_for.split(","):
+        parsed = _parse_forwarded_ip_candidate(part)
+        if parsed:
+            return parsed
+
+    parsed_real_ip = _parse_forwarded_ip_candidate(request.headers.get("x-real-ip"))
+    if parsed_real_ip:
+        return parsed_real_ip
+
+    forwarded_header = request.headers.get("forwarded", "")
+    for segment in forwarded_header.split(","):
+        for token in segment.split(";"):
+            key, _, value = token.partition("=")
+            if key.strip().lower() != "for":
+                continue
+            parsed_forwarded = _parse_forwarded_ip_candidate(value)
+            if parsed_forwarded:
+                return parsed_forwarded
+
+    direct_ip = request.client.host if request.client else "unknown"
+    return _parse_forwarded_ip_candidate(direct_ip) or direct_ip
 
 
 class ChatEventBroker:
@@ -1700,7 +1744,7 @@ async def send_chat(
     except ValueError as exc:
         return redirect_with_msg("/", str(exc))
 
-    ip = request.client.host if request.client else "unknown"
+    ip = get_request_ip_address(request)
     chat_sender, should_set_chat_sender_cookie = resolve_chat_sender_token(request.cookies.get("chat_sender"))
     last_msg = await db.scalar(
         select(ChatMessage)
@@ -2727,7 +2771,7 @@ async def admin_chat_page(request: Request, db: AsyncSession = Depends(get_db)):
             chat_message.temp_nick,
             chat_message.ip_address,
         )
-    admin_ip = request.client.host if request.client else "admin"
+    admin_ip = get_request_ip_address(request)
     selected_sender = normalize_admin_chat_sender(request.cookies.get(ADMIN_CHAT_SENDER_COOKIE))
     if selected_sender == "@Admin" and not request.cookies.get(ADMIN_CHAT_SENDER_COOKIE):
         last_sender_message = await db.scalar(
@@ -4332,7 +4376,7 @@ async def admin_send_chat_message(
         return redirect_with_admin_msg("msg_admin_chat_messages_cleared")
 
     safe_sender_nick = normalize_admin_chat_sender(sender_nick)
-    admin_ip = request.client.host if request.client else "admin"
+    admin_ip = get_request_ip_address(request)
     db.add(
         ChatMessage(
             temp_nick=safe_sender_nick,
