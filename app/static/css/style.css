@@ -1345,8 +1345,8 @@ a[href^="http"]:hover,
   --matrix-muted: #b5e5cd;
 }
 
-html[lang="ru"] body {
-  font-family: "Exo 2", "Inter", "Segoe UI", sans-serif;
+body {
+  font-family: "Aleo", "Exo 2", "Inter", "Segoe UI", sans-serif;
 }
 
 html[lang="ru"] .content-html,
@@ -1431,27 +1431,11 @@ html[lang="ru"] .form-select {
   font-weight: 700;
 }
 
-html[lang="en"] body {
-  font-family: "Orbitron", "Exo 2", "Segoe UI", sans-serif;
-}
-
 h1, h2, h3, h4, h5, h6,
 .neon-title,
 .navbar-brand {
   font-family: "Orbitron", "Russo One", "Exo 2", sans-serif;
   letter-spacing: 0.05em;
-}
-
-html[lang="ru"] h1,
-html[lang="ru"] h2,
-html[lang="ru"] h3,
-html[lang="ru"] h4,
-html[lang="ru"] h5,
-html[lang="ru"] h6,
-html[lang="ru"] .neon-title,
-html[lang="ru"] .navbar-brand {
-  font-family: "Russo One", "Exo 2", "Inter", sans-serif;
-  letter-spacing: 0.04em;
 }
 
 body {
@@ -1518,7 +1502,7 @@ body {
 
 .btn-neon {
   border-radius: var(--bs-border-radius-pill) !important;
-  font-family: "Orbitron", "Russo One", sans-serif;
+  font-family: "Aleo", "Orbitron", "Russo One", sans-serif;
   text-transform: uppercase;
   transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
@@ -1526,6 +1510,10 @@ body {
 .btn-neon:hover,
 .btn-neon:focus-visible {
   transform: translateY(-1px);
+}
+
+#steam-preview-btn {
+  margin-left: 0.2rem;
 }
 
 .btn-neon-cyan {
