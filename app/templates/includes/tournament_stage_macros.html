@@ -23,7 +23,7 @@
   </div>
   <ul class="playoff-participants list-unstyled mb-0 mt-2">
     {% for participant in match.participants %}
-    <li class="{% if participant.is_promoted_highlight %}playoff-participant-promoted{% endif %} {% if participant.is_tournament_winner %}tournament-winner-highlight{% endif %}">#{{ participant.user_id }} · {{ participant.nickname }}{% if participant.is_tournament_winner %} <span class="badge neon-accent-badge neon-accent-badge-winner tournament-winner-badge">🏆 {{ tr(participant.winner_label_key or 'tournament_winner') }}</span>{% endif %} — <strong>{{ participant.points }}</strong> pts{% if participant.is_direct_invite_preview %} <span class="badge text-bg-info">прямой инвайт</span>{% endif %}</li>
+    <li class="{% if participant.is_promoted_highlight %}playoff-participant-promoted{% endif %} {% if participant.is_tournament_winner %}tournament-winner-highlight{% endif %}">{{ participant.nickname }}{% if participant.is_tournament_winner %} <span class="badge neon-accent-badge neon-accent-badge-winner tournament-winner-badge">🏆 {{ tr(participant.winner_label_key or 'tournament_winner') }}</span>{% endif %} — <strong>{{ participant.points }}</strong> pts{% if participant.is_direct_invite_preview %} <span class="badge text-bg-info">прямой инвайт</span>{% endif %}</li>
     {% endfor %}
   </ul>
 </article>
