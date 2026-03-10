@@ -427,3 +427,66 @@ def test_admin_chat_page_renders_source_display(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert "Guest (203.0.113.9)" in response.text
+
+
+def test_send_chat_uses_forwarded_for_ip(monkeypatch) -> None:
+    """Проверяет, что для пользователя сохраняется IP из X-Forwarded-For."""
+
+    class _FakeSendChatSettings:
+        is_enabled = True
+        max_length = 100
+        cooldown_seconds = 0
+
+    state = {"saved_message": None}
+
+    async def fake_get_chat_settings(db):
+        return _FakeSendChatSettings()
+
+    async def fake_scalar(self, statement):
+        return None
+
+    def fake_add(self, instance):
+        state["saved_message"] = instance
+
+    async def fake_commit(self):
+        return None
+
+    async def fake_publish():
+        return None
+
+    monkeypatch.setattr(web, "get_chat_settings", fake_get_chat_settings)
+    monkeypatch.setattr(web.AsyncSession, "scalar", fake_scalar, raising=False)
+    monkeypatch.setattr(web.AsyncSession, "add", fake_add, raising=False)
+    monkeypatch.setattr(web.AsyncSession, "commit", fake_commit, raising=False)
+    monkeypatch.setattr(web.chat_event_broker, "publish", fake_publish)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/chat/send",
+            data={"temp_nick": "User", "nick_color": "#00d4ff", "message": "Привет"},
+            headers={"X-Forwarded-For": "203.0.113.7, 172.18.0.1"},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert state["saved_message"] is not None
+    assert state["saved_message"].ip_address == "203.0.113.7"
+
+
+def test_get_request_ip_address_prefers_x_real_ip_when_forwarded_for_missing() -> None:
+    """Проверяет, что helper корректно берет IP из X-Real-IP."""
+
+    from starlette.requests import Request
+
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/",
+        "headers": [(b"x-real-ip", b"198.51.100.22")],
+        "client": ("172.18.0.1", 12345),
+        "scheme": "http",
+        "server": ("testserver", 80),
+    }
+    request = Request(scope)
+
+    assert web.get_request_ip_address(request) == "198.51.100.22"
