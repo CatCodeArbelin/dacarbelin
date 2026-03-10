@@ -131,7 +131,7 @@
     <tbody>
       {% for row in emergency_logs %}
       <tr>
-        <td>{{ row.id }}</td><td>{{ row.created_at }}</td><td>{{ row.admin_name }}</td><td>{{ row.action_type }}</td><td>{{ 'yes' if row.dry_run else 'no' }}</td><td><code>{{ row.details_json }}</code></td>
+        <td>{{ row.id }}</td><td>{{ format_msk_datetime(row.created_at, "%Y-%m-%d %H:%M:%S") }}</td><td>{{ row.admin_name }}</td><td>{{ row.action_type }}</td><td>{{ 'yes' if row.dry_run else 'no' }}</td><td><code>{{ row.details_json }}</code></td>
       </tr>
       {% else %}
       <tr><td colspan="6" class="text-muted">No emergency operations yet.</td></tr>
