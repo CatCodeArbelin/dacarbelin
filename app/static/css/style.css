@@ -1704,3 +1704,49 @@ textarea:focus {
   border-color: rgba(157, 255, 87, 0.72) !important;
   box-shadow: 0 0 20px rgba(0, 255, 133, 0.32), 0 0 34px rgba(61, 155, 255, 0.26);
 }
+
+/* Site view mode overrides */
+body.view-mobile .desktop-only {
+  display: none !important;
+}
+
+body.view-full .mobile-only {
+  display: none !important;
+}
+
+body.view-mobile .page-content-shell__main {
+  max-width: 980px;
+}
+
+body.view-full .page-content-shell__main {
+  max-width: 1400px;
+}
+
+body.view-mobile .navbar .container,
+body.view-mobile .site-footer .container {
+  max-width: 980px;
+}
+
+body.view-full .navbar .container,
+body.view-full .site-footer .container {
+  max-width: 1400px;
+}
+
+@media (max-width: 991.98px) {
+  body.view-auto .desktop-only {
+    display: none !important;
+  }
+}
+
+@media (min-width: 992px) {
+  body.view-auto .mobile-only {
+    display: none !important;
+  }
+}
+
+.site-footer__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
