@@ -49,6 +49,16 @@ body {
   color: #000000 !important;
 }
 
+.admin-content-page .form-select {
+  color: #000000 !important;
+  background-color: #ffffff;
+}
+
+.admin-content-page .form-select option {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+}
+
 .content-html,
 .content-html * {
   color: inherit;
