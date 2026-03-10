@@ -1405,6 +1405,80 @@ DEFAULT_RULES_BODY_EN = """<h2>Loyrens Tournament: Rules and Regulations</h2>
 <p><strong>Enjoy the game. Good luck and happy gaming!</strong></p>"""
 
 
+DEFAULT_RULES_BODY_ZH = """<h2>Loyrens Tournament：规则与赛制</h2>
+<p>你好，亲爱的 Dota Auto Chess 玩家！欢迎参加我们的锦标赛！参赛完全免费，初始奖金池为<strong>15,000 卢布</strong>（由主办方追加）。</p>
+<p>主办方将从总奖金池中收取<strong>15%</strong>的组织服务费。</p>
+<h2>阶段赛程</h2>
+<p>比赛共进行 4 个比赛日：</p>
+<ul>
+  <li><strong>2026.04.25 14:00（莫斯科时间）</strong> — 1/8 决赛</li>
+  <li><strong>2026.04.26 14:00（莫斯科时间）</strong> — 1/4 决赛</li>
+  <li><strong>2026.05.02 14:00（莫斯科时间）</strong> — 半决赛</li>
+  <li><strong>2026.05.03 14:00（莫斯科时间）</strong> — 总决赛</li>
+</ul>
+<h2>参赛人数与直邀</h2>
+<p>参赛总人数：<strong>64 名选手</strong>。</p>
+<p>经主办方决定，<strong>11 名选手</strong>将直接受邀进入 1/4 决赛（跳过 1/8 决赛）：</p>
+<p><strong>Rondo_Mandarin, envy_chilling, crazyyypanda, Cadis, Dark, xdDfl, Аскорбинка, el_classico, dumpstered95, theFancyPants, Corekid94</strong></p>
+<p>其余名额将从已报名选手中分配。</p>
+<h2>通用计分规则</h2>
+<p>所有阶段均采用每局名次积分制：</p>
+<ul>
+  <li>第 1 名 — 8 分</li>
+  <li>第 2 名 — 6 分</li>
+  <li>第 3 名 — 5 分</li>
+  <li>第 4 名 — 4 分</li>
+  <li>第 5 名 — 3 分</li>
+  <li>第 6 名 — 2 分</li>
+  <li>第 7 名 — 1 分</li>
+  <li>第 8 名 — 0 分</li>
+</ul>
+<h2>赛事结构</h2>
+<h3>第一阶段 — 1/8 决赛（2026.04.25）</h3>
+<p><strong>参赛者：</strong>56 人（除直邀外的所有选手）。</p>
+<p><strong>赛制：</strong>7 个小组，每组 8 人。每组进行 3 局比赛。</p>
+<p><strong>晋级条件：</strong>每组前 3 名晋级下一阶段。</p>
+<p><strong>结果：</strong>共 21 名选手晋级 1/4 决赛。</p>
+<h3>第二阶段 — 1/4 决赛（2026.04.26）</h3>
+<p><strong>参赛者：</strong>32 人（1/8 晋级 21 人 + 直邀 11 人）。</p>
+<p><strong>赛制：</strong>4 个小组，每组 8 人。每组进行 3 局比赛。</p>
+<p><strong>晋级条件：</strong>每组前 4 名晋级下一阶段。</p>
+<p><strong>结果：</strong>共 16 名选手晋级半决赛。</p>
+<h3>第三阶段 — 半决赛（2026.05.02）</h3>
+<p><strong>参赛者：</strong>16 人。</p>
+<p><strong>赛制：</strong>2 个小组，每组 8 人。每组进行 3 局比赛。</p>
+<p><strong>晋级条件：</strong>每组前 4 名晋级总决赛。</p>
+<p><strong>结果：</strong>8 名总决赛选手。</p>
+<h3>第四阶段 — 总决赛（2026.05.03）</h3>
+<p><strong>参赛者：</strong>8 名总决赛选手。</p>
+<p><strong>赛制：</strong>“统治制”（先到 22 分并在后续任意一局拿到第 1）。</p>
+<p>选手持续对局，直到有人累计达到 22 分。</p>
+<p>达到 22 分后比赛不会立刻结束。该选手还需在后续任意一局取得第 1 名。</p>
+<p>当同一选手同时满足两个条件（22+ 分且单局第 1）时，即被判定为冠军。</p>
+<p><strong>最终名次：</strong>第 2、3 名按决赛结束时总积分确定。</p>
+<p><strong>奖金分配：</strong>第 1、2、3 名获得奖金。</p>
+<h2>比赛行为与执行规则</h2>
+<p>每位选手都可以直播自己的比赛，直播标题中需注明<strong>"Tournament by https://www.twitch.tv/loyrensss"</strong>。</p>
+<p><strong>报名与昵称：</strong><br>请在 <a href="https://dotaautochess.site" target="_blank" rel="noopener noreferrer">dotaautochess.site</a> 报名。网站昵称必须与选手在比赛开始时 Steam 游戏内的主昵称一致。该要求用于抽签、选手识别与观赛管理。若不一致，选手将无法参赛。</p>
+<p><strong>房间设置：</strong><br>所有对局在 Austria 服务器进行，1x8Ob，Casual 模式。</p>
+<p><strong>每局结束后：</strong><br>房主（当局获胜者）需将截图发送到 Telegram 群。</p>
+<p><strong>公平竞赛：</strong><br>严禁作弊、利用漏洞（游戏错误）及打假赛。任何违规将被取消资格，并禁止参加后续赛事。</p>
+<p><strong>行为规范：</strong><br>请尊重对手和主办方。禁止在聊天中辱骂或霸凌，违者取消资格。</p>
+<p><strong>技术问题：</strong><br>如选手掉线，比赛将暂停。重连等待时间为 5 分钟。所有争议由裁判或赛事主办方处理：<a href="https://t.me/l0yrensss" target="_blank" rel="noopener noreferrer">https://t.me/l0yrensss</a>。</p>
+<h2>同分时冠军判定规则</h2>
+<p>若同组（第一阶段、1/4 决赛、半决赛）选手积分相同，按以下顺序依次比较：</p>
+<ol>
+  <li>第 1 名次数更多者优先。</li>
+  <li>进入前 4 名次数更多者优先。</li>
+  <li>该组最后一局名次更高者优先。</li>
+</ol>
+<h2>替补选手规则</h2>
+<p>若报名人数超过 64 人，超出部分将自动进入替补名单。</p>
+<p>若主名单选手在比赛开始时未到场，将由替补名单中的选手替换。</p>
+<p>替补优先级按报名时间先后确定（先报名者优先）。</p>
+<p><strong>祝大家比赛顺利，玩得开心！</strong></p>"""
+
+
 def localized_attr(entity: object, base_name: str, lang: str) -> str:
     value = getattr(entity, f"{base_name}_{lang}", "") or ""
     if value:
@@ -1431,10 +1505,13 @@ async def get_or_create_rules_content(db: AsyncSession) -> RulesContent:
         if not (row.body_en or "").strip():
             row.body_en = DEFAULT_RULES_BODY_EN
             has_updates = True
+        if not (row.body_zh or "").strip():
+            row.body_zh = DEFAULT_RULES_BODY_ZH
+            has_updates = True
         if has_updates:
             await db.flush()
         return row
-    row = RulesContent(id=1, body_ru=DEFAULT_RULES_BODY_RU, body_en=DEFAULT_RULES_BODY_EN)
+    row = RulesContent(id=1, body_ru=DEFAULT_RULES_BODY_RU, body_en=DEFAULT_RULES_BODY_EN, body_zh=DEFAULT_RULES_BODY_ZH)
     db.add(row)
     await db.flush()
     return row
@@ -1884,6 +1961,17 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             winner_user_id,
             direct_invite_groups=direct_invite_groups,
         )
+    stage_title_keys = {
+        "group_stage": "tournament_stage_1_8_label",
+        "stage_2": "tournament_stage_1_4_label",
+        "stage_1_4": "tournament_stage_semifinal_groups_label",
+        "stage_final": "tournament_stage_final_label",
+    }
+    for stage in tournament_tree.get("stages", []):
+        title_key = stage_title_keys.get(stage.get("key", ""))
+        if title_key:
+            stage["title"] = t(lang, title_key)
+
     playoff_empty_active_stage_alert = get_empty_active_stage_alert(playoff_stages)
 
     return templates.TemplateResponse(
@@ -2659,6 +2747,7 @@ async def admin_content_page(request: Request, db: AsyncSession = Depends(get_db
     content_by_lang = {
         "ru": dump_admin_content_for_lang("ru", rules_content).model_dump(),
         "en": dump_admin_content_for_lang("en", rules_content).model_dump(),
+        "zh": dump_admin_content_for_lang("zh", rules_content).model_dump(),
     }
     return templates.TemplateResponse(
         request,
