@@ -84,7 +84,7 @@
             {% endfor %}
           </div>
           <textarea class="form-control mb-2" id="chat-message" name="message" maxlength="{{ chat_settings.max_length }}" placeholder="{{ tr('index_message') }}" required {% if not chat_settings.is_enabled %}disabled{% endif %}></textarea>
-          <div class="small text-contrast-muted mb-2">Осталось символов: <span id="chat-char-counter">{{ chat_settings.max_length }}</span></div>
+          <div class="small text-contrast-muted mb-2">{{ tr('index_chat_chars_left') }}: <span id="chat-char-counter">{{ chat_settings.max_length }}</span></div>
           <button class="btn btn-neon btn-neon-cyan" id="chat-send-btn" {% if not chat_settings.is_enabled %}disabled{% endif %}>{{ tr('index_connect_send') }}</button>
           <div class="chat-cooldown-timer mt-2" id="chat-cooldown-timer" hidden>
             <div class="chat-cooldown-timer__label"><span id="chat-cooldown-seconds">0</span> sec</div>

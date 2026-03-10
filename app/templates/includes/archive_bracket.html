@@ -1,4 +1,4 @@
-<div class="archive-bracket" role="region" aria-label="Архивная турнирная сетка">
+<div class="archive-bracket" role="region" aria-label="{{ tr('archive_bracket_aria') }}">
   {% for column in columns %}
     <section class="archive-bracket-column">
       <h5 class="archive-bracket-column-title">{{ column.title }}</h5>
@@ -15,7 +15,7 @@
               {% endfor %}
             </ul>
             {% if match.winner_name %}
-              <div class="archive-bracket-winner">Победитель: {{ match.winner_name }}</div>
+              <div class="archive-bracket-winner">{{ tr('archive_winner_label') }}: {{ match.winner_name }}</div>
             {% endif %}
           </article>
         {% endfor %}
