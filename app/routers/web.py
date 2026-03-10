@@ -125,7 +125,7 @@ RUB_PER_USD_RATE = Decimal("79")
 MSK_TIMEZONE = timezone(timedelta(hours=3))
 
 
-ALLOWED_USER_UPDATE_FIELDS = {"basket", "direct_invite_stage"}
+ALLOWED_USER_UPDATE_FIELDS = {"basket", "direct_invite_stage", "telegram"}
 ALLOWED_DIRECT_INVITE_STAGES = {None, *get_playoff_stage_sequence_keys()}
 TOURNAMENT_STAGE_KEYS_ORDER = get_public_stage_display_sequence()
 PLAYOFF_STAGE_KEYS_ORDER = TOURNAMENT_STAGE_KEYS_ORDER[1:]
@@ -968,15 +968,17 @@ def _normalize_direct_invite_stage(raw_value: str | None) -> str | None:
     return value
 
 
-def _validate_user_update_payload(basket: str, direct_invite_stage: str | None) -> dict[str, str | None]:
+def _validate_user_update_payload(basket: str, direct_invite_stage: str | None, telegram: str | None) -> dict[str, str | None]:
     allowed_baskets = {item.value for item in Basket}
     if basket not in allowed_baskets:
         raise ValueError("invalid basket")
 
     normalized_stage = _normalize_direct_invite_stage(direct_invite_stage)
+    normalized_telegram = (telegram or "").strip() or None
     return {
         "basket": basket,
         "direct_invite_stage": normalized_stage,
+        "telegram": normalized_telegram,
     }
 
 
@@ -2117,7 +2119,7 @@ async def donate_page(request: Request, db: AsyncSession = Depends(get_db)):
     lang = get_lang(request.cookies.get("lang"))
     donation_links = (await db.scalars(select(DonationLink).where(DonationLink.is_active.is_(True)).order_by(DonationLink.sort_order, DonationLink.id))).all()
     crypto_wallets = (await db.scalars(select(CryptoWallet).where(CryptoWallet.is_active.is_(True)).order_by(CryptoWallet.sort_order, CryptoWallet.id))).all()
-    donors = (await db.scalars(select(Donor).order_by(Donor.sort_order, Donor.id))).all()
+    donors = (await db.scalars(select(Donor).order_by(desc(Donor.amount), Donor.sort_order, Donor.id))).all()
     total_sponsors_amount = parse_donor_amount("0")
     for donor in donors:
         total_sponsors_amount += parse_donor_amount(str(donor.amount))
@@ -2754,6 +2756,7 @@ async def _update_user_allowed_fields(
     user_id: int,
     basket: str,
     direct_invite_stage: str | None,
+    telegram: str | None,
     manual_points: int | None = None,
 ) -> RedirectResponse:
     user = await db.get(User, user_id)
@@ -2764,6 +2767,7 @@ async def _update_user_allowed_fields(
         validated_data = _validate_user_update_payload(
             basket=basket,
             direct_invite_stage=direct_invite_stage,
+            telegram=telegram,
         )
     except ValueError:
         return redirect_with_admin_users_msg("msg_operation_failed")
@@ -2902,6 +2906,7 @@ async def admin_update_user(
     basket: str = Form(...),
     direct_invite_stage: str | None = Form(default=None),
     manual_points: int | None = Form(default=None),
+    telegram: str = Form(default=""),
     db: AsyncSession = Depends(get_db),
 ):
     # Атомарно обновляем разрешенные поля пользователя из админ-панели.
@@ -2916,6 +2921,7 @@ async def admin_update_user(
         basket=basket,
         direct_invite_stage=resolved_direct_invite_stage,
         manual_points=manual_points,
+        telegram=telegram,
     )
 
 
@@ -2935,6 +2941,7 @@ async def admin_update_user_basket(
         basket=basket,
         direct_invite_stage=user.direct_invite_stage,
         manual_points=None,
+        telegram=user.telegram,
     )
 
 
