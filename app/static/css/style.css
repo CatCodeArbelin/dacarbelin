@@ -2,6 +2,25 @@ body {
   background: #08090d;
   color: #ffffff;
   text-shadow: 0 0 4px rgba(255, 255, 255, 0.38);
+  position: relative;
+  min-height: 100vh;
+}
+
+#matrix-bg {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+.navbar,
+.page-content-shell,
+.site-footer {
+  position: relative;
+  z-index: 1;
 }
 .container, .form-check-label, .navbar-brand, h1, h2, h3, h4, h5, h6, label, small, strong {
   color: #ffffff;
@@ -1622,4 +1641,3 @@ textarea:focus {
   border-color: rgba(157, 255, 87, 0.72) !important;
   box-shadow: 0 0 20px rgba(0, 255, 133, 0.32), 0 0 34px rgba(61, 155, 255, 0.26);
 }
-

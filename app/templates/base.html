@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body class="bg-dark text-light">
+<canvas id="matrix-bg" aria-hidden="true"></canvas>
 <nav class="navbar navbar-expand-lg navbar-dark neon-border-blue mb-4 navbar-neon">
   <div class="container">
     <a class="navbar-brand nav-main-link neon-title neon-title--logo" href="/">DAC Tournament</a>
@@ -47,5 +48,51 @@
   </div>
 </footer>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  (() => {
+    const canvas = document.getElementById('matrix-bg');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const charset = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const fontSize = 24;
+    const columnGap = 2.6;
+    const stepX = fontSize * columnGap;
+    let rainDrops = [];
+
+    const initRain = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const columns = Math.max(1, Math.floor(canvas.width / stepX));
+      rainDrops = new Array(columns).fill(1);
+    };
+
+    const draw = () => {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.07)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = 'rgba(0, 255, 0, 0.14)';
+      ctx.font = `${fontSize}px monospace`;
+
+      for (let i = 0; i < rainDrops.length; i += 1) {
+        const text = charset.charAt(Math.floor(Math.random() * charset.length));
+        const x = i * stepX;
+        const y = rainDrops[i] * fontSize;
+        ctx.fillText(text, x, y);
+
+        if (y > canvas.height && Math.random() > 0.975) {
+          rainDrops[i] = 0;
+        }
+        rainDrops[i] += 1;
+      }
+    };
+
+    window.addEventListener('resize', initRain);
+    initRain();
+    setInterval(draw, 1000 / 24);
+  })();
+</script>
 </body>
 </html>
