@@ -65,7 +65,9 @@
                 {% endfor %}
               </select>
             </td>
-            <td>{{ user.telegram or 'None' }}</td>
+            <td>
+              <input class="form-control form-control-sm" form="user-update-{{ user.id }}" type="text" name="telegram" value="{{ user.telegram or '' }}" placeholder="Telegram\QQChat">
+            </td>
             <td>
               <form id="user-update-{{ user.id }}" action="/admin/user/update" method="post" class="d-inline">
                 <input type="hidden" name="user_id" value="{{ user.id }}">

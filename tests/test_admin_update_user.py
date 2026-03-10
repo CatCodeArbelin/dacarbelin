@@ -30,13 +30,14 @@ def _build_user(*, user_id: int, direct_invite_stage: str | None, direct_invite_
 
 def test_admin_update_user_preserves_direct_invite_stage_when_form_omits_it(monkeypatch) -> None:
     target_user = _build_user(user_id=7, direct_invite_stage="stage_2", direct_invite_group_number=2)
-    state: dict[str, str | None] = {"direct_invite_stage": None}
+    state: dict[str, str | None] = {"direct_invite_stage": None, "telegram": None}
 
     async def fake_get(self, model, pk):
         return target_user if pk == 7 else None
 
     async def fake_update_helper(db, **kwargs):
         state["direct_invite_stage"] = kwargs["direct_invite_stage"]
+        state["telegram"] = kwargs["telegram"]
         return web.redirect_with_admin_users_msg("msg_status_ok")
 
     monkeypatch.setattr(web.AsyncSession, "get", fake_get, raising=False)
@@ -53,6 +54,7 @@ def test_admin_update_user_preserves_direct_invite_stage_when_form_omits_it(monk
     assert response.status_code == 303
     assert response.headers["location"] == "/admin/users?msg=msg_status_ok"
     assert state["direct_invite_stage"] == "stage_2"
+    assert state["telegram"] == ""
 
 
 def test_admin_update_user_ignores_submitted_nickname(monkeypatch) -> None:
@@ -110,6 +112,7 @@ def test_update_user_allowed_fields_clears_group_number_when_stage_is_cleared() 
             basket="rook",
             direct_invite_stage=None,
             manual_points=None,
+            telegram="@new_contact",
         )
     )
 
@@ -117,4 +120,26 @@ def test_update_user_allowed_fields_clears_group_number_when_stage_is_cleared() 
     assert response.headers["location"] == "/admin/users?msg=msg_status_ok"
     assert user.direct_invite_stage is None
     assert user.direct_invite_group_number is None
+    assert db.committed is True
+
+
+
+def test_update_user_allowed_fields_updates_telegram() -> None:
+    user = _build_user(user_id=16, direct_invite_stage=None, direct_invite_group_number=None)
+    db = _FakeUpdateDb(user)
+
+    response = asyncio.run(
+        web._update_user_allowed_fields(
+            db,
+            user_id=16,
+            basket="rook",
+            direct_invite_stage=None,
+            telegram="  @qqchat  ",
+            manual_points=None,
+        )
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin/users?msg=msg_status_ok"
+    assert user.telegram == "@qqchat"
     assert db.committed is True

@@ -27,6 +27,8 @@ class _FakeDonateDB:
             return _FakeScalarResult(self.donation_links)
         if "crypto_wallets" in query:
             return _FakeScalarResult(self.crypto_wallets)
+        if "donors" in query and "donors.amount DESC" in query:
+            return _FakeScalarResult(sorted(self.donors, key=lambda donor: donor.amount, reverse=True))
         return _FakeScalarResult(self.donors)
 
     async def scalar(self, statement):
@@ -127,3 +129,30 @@ def test_donate_page_shows_usd_for_zh_locale(monkeypatch):
     assert response.status_code == 200
     assert "$100" in response.text
     assert "7900 ₽" not in response.text
+
+
+def test_donate_page_sorts_donors_by_amount_desc(monkeypatch):
+    fake_db = _FakeDonateDB()
+    fake_db.donors = [
+        Donor(name="Small", amount=100, message_ru="", message_en=""),
+        Donor(name="Top", amount=9900, message_ru="", message_en=""),
+    ]
+
+    async def fake_enabled() -> bool:
+        return False
+
+    monkeypatch.setattr(main_module, "is_technical_works_enabled", fake_enabled)
+
+    async def override_get_db():
+        yield fake_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            client.cookies.set("lang", "ru")
+            response = client.get("/donate")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert response.text.find("Top") < response.text.find("Small")
