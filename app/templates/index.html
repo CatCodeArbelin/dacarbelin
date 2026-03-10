@@ -32,8 +32,8 @@
 
           <div id="steam-preview-message" class="small mb-2"></div>
 
-          <label class="form-label" for="registration-telegram">{{ tr('participants_telegram') }} {{ tr('participants_telegram_optional') }}</label>
-          <input id="registration-telegram" class="form-control mb-2" name="telegram" placeholder="{{ tr('participants_telegram') }}" {% if not registration_open or tournament_started %}disabled{% endif %}>
+          <label class="form-label" for="registration-telegram">Telegram\QQChat</label>
+          <input id="registration-telegram" class="form-control mb-2" name="telegram" placeholder="Telegram\QQChat" {% if not registration_open or tournament_started %}disabled{% endif %}>
 
           <div class="form-check mb-3">
             <input id="rules-ack" class="form-check-input" type="checkbox" name="rules_ack" value="1" {% if not registration_open or tournament_started %}disabled{% endif %}>
