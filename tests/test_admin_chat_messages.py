@@ -229,6 +229,74 @@ def test_admin_send_chat_uses_selected_sender_and_sets_cookie(monkeypatch) -> No
     assert "admin_chat_sender=%40Loyrensss" in response.headers["set-cookie"]
 
 
+
+def test_admin_clear_chat_messages_success(monkeypatch) -> None:
+    """Проверяет массовую очистку сообщений чата админом."""
+    state = {"executed": False, "committed": False, "published": False}
+
+    async def fake_execute(self, statement):
+        state["executed"] = str(statement).startswith("DELETE FROM chat_messages")
+
+    async def fake_commit(self):
+        state["committed"] = True
+
+    async def fake_publish():
+        state["published"] = True
+
+    monkeypatch.setattr(web.AsyncSession, "execute", fake_execute, raising=False)
+    monkeypatch.setattr(web.AsyncSession, "commit", fake_commit, raising=False)
+    monkeypatch.setattr(web.chat_event_broker, "publish", fake_publish)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post("/admin/chat/messages/clear", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_admin_chat_messages_cleared"
+    assert state == {"executed": True, "committed": True, "published": True}
+
+
+def test_admin_send_chat_clear_command_clears_messages(monkeypatch) -> None:
+    """Проверяет поддержку команды /clear в отправке админ-сообщений."""
+
+    class _FakeSendChatSettings:
+        max_length = 100
+
+    state = {"executed": False, "committed": False, "published": False, "added": False}
+
+    async def fake_get_chat_settings(db):
+        return _FakeSendChatSettings()
+
+    async def fake_execute(self, statement):
+        state["executed"] = str(statement).startswith("DELETE FROM chat_messages")
+
+    async def fake_commit(self):
+        state["committed"] = True
+
+    async def fake_publish():
+        state["published"] = True
+
+    def fake_add(self, instance):
+        state["added"] = True
+
+    monkeypatch.setattr(web, "get_chat_settings", fake_get_chat_settings)
+    monkeypatch.setattr(web.AsyncSession, "execute", fake_execute, raising=False)
+    monkeypatch.setattr(web.AsyncSession, "commit", fake_commit, raising=False)
+    monkeypatch.setattr(web.AsyncSession, "add", fake_add, raising=False)
+    monkeypatch.setattr(web.chat_event_broker, "publish", fake_publish)
+
+    with TestClient(app) as client:
+        client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
+        response = client.post(
+            "/admin/chat/send",
+            data={"message": "/clear", "sender_nick": "@Admin"},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/admin?msg=msg_admin_chat_messages_cleared"
+    assert state == {"executed": True, "committed": True, "published": True, "added": False}
+
 def test_send_chat_publishes_stream_event(monkeypatch) -> None:
     """Проверяет публикацию SSE-события после пользовательского сообщения."""
 
