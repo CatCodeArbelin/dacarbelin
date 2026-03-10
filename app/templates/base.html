@@ -30,7 +30,11 @@
         <li class="nav-item"><a href="/archive" class="nav-link nav-main-link px-lg-2">{{ tr('nav_archive') }}</a></li>
       </ul>
       <div class="d-grid d-lg-flex gap-2 ms-lg-3">
-        <a href="/set-view/{{ site_view_switch_mode }}" class="btn btn-sm btn-neon btn-neon-cyan">{{ site_view_switch_label }}</a>
+        <a href="/set-view/{{ site_view_switch_mode }}" class="btn btn-sm btn-neon btn-neon-cyan view-switch-btn" aria-label="{{ tr('base_view_full') if is_mobile_view else tr('base_view_mobile') }}">
+          <span class="view-switch-btn__emoji">{{ '💻' if is_mobile_view else '📱' }}</span>
+          <span class="view-switch-btn__divider">↔</span>
+          <span class="view-switch-btn__emoji view-switch-btn__emoji--muted">{{ '📱' if is_mobile_view else '💻' }}</span>
+        </a>
         <a href="/set-lang/zh" class="btn btn-sm btn-neon btn-neon-amber">{{ tr('base_lang_zh') }}</a>
         <a href="/set-lang/en" class="btn btn-sm btn-neon btn-neon-cyan">{{ tr('base_lang_en') }}</a>
         <a href="/set-lang/ru" class="btn btn-sm btn-neon btn-neon-pink">{{ tr('base_lang_ru') }}</a>
@@ -49,7 +53,6 @@
       <span>For the community, with ❤️, by</span>
       <a class="site-footer__author" href="https://t.me/arbelin94" target="_blank" rel="noopener noreferrer">Arbelin</a>
     </div>
-    <a href="/set-view/{{ site_view_switch_mode }}" class="btn btn-sm btn-neon btn-neon-cyan">{{ site_view_switch_label }}</a>
   </div>
 </footer>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
