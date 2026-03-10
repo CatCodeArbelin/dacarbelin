@@ -1235,6 +1235,30 @@ body {
   background: rgba(0, 229, 255, 0.16) !important;
 }
 
+.view-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-width: 4.35rem;
+  padding-inline: 0.6rem;
+}
+
+.view-switch-btn__emoji {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.view-switch-btn__emoji--muted {
+  opacity: 0.62;
+}
+
+.view-switch-btn__divider {
+  font-size: 0.8rem;
+  line-height: 1;
+  opacity: 0.85;
+}
+
 .btn-neon-pink {
   color: #ffe9f8 !important;
   border-color: var(--neon-pink) !important;
