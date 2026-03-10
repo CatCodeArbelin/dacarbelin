@@ -16,7 +16,7 @@
 {% endif %}
 
 <section class="mt-4">
-  <h3>Сетка турнира</h3>
+  <h3>{{ tr('tournament_bracket_title') }}</h3>
   {{ tree_ui.render_tournament_tree(tournament_tree, tr, 'tournament-tree') }}
 </section>
 {% endblock %}

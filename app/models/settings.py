@@ -90,6 +90,7 @@ class RulesContent(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     body_ru: Mapped[str] = mapped_column(Text, default="")
     body_en: Mapped[str] = mapped_column(Text, default="")
+    body_zh: Mapped[str] = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 

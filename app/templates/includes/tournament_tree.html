@@ -1,13 +1,13 @@
 {% macro render_tournament_tree(tree, tr, block_class='tournament-tree') -%}
 {% if tree and tree.stages %}
-<div class="{{ block_class }}" role="region" aria-label="Турнирная сетка">
+<div class="{{ block_class }}" role="region" aria-label="{{ tr('tournament_bracket_title') }}">
   {% for stage in tree.stages %}
   <section class="{{ block_class }}-stage {{ block_class }}-stage-{{ stage.key }} {% if stage.is_active %}{{ block_class }}-stage-active{% endif %}" data-stage-key="{{ stage.key }}">
     <h5 class="{{ block_class }}-stage-title">{{ stage.title }}</h5>
     <div class="{{ block_class }}-matches">
       {% for match in stage.matches %}
       <article class="{{ block_class }}-match playoff-status-{{ match.status }} {% if stage.is_active %}{{ block_class }}-match-active{% endif %}">
-        <div class="{{ block_class }}-match-head">Group {{ match.label }}</div>
+        <div class="{{ block_class }}-match-head">{{ tr('tournament_group') }} {{ match.label }}</div>
         <div class="{{ block_class }}-meta mb-2">
           <span class="{{ block_class }}-badge {{ block_class }}-badge-schedule">{{ tr('tournament_schedule') }}: {{ match.schedule_text or tr('tournament_tbd') }}</span>
           <span class="{{ block_class }}-badge {{ block_class }}-badge-password">{{ tr('tournament_lobby_pw') }}: {{ match.lobby_password or tr('tournament_tbd') }}</span>
