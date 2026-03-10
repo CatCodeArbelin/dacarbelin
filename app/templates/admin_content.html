@@ -15,6 +15,7 @@
       <select id="content-lang-selector" class="form-select form-select-sm" style="width: 120px;">
         <option value="ru" {% if selected_content_lang == 'ru' %}selected{% endif %}>RU</option>
         <option value="en" {% if selected_content_lang == 'en' %}selected{% endif %}>EN</option>
+        <option value="zh" {% if selected_content_lang == 'zh' %}selected{% endif %}>CH</option>
       </select>
     </div>
   </div>
@@ -44,7 +45,7 @@
     <form action="/admin/donation-links/{{ item.id }}/update" method="post" class="row g-2 mb-2">
       <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
       <input type="hidden" name="category" value="general">
-      <div class="col-md-3"><input class="form-control" name="label" value="{{ (item.title_ru if selected_content_lang == 'ru' else item.title_en)|e }}" required></div>
+      <div class="col-md-3"><input class="form-control" name="label" value="{{ (item.title_ru if selected_content_lang == 'ru' else (item.title_en if selected_content_lang == 'en' else item.title_zh))|e }}" required></div>
       <div class="col-md-5"><input class="form-control" name="url" value="{{ item.url|e }}" required></div>
       <div class="col-md-2 form-check mt-2"><input class="form-check-input" type="checkbox" name="is_active" value="true" id="link-active-{{ item.id }}" {% if item.is_active %}checked{% endif %}><label class="form-check-label" for="link-active-{{ item.id }}">Active</label></div>
       <div class="col-md-2"><button class="btn btn-sm btn-primary">Save</button></div>
@@ -75,7 +76,7 @@
     <form action="/admin/donation-links/{{ item.id }}/update" method="post" class="row g-2 mb-2">
       <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
       <input type="hidden" name="category" value="bank_cards">
-      <div class="col-md-3"><input class="form-control" name="label" value="{{ (item.title_ru if selected_content_lang == 'ru' else item.title_en)|e }}" required></div>
+      <div class="col-md-3"><input class="form-control" name="label" value="{{ (item.title_ru if selected_content_lang == 'ru' else (item.title_en if selected_content_lang == 'en' else item.title_zh))|e }}" required></div>
       <div class="col-md-5"><input class="form-control" name="url" value="{{ item.url|e }}" placeholder="https://... (необязательно)"></div>
       <div class="col-md-2 form-check mt-2"><input class="form-check-input" type="checkbox" name="is_active" value="true" id="card-active-{{ item.id }}" {% if item.is_active %}checked{% endif %}><label class="form-check-label" for="card-active-{{ item.id }}">Active</label></div>
       <div class="col-md-2"><button class="btn btn-sm btn-primary">Save</button></div>
@@ -104,7 +105,7 @@
     <form action="/admin/donation-links/{{ item.id }}/update" method="post" class="row g-2 mb-2">
       <input type="hidden" class="content-lang-input" name="content_lang" value="{{ selected_content_lang }}">
       <input type="hidden" name="category" value="support_author">
-      <div class="col-md-3"><input class="form-control" name="label" value="{{ (item.title_ru if selected_content_lang == 'ru' else item.title_en)|e }}" required></div>
+      <div class="col-md-3"><input class="form-control" name="label" value="{{ (item.title_ru if selected_content_lang == 'ru' else (item.title_en if selected_content_lang == 'en' else item.title_zh))|e }}" required></div>
       <div class="col-md-5"><input class="form-control" name="url" value="{{ item.url|e }}" required></div>
       <div class="col-md-2 form-check mt-2"><input class="form-check-input" type="checkbox" name="is_active" value="true" id="author-active-{{ item.id }}" {% if item.is_active %}checked{% endif %}><label class="form-check-label" for="author-active-{{ item.id }}">Active</label></div>
       <div class="col-md-2"><button class="btn btn-sm btn-primary">Save</button></div>

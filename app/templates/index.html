@@ -32,8 +32,8 @@
 
           <div id="steam-preview-message" class="small mb-2"></div>
 
-          <label class="form-label" for="registration-telegram">{{ tr('participants_telegram') }} {{ tr('participants_telegram_optional') }}</label>
-          <input id="registration-telegram" class="form-control mb-2" name="telegram" placeholder="{{ tr('participants_telegram') }}" {% if not registration_open or tournament_started %}disabled{% endif %}>
+          <label class="form-label" for="registration-telegram">Telegram\QQChat</label>
+          <input id="registration-telegram" class="form-control mb-2" name="telegram" placeholder="Telegram\QQChat" {% if not registration_open or tournament_started %}disabled{% endif %}>
 
           <div class="form-check mb-3">
             <input id="rules-ack" class="form-check-input" type="checkbox" name="rules_ack" value="1" {% if not registration_open or tournament_started %}disabled{% endif %}>
@@ -54,7 +54,7 @@
       <div class="card-body">
         <h3 class="prize-pool-title-neon page-title-neon">{{ tr('index_prize_pool') }}</h3>
         <div class="prize-pool-amount{% if prize_pool_wave_enabled %} prize-pool-amount-wave{% endif %}">
-          {% if lang == 'en' %}
+          {% if lang in ('en', 'zh') %}
             {% for char in ('$ ' ~ total_sponsors_amount_usd) %}<span class="prize-pool-digit">{{ char }}</span>{% endfor %}
           {% else %}
             {% for char in (total_sponsors_amount_rub ~ ' ₽') %}<span class="prize-pool-digit">{{ char }}</span>{% endfor %}
@@ -70,7 +70,7 @@
       <div class="card-body">
         <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
           <h3 class="text-contrast-neon neon-text-outline mb-0">{{ tr('index_chat') }}</h3>
-          <button type="button" class="btn btn-outline-light btn-sm" id="chat-refresh-btn">Refresh</button>
+          <button type="button" class="btn btn-sm btn-chat-refresh" id="chat-refresh-btn">{{ tr('index_chat_refresh') }}</button>
         </div>
         <form action="/chat/send" method="post" class="mb-3" id="chat-form" data-cooldown-seconds="{{ chat_settings.cooldown_seconds }}">
           {% if not chat_settings.is_enabled %}<div class="alert alert-warning">{{ tr('msg_chat_disabled_admin') }}</div>{% endif %}
@@ -84,7 +84,7 @@
             {% endfor %}
           </div>
           <textarea class="form-control mb-2" id="chat-message" name="message" maxlength="{{ chat_settings.max_length }}" placeholder="{{ tr('index_message') }}" required {% if not chat_settings.is_enabled %}disabled{% endif %}></textarea>
-          <div class="small text-contrast-muted mb-2">Осталось символов: <span id="chat-char-counter">{{ chat_settings.max_length }}</span></div>
+          <div class="small text-contrast-muted mb-2">{{ tr('index_chat_chars_left') }}: <span id="chat-char-counter">{{ chat_settings.max_length }}</span></div>
           <button class="btn btn-neon btn-neon-cyan" id="chat-send-btn" {% if not chat_settings.is_enabled %}disabled{% endif %}>{{ tr('index_connect_send') }}</button>
           <div class="chat-cooldown-timer mt-2" id="chat-cooldown-timer" hidden>
             <div class="chat-cooldown-timer__label"><span id="chat-cooldown-seconds">0</span> sec</div>
@@ -98,7 +98,7 @@
             {% set nick_color = msg.nick_color or chat_nick_colors[0] %}
             {% set is_admin_message = msg.temp_nick == '@Admin' %}
             <div>
-              <strong class="chat-nick{% if is_admin_message %} chat-nick-admin{% endif %}" style="--nick-color: {{ nick_color }};">{{ msg.temp_nick }}</strong><span class="chat-timestamp"> ({{ msg.created_at.strftime('%d.%m.%y %H:%M:%S') }})</span>: {{ msg.message }}
+              <strong class="chat-nick{% if is_admin_message %} chat-nick-admin{% endif %}" style="--nick-color: {{ nick_color }};">{{ msg.temp_nick }}</strong><span class="chat-timestamp"> ({{ format_msk_datetime(msg.created_at) }})</span>: {{ msg.message }}
             </div>
           {% endfor %}
         </div>

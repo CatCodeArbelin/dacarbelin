@@ -7,32 +7,102 @@
   <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Aleo:wght@400;500;600;700&family=Exo+2:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;600;700;800&family=Russo+One&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body class="bg-dark text-light">
+<body class="bg-dark text-light view-{{ site_view }} {% if is_mobile_view %}is-mobile-view{% else %}is-full-view{% endif %} {% block body_class %}{% endblock %}">
+<canvas id="matrix-bg" aria-hidden="true"></canvas>
 <nav class="navbar navbar-expand-lg navbar-dark neon-border-blue mb-4 navbar-neon">
   <div class="container">
     <a class="navbar-brand nav-main-link neon-title neon-title--logo" href="/">DAC Tournament</a>
-    <div class="d-flex gap-3">
-      <a href="/participants" class="nav-link nav-main-link">{{ tr('nav_participants') }}</a>
-      <a href="/tournament" class="nav-link nav-main-link">{{ tr('nav_tournament') }}</a>
-      <a href="/donate" class="nav-link nav-main-link">{{ tr('nav_donate') }}</a>
-      <a href="/rules" class="nav-link nav-main-link">{{ tr('nav_rules') }}</a>
-      <a href="/archive" class="nav-link nav-main-link">{{ tr('nav_archive') }}</a>
-      <a href="/set-lang/en" class="btn btn-sm btn-neon btn-neon-cyan">{{ tr('base_lang_en') }}</a>
-      <a href="/set-lang/ru" class="btn btn-sm btn-neon btn-neon-pink">{{ tr('base_lang_ru') }}</a>
+    <button class="navbar-toggler border-0 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#main-navbar" aria-controls="main-navbar" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="main-navbar">
+      <ul class="navbar-nav ms-auto mb-3 mb-lg-0 align-items-lg-center gap-lg-2">
+        <li class="nav-item"><a href="/participants" class="nav-link nav-main-link px-lg-2">{{ tr('nav_participants') }}</a></li>
+        <li class="nav-item"><a href="/tournament" class="nav-link nav-main-link px-lg-2">{{ tr('nav_tournament') }}</a></li>
+        <li class="nav-item"><a href="/donate" class="nav-link nav-main-link px-lg-2">{{ tr('nav_donate') }}</a></li>
+        <li class="nav-item"><a href="/rules" class="nav-link nav-main-link px-lg-2">{{ tr('nav_rules') }}</a></li>
+        <li class="nav-item"><a href="/archive" class="nav-link nav-main-link px-lg-2">{{ tr('nav_archive') }}</a></li>
+      </ul>
+      <div class="d-grid d-lg-flex gap-2 ms-lg-3">
+        <a href="/set-view/{{ site_view_switch_mode }}" class="btn btn-sm btn-neon btn-neon-cyan">{{ site_view_switch_label }}</a>
+        <a href="/set-lang/zh" class="btn btn-sm btn-neon btn-neon-amber">{{ tr('base_lang_zh') }}</a>
+        <a href="/set-lang/en" class="btn btn-sm btn-neon btn-neon-cyan">{{ tr('base_lang_en') }}</a>
+        <a href="/set-lang/ru" class="btn btn-sm btn-neon btn-neon-pink">{{ tr('base_lang_ru') }}</a>
+      </div>
     </div>
   </div>
 </nav>
-<div class="container pb-5">
-  {% block content %}{% endblock %}
+<div class="page-content-shell">
+  <main class="container pb-3 page-content-shell__main">
+    {% block content %}{% endblock %}
+  </main>
 </div>
 <footer class="site-footer mt-auto">
   <div class="container site-footer__inner">
-    <span>For the community, with ❤️, by</span>
-    <a class="site-footer__author" href="https://t.me/arbelin94" target="_blank" rel="noopener noreferrer">Arbelin</a>
+    <div class="site-footer__meta">
+      <span>For the community, with ❤️, by</span>
+      <a class="site-footer__author" href="https://t.me/arbelin94" target="_blank" rel="noopener noreferrer">Arbelin</a>
+    </div>
+    <a href="/set-view/{{ site_view_switch_mode }}" class="btn btn-sm btn-neon btn-neon-cyan">{{ site_view_switch_label }}</a>
   </div>
 </footer>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  (() => {
+    const canvas = document.getElementById('matrix-bg');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const isTechnicalWorks = document.body.classList.contains('technical-works-mode');
+    const charset = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const fontSize = isTechnicalWorks ? 21 : 24;
+    const columnGap = isTechnicalWorks ? 2.15 : 2.6;
+    const stepX = fontSize * columnGap;
+    const trailFade = isTechnicalWorks ? 0.11 : 0.07;
+    const glyphOpacity = isTechnicalWorks ? 0.3 : 0.2;
+    const resetChance = isTechnicalWorks ? 0.04 : 0.025;
+    const frameRate = isTechnicalWorks ? 30 : 24;
+    let rainDrops = [];
+
+    const initRain = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const columns = Math.max(1, Math.floor(canvas.width / stepX));
+      rainDrops = new Array(columns).fill(1);
+    };
+
+    const draw = () => {
+      ctx.fillStyle = `rgba(0, 0, 0, ${trailFade})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = `rgba(0, 255, 0, ${glyphOpacity})`;
+      ctx.font = `${fontSize}px monospace`;
+
+      for (let i = 0; i < rainDrops.length; i += 1) {
+        const text = charset.charAt(Math.floor(Math.random() * charset.length));
+        const x = i * stepX;
+        const y = rainDrops[i] * fontSize;
+        ctx.fillText(text, x, y);
+
+        if (y > canvas.height && Math.random() < resetChance) {
+          rainDrops[i] = 0;
+        }
+        rainDrops[i] += 1;
+      }
+    };
+
+    window.addEventListener('resize', initRain);
+    initRain();
+    setInterval(draw, 1000 / frameRate);
+  })();
+</script>
 </body>
 </html>

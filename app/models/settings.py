@@ -33,6 +33,7 @@ class DonationLink(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title_ru: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     title_en: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    title_zh: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     url: Mapped[str] = mapped_column(String(512), nullable=False)
     category: Mapped[str] = mapped_column(String(50), nullable=False, default="general")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
@@ -90,6 +91,7 @@ class RulesContent(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     body_ru: Mapped[str] = mapped_column(Text, default="")
     body_en: Mapped[str] = mapped_column(Text, default="")
+    body_zh: Mapped[str] = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 

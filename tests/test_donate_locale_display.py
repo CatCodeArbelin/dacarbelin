@@ -103,3 +103,27 @@ def test_donate_page_support_author_visibility_toggle(monkeypatch):
 
     assert response_visible.status_code == 200
     assert "Support the site author" in response_visible.text
+
+
+def test_donate_page_shows_usd_for_zh_locale(monkeypatch):
+    fake_db = _FakeDonateDB()
+
+    async def fake_enabled() -> bool:
+        return False
+
+    monkeypatch.setattr(main_module, "is_technical_works_enabled", fake_enabled)
+
+    async def override_get_db():
+        yield fake_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            client.cookies.set("lang", "zh")
+            response = client.get("/donate")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    assert "$100" in response.text
+    assert "7900 ₽" not in response.text

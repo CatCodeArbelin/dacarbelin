@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-<h2 class="page-title-neon">{{ tr('rules_title') }}</h2>
-<div class="content-html">{{ rules_content_html|safe }}</div>
+<section class="rules-page">
+  <header class="rules-page__header">
+    <h2 class="page-title-neon">{{ tr('rules_title') }}</h2>
+  </header>
+  <div class="rules-page__content content-html">{{ rules_content_html|safe }}</div>
+</section>
 {% endblock %}

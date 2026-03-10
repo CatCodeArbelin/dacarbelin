@@ -1,6 +1,7 @@
 """Содержит веб-маршруты для страниц турнира, админки и пользовательских действий."""
 
 import asyncio
+import ipaddress
 import json
 import logging
 import math
@@ -9,7 +10,7 @@ import re
 from html import escape, unescape
 from html.parser import HTMLParser
 from urllib.parse import quote, unquote, urlencode
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Form, Query, Request
@@ -121,6 +122,7 @@ templates = Jinja2Templates(directory="app/templates")
 DONATE_HIGHLIGHT_AMOUNT_SETTING_KEY = "donate_highlight_amount"
 DONATE_SUPPORT_AUTHOR_VISIBLE_SETTING_KEY = "donate_support_author_visible"
 RUB_PER_USD_RATE = Decimal("79")
+MSK_TIMEZONE = timezone(timedelta(hours=3))
 
 
 ALLOWED_USER_UPDATE_FIELDS = {"basket", "direct_invite_stage"}
@@ -151,6 +153,17 @@ ADMIN_CHAT_SENDERS = {
 }
 ADMIN_CHAT_SENDER_COOKIE = "admin_chat_sender"
 CHAT_SENDER_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
+SITE_VIEW_COOKIE = "site_view"
+SITE_VIEW_MODES = {"mobile", "full", "auto"}
+MOBILE_USER_AGENT_MARKERS = (
+    "android",
+    "iphone",
+    "ipad",
+    "ipod",
+    "mobile",
+    "windows phone",
+    "opera mini",
+)
 
 
 def parse_donor_amount(amount_raw: str) -> Decimal:
@@ -175,6 +188,79 @@ def format_money_amount(amount: Decimal) -> str:
 def to_rub_and_usd_display_amounts(total_rub_amount: Decimal) -> tuple[str, str]:
     usd_amount = total_rub_amount / RUB_PER_USD_RATE
     return format_money_amount(total_rub_amount), format_money_amount(usd_amount)
+
+
+def to_msk_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    utc_value = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+    return utc_value.astimezone(MSK_TIMEZONE)
+
+
+def format_msk_datetime(value: datetime | None, fmt: str = "%d.%m.%y %H:%M:%S") -> str:
+    msk_value = to_msk_datetime(value)
+    return msk_value.strftime(fmt) if msk_value else ""
+
+
+def format_chat_message_source(
+    temp_nick: str,
+    ip_address: str,
+    *,
+    city: str | None = None,
+    country: str | None = None,
+) -> str:
+    """Возвращает строку источника сообщения для админского списка чата."""
+    safe_nick = (temp_nick or "").strip() or "Unknown"
+    safe_ip = (ip_address or "").strip() or "unknown-ip"
+    city_value = (city or "").strip()
+    country_value = (country or "").strip()
+    geo_parts = [part for part in (city_value, country_value) if part]
+    if geo_parts:
+        return f"{safe_nick}({safe_ip} - {', '.join(geo_parts)})"
+    return f"{safe_nick} ({safe_ip})"
+
+
+def _parse_forwarded_ip_candidate(raw_value: str | None) -> str | None:
+    candidate = (raw_value or "").strip().strip('"')
+    if not candidate or candidate.lower() == "unknown":
+        return None
+
+    if candidate.startswith("[") and "]" in candidate:
+        candidate = candidate[1:candidate.index("]")]
+    elif candidate.count(":") == 1:
+        host_part, port_part = candidate.rsplit(":", 1)
+        if port_part.isdigit():
+            candidate = host_part
+
+    try:
+        return str(ipaddress.ip_address(candidate))
+    except ValueError:
+        return None
+
+
+def get_request_ip_address(request: Request) -> str:
+    x_forwarded_for = request.headers.get("x-forwarded-for", "")
+    for part in x_forwarded_for.split(","):
+        parsed = _parse_forwarded_ip_candidate(part)
+        if parsed:
+            return parsed
+
+    parsed_real_ip = _parse_forwarded_ip_candidate(request.headers.get("x-real-ip"))
+    if parsed_real_ip:
+        return parsed_real_ip
+
+    forwarded_header = request.headers.get("forwarded", "")
+    for segment in forwarded_header.split(","):
+        for token in segment.split(";"):
+            key, _, value = token.partition("=")
+            if key.strip().lower() != "for":
+                continue
+            parsed_forwarded = _parse_forwarded_ip_candidate(value)
+            if parsed_forwarded:
+                return parsed_forwarded
+
+    direct_ip = request.client.host if request.client else "unknown"
+    return _parse_forwarded_ip_candidate(direct_ip) or direct_ip
 
 
 class ChatEventBroker:
@@ -909,9 +995,35 @@ def _display_nickname(user: User | None, fallback: str) -> str:
 
 def template_context(request: Request, **extra):
     lang = get_lang(request.cookies.get("lang"))
-    context = {"request": request, "lang": lang, "tr": lambda key: t(lang, key)}
+    site_view = resolve_site_view(request.cookies.get(SITE_VIEW_COOKIE))
+    is_mobile_view = resolve_is_mobile_view(site_view=site_view, user_agent=request.headers.get("user-agent"))
+    switch_mode = "full" if is_mobile_view else "mobile"
+    context = {
+        "request": request,
+        "lang": lang,
+        "site_view": site_view,
+        "is_mobile_view": is_mobile_view,
+        "site_view_switch_mode": switch_mode,
+        "site_view_switch_label": t(lang, "base_view_full") if is_mobile_view else t(lang, "base_view_mobile"),
+        "tr": lambda key: t(lang, key),
+        "format_msk_datetime": format_msk_datetime,
+    }
     context.update(extra)
     return context
+
+
+def resolve_site_view(site_view_cookie: str | None) -> str:
+    normalized = (site_view_cookie or "").strip().lower()
+    return normalized if normalized in SITE_VIEW_MODES else "auto"
+
+
+def resolve_is_mobile_view(*, site_view: str, user_agent: str | None) -> bool:
+    if site_view == "mobile":
+        return True
+    if site_view == "full":
+        return False
+    user_agent_value = (user_agent or "").lower()
+    return any(marker in user_agent_value for marker in MOBILE_USER_AGENT_MARKERS)
 
 
 
@@ -1248,7 +1360,7 @@ def _build_chat_messages_payload(chat_messages: list[ChatMessage]) -> list[dict[
             "message": msg.message,
             "nick_color": msg.nick_color or default_nick_color,
             "is_admin": msg.temp_nick == "@Admin",
-            "created_at_display": msg.created_at.strftime("%d.%m.%y %H:%M:%S"),
+            "created_at_display": format_msk_datetime(msg.created_at),
         }
         for msg in chat_messages
     ]
@@ -1256,6 +1368,227 @@ def _build_chat_messages_payload(chat_messages: list[ChatMessage]) -> list[dict[
 
 class ContentLocalePayload(BaseModel):
     rules_body: str
+
+
+DEFAULT_RULES_BODY_RU = """<h2>Loyrens Tournament: Правила и Регламент</h2>
+<p>Привет, дорогой любитель Dota Auto Chess! Приглашаем принять участие в нашем турнире! Участие полностью бесплатное, а стартовый призовой фонд составляет <strong>15 000 рублей</strong> (добавлено от организатора).</p>
+<p>Организатор берет комиссию <strong>15%</strong> от общего призового фонда.</p>
+<h2>РАСПИСАНИЕ ЭТАПОВ</h2>
+<p>Турнир пройдет в 4 игровых дня:</p>
+<ul>
+  <li><strong>25.04.2026 в 14:00 (Мск)</strong> — ⅛ финала</li>
+  <li><strong>26.04.2026 в 14:00 (Мск)</strong> — ¼ финала</li>
+  <li><strong>2.05.2026 в 14:00 (Мск)</strong> — Полуфиналы</li>
+  <li><strong>3.05.2026 в 14:00 (Мск)</strong> — Финал</li>
+</ul>
+<h2>УЧАСТНИКИ И ИНВАЙТЫ</h2>
+<p>Общее количество участников: <strong>64 игрока</strong>.</p>
+<p>По решению организатора, <strong>11 игроков</strong> получают прямой инвайт в ¼ финала (минуя стадию ⅛):</p>
+<p><strong>Rondo_Mandarin, envy_chilling, crazyyypanda, Cadis, Dark, xdDfl, Аскорбинка, el_classico, dumpstered95, theFancyPants, Corekid94</strong></p>
+<p>Остальные места распределяются между зарегистрировавшимися игроками.</p>
+<h2>ОБЩАЯ СИСТЕМА НАЧИСЛЕНИЯ ОЧКОВ</h2>
+<p>На всех этапах действует стандартная система начисления очков за место в каждой игре:</p>
+<ul>
+  <li>1 место — 8 очков</li>
+  <li>2 место — 6 очков</li>
+  <li>3 место — 5 очков</li>
+  <li>4 место — 4 очка</li>
+  <li>5 место — 3 очка</li>
+  <li>6 место — 2 очка</li>
+  <li>7 место — 1 очко</li>
+  <li>8 место — 0 очков</li>
+</ul>
+<h2>СТРУКТУРА ТУРНИРА</h2>
+<h3>I ЭТАП — ⅛ финала (25.04.2026)</h3>
+<p><strong>Участники:</strong> 56 человек (все, кроме инвайтов).</p>
+<p><strong>Формат:</strong> 7 групп по 8 игроков. Каждая группа играет 3 игры.</p>
+<p><strong>Выход в следующий этап:</strong> 3 лучших из каждой группы.</p>
+<p><strong>Итог:</strong> 21 участник проходят в ¼ финала.</p>
+<h3>II ЭТАП — ¼ финала (26.04.2026)</h3>
+<p><strong>Участники:</strong> 32 человека (21 прошедший с ⅛ + 11 приглашенных).</p>
+<p><strong>Формат:</strong> 4 группы по 8 игроков. Каждая группа играет 3 игры.</p>
+<p><strong>Выход в следующий этап:</strong> 4 лучших из каждой группы.</p>
+<p><strong>Итог:</strong> 16 участников проходят в полуфинал.</p>
+<h3>III ЭТАП — Полуфиналы (2.05.2026)</h3>
+<p><strong>Участники:</strong> 16 человек.</p>
+<p><strong>Формат:</strong> 2 группы по 8 игроков. Каждая группа играет 3 игры.</p>
+<p><strong>Выход в финал:</strong> 4 лучших из каждой группы.</p>
+<p><strong>Итог:</strong> 8 финалистов.</p>
+<h3>IV ЭТАП — ФИНАЛ (3.05.2026)</h3>
+<p><strong>Участники:</strong> 8 финалистов.</p>
+<p><strong>Формат:</strong> Система «Доминирования» (до 22 очков + победа).</p>
+<p>Игроки играют до тех пор, пока один из участников не наберет 22 очка.</p>
+<p>После достижения порога в 22 очка, турнир не заканчивается сразу. Игрок, перешагнувший порог, должен дополнительно занять 1-е место в любой из последующих игр.</p>
+<p>Как только игрок выполняет оба условия (22+ очков и 1 место), он объявляется победителем.</p>
+<p><strong>Итоговые места:</strong> 2-е и 3-е место определяются по сумме очков на момент завершения финала.</p>
+<p><strong>Призовые:</strong> Получают участники, занявшие 1, 2 и 3 места.</p>
+<h2>ПРАВИЛА ПРОВЕДЕНИЯ МАТЧЕЙ</h2>
+<p>Каждый игрок имеет право стримить свои игры, необходимо указать <strong>"Tournament by https://www.twitch.tv/loyrensss"</strong> в названии трансляции.</p>
+<p><strong>Регистрация и никнейм:</strong><br>Регистрация на сайте <a href="https://dotaautochess.site" target="_blank" rel="noopener noreferrer">dotaautochess.site</a>. Никнейм на сайте обязательно должен совпадать с основным игровым никнеймом в Steam на начало турнира. Это необходимо для жеребьевки, удобства поиска игроков и удобства просмотра игр. В случае несоответствия игрок не будет допущен к турниру.</p>
+<p><strong>Настройки лобби:</strong><br>Все игры проводятся на сервере Австрия, режим 1x8Ob, Casual mode.</p>
+<p><strong>После каждой игры:</strong><br>Победителю лобби необходимо выслать скриншот в группу в Telegram.</p>
+<p><strong>Честная игра:</strong><br>Запрещены читы, багоюзы (использование ошибок игры) и договорные матчи. Любое нарушение карается дисквалификацией и баном на будущие турниры.</p>
+<p><strong>Поведение:</strong><br>Уважайте соперников и организаторов. Оскорбления и издевательства в чате запрещены и ведут к дисквалификации.</p>
+<p><strong>Технические моменты:</strong><br>В случае вылета игрока ставится пауза. Время ожидания на реконнект — 5 минут. Все спорные моменты решаются с судьей или организатором турнира: <a href="https://t.me/l0yrensss" target="_blank" rel="noopener noreferrer">https://t.me/l0yrensss</a>.</p>
+<h2>ПРАВИЛА ОПРЕДЕЛЕНИЯ ПОБЕДИТЕЛЯ ПРИ РАВЕНСТВЕ ОЧКОВ</h2>
+<p>Если в группе (⅛, ¼, полуфинал) у игроков одинаковая сумма очков, применяются следующие критерии (по убыванию важности):</p>
+<ol>
+  <li>Наибольшее количество первых мест.</li>
+  <li>Наибольшее количество попаданий в Top-4.</li>
+  <li>Более высокое место, занятое в последней игре группы.</li>
+</ol>
+<h2>ЗАПАСНЫЕ ИГРОКИ</h2>
+<p>Если количество зарегистрировавшихся превышает 64, все остальные автоматически попадают в список запасных.</p>
+<p>В случае неявки кого-то из основных игроков на старте турнира, замена производится из списка запасных.</p>
+<p>Приоритет в замене получает игрок, который раньше остальных подал заявку на участие.</p>
+<p><strong>Наслаждайтесь игрой. Удачи и приятной игры!</strong></p>"""
+
+DEFAULT_RULES_BODY_EN = """<h2>Loyrens Tournament: Rules and Regulations</h2>
+<p>Hello, dear Dota Auto Chess fans! We invite you to participate in our tournament! Participation is completely free, and the starting prize pool is <strong>15,000 rubles</strong> (added by the organizer).</p>
+<p>The organizer takes a commission of <strong>15%</strong> of the total prize fund.</p>
+<h2>SCHEDULE OF STAGES</h2>
+<p>The tournament will be held over 4 game days:</p>
+<ul>
+  <li><strong>April 25, 2026, 2:00 PM (Moscow time)</strong> — Round of 16</li>
+  <li><strong>April 26, 2026, 2:00 PM (Moscow time)</strong> — Quarter-finals</li>
+  <li><strong>May 2, 2026, 2:00 PM (Moscow time)</strong> — Semi-finals</li>
+  <li><strong>May 3, 2026, 2:00 PM (Moscow time)</strong> — Final</li>
+</ul>
+<h2>PARTICIPANTS AND INVITES</h2>
+<p>Total number of participants: <strong>64 players</strong>.</p>
+<p>According to the organizer's decision, <strong>11 players</strong> receive a direct invitation to the quarter-finals (skipping the first stage):</p>
+<p><strong>Rondo_Mandarin, envy_chilling, crazyyypanda, Cadis, Dark, xdDfl, Askorbinka, el_classico, dumpstered95, theFancyPants, Corekid9</strong></p>
+<p>The remaining places are distributed among registered players.</p>
+<h2>GENERAL SCORING SYSTEM</h2>
+<p>At all stages, a standard system of scoring points for placement in each game applies:</p>
+<ul>
+  <li>1st place — 8 points</li>
+  <li>2nd place — 6 points</li>
+  <li>3rd place — 5 points</li>
+  <li>4th place — 4 points</li>
+  <li>5th place — 3 points</li>
+  <li>6th place — 2 points</li>
+  <li>7th place — 1 point</li>
+  <li>8th place — 0 points</li>
+</ul>
+<h2>TOURNAMENT STRUCTURE</h2>
+<h3>Stage I — Round of 16 (April 25, 2026)</h3>
+<p><strong>Participants:</strong> 56 people (all except invites).</p>
+<p><strong>Format:</strong> 7 groups of 8 players. Each group plays 3 games.</p>
+<p><strong>Advancement:</strong> Top 3 from each group.</p>
+<p><strong>Result:</strong> 21 participants advance to the quarter-finals.</p>
+<h3>Stage II — Quarter-finals (April 26, 2026)</h3>
+<p><strong>Participants:</strong> 32 people (21 who advanced from Stage I + 11 invited).</p>
+<p><strong>Format:</strong> 4 groups of 8 players. Each group plays 3 games.</p>
+<p><strong>Advancement:</strong> Top 4 from each group.</p>
+<p><strong>Result:</strong> 16 participants advance to the semi-finals.</p>
+<h3>Stage III — Semi-finals (May 2, 2026)</h3>
+<p><strong>Participants:</strong> 16 people.</p>
+<p><strong>Format:</strong> 2 groups of 8 players. Each group plays 3 games.</p>
+<p><strong>Advancement:</strong> Top 4 from each group.</p>
+<p><strong>Result:</strong> 8 finalists.</p>
+<h3>Stage IV — Final (May 3, 2026)</h3>
+<p><strong>Participants:</strong> 8 finalists.</p>
+<p><strong>Format:</strong> Domination system (up to 22 points + win).</p>
+<p>Players continue playing until one of the participants reaches 22 points.</p>
+<p>The tournament does not end immediately after reaching the 22-point threshold. The player who crosses the threshold must additionally finish 1st in any subsequent game.</p>
+<p>As soon as a player fulfills both conditions (22+ points and 1st place), they are declared the winner.</p>
+<p><strong>Final placements:</strong> 2nd and 3rd places are determined by total points at the end of the final.</p>
+<p><strong>Prizes:</strong> Awarded to participants who finish 1st, 2nd, and 3rd.</p>
+<h2>MATCH RULES</h2>
+<p>Every player has the right to stream their games; the stream title must include <strong>"Tournament by https://www.twitch.tv/loyrensss"</strong>.</p>
+<p><strong>Registration and nickname:</strong><br>Registration is available at <a href="https://dotaautochess.site" target="_blank" rel="noopener noreferrer">dotaautochess.site</a>. The website nickname must match the player's primary Steam in-game nickname at the start of the tournament. This is required for the draw, easier player lookup, and easier game viewing. If it does not match, the player will not be admitted to the tournament.</p>
+<p><strong>Lobby settings:</strong><br>All games are played on the Austria server, 1x8Ob, Casual mode.</p>
+<p><strong>After each game:</strong><br>The winner of the lobby must send a screenshot to the Telegram group.</p>
+<p><strong>Fair play:</strong><br>Cheating, bug abuse (exploiting game errors), and match-fixing are prohibited. Any violation results in disqualification and a ban from future tournaments.</p>
+<p><strong>Behavior:</strong><br>Respect opponents and organizers. Insults and bullying in chat are prohibited and lead to disqualification.</p>
+<p><strong>Technical points:</strong><br>If a player disconnects, the game is paused. Reconnect timeout is 5 minutes. All disputed situations are resolved with the judge or tournament organizer: <a href="https://t.me/l0yrensss" target="_blank" rel="noopener noreferrer">https://t.me/l0yrensss</a>.</p>
+<h2>RULES FOR DETERMINING A WINNER IN CASE OF A TIE</h2>
+<p>If players in a group (Stage I, quarter-final, semi-final) have the same number of points, the following criteria are applied in descending order of importance:</p>
+<ol>
+  <li>Greatest number of 1st places.</li>
+  <li>Greatest number of Top-4 finishes.</li>
+  <li>Higher placement in the last game of the group.</li>
+</ol>
+<h2>SUBSTITUTE PLAYERS</h2>
+<p>If the number of registered participants exceeds 64, all additional players are automatically placed on the reserve list.</p>
+<p>If one of the main players does not appear at the start of the tournament, a replacement is made from the reserve list.</p>
+<p>Replacement priority is given to the player who submitted their application earlier than others.</p>
+<p><strong>Enjoy the game. Good luck and happy gaming!</strong></p>"""
+
+
+DEFAULT_RULES_BODY_ZH = """<h2>Loyrens Tournament：规则与赛制</h2>
+<p>你好，亲爱的 Dota Auto Chess 玩家！欢迎参加我们的锦标赛！参赛完全免费，初始奖金池为<strong>15,000 卢布</strong>（由主办方追加）。</p>
+<p>主办方将从总奖金池中收取<strong>15%</strong>的组织服务费。</p>
+<h2>阶段赛程</h2>
+<p>比赛共进行 4 个比赛日：</p>
+<ul>
+  <li><strong>2026.04.25 14:00（莫斯科时间）</strong> — 1/8 决赛</li>
+  <li><strong>2026.04.26 14:00（莫斯科时间）</strong> — 1/4 决赛</li>
+  <li><strong>2026.05.02 14:00（莫斯科时间）</strong> — 半决赛</li>
+  <li><strong>2026.05.03 14:00（莫斯科时间）</strong> — 总决赛</li>
+</ul>
+<h2>参赛人数与直邀</h2>
+<p>参赛总人数：<strong>64 名选手</strong>。</p>
+<p>经主办方决定，<strong>11 名选手</strong>将直接受邀进入 1/4 决赛（跳过 1/8 决赛）：</p>
+<p><strong>Rondo_Mandarin, envy_chilling, crazyyypanda, Cadis, Dark, xdDfl, Аскорбинка, el_classico, dumpstered95, theFancyPants, Corekid94</strong></p>
+<p>其余名额将从已报名选手中分配。</p>
+<h2>通用计分规则</h2>
+<p>所有阶段均采用每局名次积分制：</p>
+<ul>
+  <li>第 1 名 — 8 分</li>
+  <li>第 2 名 — 6 分</li>
+  <li>第 3 名 — 5 分</li>
+  <li>第 4 名 — 4 分</li>
+  <li>第 5 名 — 3 分</li>
+  <li>第 6 名 — 2 分</li>
+  <li>第 7 名 — 1 分</li>
+  <li>第 8 名 — 0 分</li>
+</ul>
+<h2>赛事结构</h2>
+<h3>第一阶段 — 1/8 决赛（2026.04.25）</h3>
+<p><strong>参赛者：</strong>56 人（除直邀外的所有选手）。</p>
+<p><strong>赛制：</strong>7 个小组，每组 8 人。每组进行 3 局比赛。</p>
+<p><strong>晋级条件：</strong>每组前 3 名晋级下一阶段。</p>
+<p><strong>结果：</strong>共 21 名选手晋级 1/4 决赛。</p>
+<h3>第二阶段 — 1/4 决赛（2026.04.26）</h3>
+<p><strong>参赛者：</strong>32 人（1/8 晋级 21 人 + 直邀 11 人）。</p>
+<p><strong>赛制：</strong>4 个小组，每组 8 人。每组进行 3 局比赛。</p>
+<p><strong>晋级条件：</strong>每组前 4 名晋级下一阶段。</p>
+<p><strong>结果：</strong>共 16 名选手晋级半决赛。</p>
+<h3>第三阶段 — 半决赛（2026.05.02）</h3>
+<p><strong>参赛者：</strong>16 人。</p>
+<p><strong>赛制：</strong>2 个小组，每组 8 人。每组进行 3 局比赛。</p>
+<p><strong>晋级条件：</strong>每组前 4 名晋级总决赛。</p>
+<p><strong>结果：</strong>8 名总决赛选手。</p>
+<h3>第四阶段 — 总决赛（2026.05.03）</h3>
+<p><strong>参赛者：</strong>8 名总决赛选手。</p>
+<p><strong>赛制：</strong>“统治制”（先到 22 分并在后续任意一局拿到第 1）。</p>
+<p>选手持续对局，直到有人累计达到 22 分。</p>
+<p>达到 22 分后比赛不会立刻结束。该选手还需在后续任意一局取得第 1 名。</p>
+<p>当同一选手同时满足两个条件（22+ 分且单局第 1）时，即被判定为冠军。</p>
+<p><strong>最终名次：</strong>第 2、3 名按决赛结束时总积分确定。</p>
+<p><strong>奖金分配：</strong>第 1、2、3 名获得奖金。</p>
+<h2>比赛行为与执行规则</h2>
+<p>每位选手都可以直播自己的比赛，直播标题中需注明<strong>"Tournament by https://www.twitch.tv/loyrensss"</strong>。</p>
+<p><strong>报名与昵称：</strong><br>请在 <a href="https://dotaautochess.site" target="_blank" rel="noopener noreferrer">dotaautochess.site</a> 报名。网站昵称必须与选手在比赛开始时 Steam 游戏内的主昵称一致。该要求用于抽签、选手识别与观赛管理。若不一致，选手将无法参赛。</p>
+<p><strong>房间设置：</strong><br>所有对局在 Austria 服务器进行，1x8Ob，Casual 模式。</p>
+<p><strong>每局结束后：</strong><br>房主（当局获胜者）需将截图发送到 Telegram 群。</p>
+<p><strong>公平竞赛：</strong><br>严禁作弊、利用漏洞（游戏错误）及打假赛。任何违规将被取消资格，并禁止参加后续赛事。</p>
+<p><strong>行为规范：</strong><br>请尊重对手和主办方。禁止在聊天中辱骂或霸凌，违者取消资格。</p>
+<p><strong>技术问题：</strong><br>如选手掉线，比赛将暂停。重连等待时间为 5 分钟。所有争议由裁判或赛事主办方处理：<a href="https://t.me/l0yrensss" target="_blank" rel="noopener noreferrer">https://t.me/l0yrensss</a>。</p>
+<h2>同分时冠军判定规则</h2>
+<p>若同组（第一阶段、1/4 决赛、半决赛）选手积分相同，按以下顺序依次比较：</p>
+<ol>
+  <li>第 1 名次数更多者优先。</li>
+  <li>进入前 4 名次数更多者优先。</li>
+  <li>该组最后一局名次更高者优先。</li>
+</ol>
+<h2>替补选手规则</h2>
+<p>若报名人数超过 64 人，超出部分将自动进入替补名单。</p>
+<p>若主名单选手在比赛开始时未到场，将由替补名单中的选手替换。</p>
+<p>替补优先级按报名时间先后确定（先报名者优先）。</p>
+<p><strong>祝大家比赛顺利，玩得开心！</strong></p>"""
 
 
 def localized_attr(entity: object, base_name: str, lang: str) -> str:
@@ -1277,8 +1610,20 @@ def dump_admin_content_for_lang(
 async def get_or_create_rules_content(db: AsyncSession) -> RulesContent:
     row = await db.scalar(select(RulesContent).where(RulesContent.id == 1))
     if row:
+        has_updates = False
+        if not (row.body_ru or "").strip():
+            row.body_ru = DEFAULT_RULES_BODY_RU
+            has_updates = True
+        if not (row.body_en or "").strip():
+            row.body_en = DEFAULT_RULES_BODY_EN
+            has_updates = True
+        if not (row.body_zh or "").strip():
+            row.body_zh = DEFAULT_RULES_BODY_ZH
+            has_updates = True
+        if has_updates:
+            await db.flush()
         return row
-    row = RulesContent(id=1, body_ru="", body_en="")
+    row = RulesContent(id=1, body_ru=DEFAULT_RULES_BODY_RU, body_en=DEFAULT_RULES_BODY_EN, body_zh=DEFAULT_RULES_BODY_ZH)
     db.add(row)
     await db.flush()
     return row
@@ -1288,7 +1633,16 @@ async def get_or_create_rules_content(db: AsyncSession) -> RulesContent:
 async def set_lang(lang: str):
     # Сохраняем выбранный язык в cookie.
     response = RedirectResponse(url="/", status_code=302)
-    response.set_cookie("lang", "ru" if lang == "ru" else "en", max_age=60 * 60 * 24 * 365)
+    selected_lang = lang if lang in {"ru", "en", "zh"} else "en"
+    response.set_cookie("lang", selected_lang, max_age=60 * 60 * 24 * 365)
+    return response
+
+
+@router.get("/set-view/{mode}")
+async def set_view(mode: str):
+    response = RedirectResponse(url="/", status_code=302)
+    selected_mode = mode if mode in SITE_VIEW_MODES else "auto"
+    response.set_cookie(SITE_VIEW_COOKIE, selected_mode, max_age=60 * 60 * 24 * 365 * 5)
     return response
 
 
@@ -1448,7 +1802,7 @@ async def send_chat(
     except ValueError as exc:
         return redirect_with_msg("/", str(exc))
 
-    ip = request.client.host if request.client else "unknown"
+    ip = get_request_ip_address(request)
     chat_sender, should_set_chat_sender_cookie = resolve_chat_sender_token(request.cookies.get("chat_sender"))
     last_msg = await db.scalar(
         select(ChatMessage)
@@ -1727,6 +2081,17 @@ async def tournament_page(request: Request, db: AsyncSession = Depends(get_db)):
             winner_user_id,
             direct_invite_groups=direct_invite_groups,
         )
+    stage_title_keys = {
+        "group_stage": "tournament_stage_1_8_label",
+        "stage_2": "tournament_stage_1_4_label",
+        "stage_1_4": "tournament_stage_semifinal_groups_label",
+        "stage_final": "tournament_stage_final_label",
+    }
+    for stage in tournament_tree.get("stages", []):
+        title_key = stage_title_keys.get(stage.get("key", ""))
+        if title_key:
+            stage["title"] = t(lang, title_key)
+
     playoff_empty_active_stage_alert = get_empty_active_stage_alert(playoff_stages)
 
     return templates.TemplateResponse(
@@ -2459,7 +2824,12 @@ async def admin_chat_page(request: Request, db: AsyncSession = Depends(get_db)):
     chat_messages = (
         await db.scalars(select(ChatMessage).order_by(desc(ChatMessage.id)).limit(100))
     ).all()
-    admin_ip = request.client.host if request.client else "admin"
+    for chat_message in chat_messages:
+        chat_message.source_display = format_chat_message_source(
+            chat_message.temp_nick,
+            chat_message.ip_address,
+        )
+    admin_ip = get_request_ip_address(request)
     selected_sender = normalize_admin_chat_sender(request.cookies.get(ADMIN_CHAT_SENDER_COOKIE))
     if selected_sender == "@Admin" and not request.cookies.get(ADMIN_CHAT_SENDER_COOKIE):
         last_sender_message = await db.scalar(
@@ -2502,6 +2872,7 @@ async def admin_content_page(request: Request, db: AsyncSession = Depends(get_db
     content_by_lang = {
         "ru": dump_admin_content_for_lang("ru", rules_content).model_dump(),
         "en": dump_admin_content_for_lang("en", rules_content).model_dump(),
+        "zh": dump_admin_content_for_lang("zh", rules_content).model_dump(),
     }
     return templates.TemplateResponse(
         request,
@@ -4056,8 +4427,14 @@ async def admin_send_chat_message(
     except ValueError as exc:
         return redirect_with_admin_msg(str(exc))
 
+    if message.strip() == "/clear":
+        await db.execute(delete(ChatMessage))
+        await db.commit()
+        await chat_event_broker.publish()
+        return redirect_with_admin_msg("msg_admin_chat_messages_cleared")
+
     safe_sender_nick = normalize_admin_chat_sender(sender_nick)
-    admin_ip = request.client.host if request.client else "admin"
+    admin_ip = get_request_ip_address(request)
     db.add(
         ChatMessage(
             temp_nick=safe_sender_nick,
@@ -4077,6 +4454,14 @@ async def admin_send_chat_message(
         samesite="lax",
     )
     return redirect
+
+
+@router.post("/admin/chat/messages/clear")
+async def admin_clear_chat_messages(db: AsyncSession = Depends(get_db)):
+    await db.execute(delete(ChatMessage))
+    await db.commit()
+    await chat_event_broker.publish()
+    return redirect_with_admin_msg("msg_admin_chat_messages_cleared")
 
 
 @router.post("/admin/chat/message/update")

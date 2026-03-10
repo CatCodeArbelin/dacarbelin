@@ -4,7 +4,7 @@
   <div class="col-md-6 col-lg-4">
     <div class="card bg-black neon-border-red">
       <div class="card-body">
-        <h2 class="h4 mb-3">{{ tr('admin_login_title') }}</h2>
+        <h2 class="h4 mb-3 admin-login-title text-contrast-high neon-text-outline">{{ tr('admin_login_title') }}</h2>
         {% if request.query_params.get('msg') %}
           <div class="alert alert-danger">{{ tr(request.query_params.get('msg')) }}</div>
         {% endif %}
