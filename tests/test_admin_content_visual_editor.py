@@ -232,8 +232,20 @@ def test_admin_can_toggle_donate_support_author_visibility():
     assert fake_db.site_settings[0].value == "1"
 
 
-def test_admin_content_page_has_ch_language_option_and_rules_can_be_saved():
+def test_admin_content_page_uses_selected_language_fields_and_rules_can_be_saved():
     fake_db = _FakeContentDB()
+    fake_db.donation_links = [
+        DonationLink(
+            id=1,
+            title_ru="Лейбл RU",
+            title_en="Label EN",
+            title_zh="标签 ZH",
+            url="https://example.com",
+            category="general",
+            is_active=True,
+            sort_order=0,
+        )
+    ]
 
     async def override_get_db():
         yield fake_db
@@ -243,7 +255,9 @@ def test_admin_content_page_has_ch_language_option_and_rules_can_be_saved():
         with TestClient(app) as client:
             client.cookies.set(ADMIN_SESSION_COOKIE, create_admin_session_cookie())
 
-            page = client.get("/admin/content?content_lang=zh")
+            page_ru = client.get("/admin/content?content_lang=ru")
+            page_en = client.get("/admin/content?content_lang=en")
+            page_zh = client.get("/admin/content?content_lang=zh")
             response = client.post(
                 "/admin/rules",
                 data={"content_lang": "zh", "body": "<p>中文规则</p>"},
@@ -252,9 +266,14 @@ def test_admin_content_page_has_ch_language_option_and_rules_can_be_saved():
     finally:
         app.dependency_overrides.pop(get_db, None)
 
-    assert page.status_code == 200
-    assert 'option value="zh"' in page.text
-    assert '>CH<' in page.text
+    assert page_ru.status_code == 200
+    assert page_en.status_code == 200
+    assert page_zh.status_code == 200
+    assert 'option value="zh"' in page_zh.text
+    assert '>CH<' in page_zh.text
+    assert 'value="Лейбл RU"' in page_ru.text
+    assert 'value="Label EN"' in page_en.text
+    assert 'value="标签 ZH"' in page_zh.text
     assert response.status_code == 303
     assert fake_db.rules_content
     assert fake_db.rules_content[0].body_zh == "<p>中文规则</p>"
