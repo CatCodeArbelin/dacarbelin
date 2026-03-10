@@ -4302,6 +4302,12 @@ async def admin_send_chat_message(
     except ValueError as exc:
         return redirect_with_admin_msg(str(exc))
 
+    if message.strip() == "/clear":
+        await db.execute(delete(ChatMessage))
+        await db.commit()
+        await chat_event_broker.publish()
+        return redirect_with_admin_msg("msg_admin_chat_messages_cleared")
+
     safe_sender_nick = normalize_admin_chat_sender(sender_nick)
     admin_ip = request.client.host if request.client else "admin"
     db.add(
@@ -4323,6 +4329,14 @@ async def admin_send_chat_message(
         samesite="lax",
     )
     return redirect
+
+
+@router.post("/admin/chat/messages/clear")
+async def admin_clear_chat_messages(db: AsyncSession = Depends(get_db)):
+    await db.execute(delete(ChatMessage))
+    await db.commit()
+    await chat_event_broker.publish()
+    return redirect_with_admin_msg("msg_admin_chat_messages_cleared")
 
 
 @router.post("/admin/chat/message/update")
