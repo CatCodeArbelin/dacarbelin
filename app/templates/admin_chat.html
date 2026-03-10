@@ -46,7 +46,7 @@
         <td>{{ chat_message.id }}</td>
         <td><input class="form-control form-control-sm" form="chat-message-update-{{ chat_message.id }}" name="temp_nick" value="{{ chat_message.temp_nick }}" maxlength="120" required><div class="small text-contrast-muted mt-1">{{ chat_message.source_display }}</div></td>
         <td><textarea class="form-control form-control-sm" form="chat-message-update-{{ chat_message.id }}" name="message" rows="2" maxlength="{{ chat_settings.max_length }}" required>{{ chat_message.message }}</textarea></td>
-        <td>{{ chat_message.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td>{{ format_msk_datetime(chat_message.created_at, '%Y-%m-%d %H:%M:%S') }}</td>
         <td>
           <form id="chat-message-update-{{ chat_message.id }}" action="/admin/chat/message/update" method="post" class="d-inline"><input type="hidden" name="message_id" value="{{ chat_message.id }}"></form>
           <form id="chat-message-delete-{{ chat_message.id }}" action="/admin/chat/message/delete" method="post" class="d-inline"><input type="hidden" name="message_id" value="{{ chat_message.id }}"></form>
