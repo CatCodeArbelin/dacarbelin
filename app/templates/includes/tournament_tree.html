@@ -1,6 +1,8 @@
 {% macro render_tournament_tree(tree, tr, block_class='tournament-tree') -%}
 {% if tree and tree.stages %}
-<div class="{{ block_class }}" role="region" aria-label="{{ tr('tournament_bracket_title') }}">
+<div class="{{ block_class }}-shell">
+  <p class="{{ block_class }}-scroll-hint" role="note">↔ {{ tr('tournament_scroll_hint') }}</p>
+  <div class="{{ block_class }}" role="region" aria-label="{{ tr('tournament_bracket_title') }}">
   {% for stage in tree.stages %}
   <section class="{{ block_class }}-stage {{ block_class }}-stage-{{ stage.key }} {% if stage.is_active %}{{ block_class }}-stage-active{% endif %}" data-stage-key="{{ stage.key }}">
     <h5 class="{{ block_class }}-stage-title">{{ stage.title }}</h5>
@@ -34,6 +36,7 @@
     </div>
   </section>
   {% endfor %}
+  </div>
 </div>
 {% endif %}
 {%- endmacro %}

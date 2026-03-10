@@ -32,8 +32,8 @@
 
           <div id="steam-preview-message" class="small mb-2"></div>
 
-          <label class="form-label" for="registration-telegram">Telegram\QQChat</label>
-          <input id="registration-telegram" class="form-control mb-2" name="telegram" placeholder="Telegram\QQChat" {% if not registration_open or tournament_started %}disabled{% endif %}>
+          <label class="form-label" for="registration-telegram">{{ tr('index_contact_label') }}</label>
+          <input id="registration-telegram" class="form-control mb-2" name="telegram" placeholder="{{ tr('index_contact_label') }}" {% if not registration_open or tournament_started %}disabled{% endif %}>
 
           <div class="form-check mb-3">
             <input id="rules-ack" class="form-check-input" type="checkbox" name="rules_ack" value="1" {% if not registration_open or tournament_started %}disabled{% endif %}>
@@ -75,7 +75,7 @@
         <form action="/chat/send" method="post" class="mb-3" id="chat-form" data-cooldown-seconds="{{ chat_settings.cooldown_seconds }}">
           {% if not chat_settings.is_enabled %}<div class="alert alert-warning">{{ tr('msg_chat_disabled_admin') }}</div>{% endif %}
           <input class="form-control mb-2" name="temp_nick" placeholder="{{ tr('index_temp_nick') }}" value="{{ chat_saved_nick }}" required>
-          <div class="chat-color-picker mb-2" role="radiogroup" aria-label="{{ tr('index_temp_nick') }} color">
+          <div class="chat-color-picker mb-2" role="radiogroup" aria-label="{{ tr('index_temp_nick_color') }}">
             {% for color in chat_nick_colors %}
               <label class="chat-color-swatch" style="--swatch-color: {{ color }};" title="{{ color }}">
                 <input type="radio" name="nick_color" value="{{ color }}" {% if color == chat_saved_nick_color %}checked{% endif %}>
@@ -87,7 +87,7 @@
           <div class="small text-contrast-muted mb-2">{{ tr('index_chat_chars_left') }}: <span id="chat-char-counter">{{ chat_settings.max_length }}</span></div>
           <button class="btn btn-neon btn-neon-cyan" id="chat-send-btn" {% if not chat_settings.is_enabled %}disabled{% endif %}>{{ tr('index_connect_send') }}</button>
           <div class="chat-cooldown-timer mt-2" id="chat-cooldown-timer" hidden>
-            <div class="chat-cooldown-timer__label"><span id="chat-cooldown-seconds">0</span> sec</div>
+            <div class="chat-cooldown-timer__label"><span id="chat-cooldown-seconds">0</span> {{ tr('index_seconds_short') }}</div>
             <div class="chat-cooldown-timer__track">
               <div class="chat-cooldown-timer__bar" id="chat-cooldown-bar"></div>
             </div>
