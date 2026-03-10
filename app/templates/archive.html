@@ -4,13 +4,13 @@
 <h2 class="page-title-neon">{{ tr('archive_title') }}</h2>
 
 {% if tournament_archives %}
-  <h4 class="mt-4">Архив турниров</h4>
+  <h4 class="mt-4">{{ tr('archive_tournaments') }}</h4>
   {% for entry in tournament_archives %}
     <div class="card bg-black neon-border-blue mb-3">
       <div class="card-body">
-        <h4>{{ entry.title or 'Турнир' }}</h4>
-        {% if entry.season %}<div class="text-contrast-muted mb-2">Сезон: {{ entry.season }}</div>{% endif %}
-        {% if entry.winner_nickname %}<p><strong>Чемпион:</strong> <span class="archive-champion">★ {{ entry.winner_nickname }}</span></p>{% endif %}
+        <h4>{{ entry.title or tr('archive_tournament_fallback') }}</h4>
+        {% if entry.season %}<div class="text-contrast-muted mb-2">{{ tr('archive_season') }}: {{ entry.season }}</div>{% endif %}
+        {% if entry.winner_nickname %}<p><strong>{{ tr('archive_champion_label') }}:</strong> <span class="archive-champion">★ {{ entry.winner_nickname }}</span></p>{% endif %}
         {% if entry.created_at %}<div class="small text-contrast-muted mb-2">{{ format_msk_datetime(entry.created_at, '%Y-%m-%d %H:%M MSK') }}</div>{% endif %}
 
         {% if entry.bracket_tree %}
@@ -29,7 +29,7 @@
       <h4>{{ entry.title }}</h4>
       {% if entry.season %}<div class="text-contrast-muted mb-2">{{ entry.season }}</div>{% endif %}
       {% if entry.summary %}<p>{{ entry.summary }}</p>{% endif %}
-      {% if entry.champion_name %}<p><strong>Чемпион:</strong> <span class="archive-champion">★ {{ entry.champion_name }}</span></p>{% endif %}
+      {% if entry.champion_name %}<p><strong>{{ tr('archive_champion_label') }}:</strong> <span class="archive-champion">★ {{ entry.champion_name }}</span></p>{% endif %}
       {% if entry.bracket_tree %}
         {{ tree_ui.render_tournament_tree(entry.bracket_tree, tr, 'archive-tree') }}
       {% elif entry.bracket_summary %}
