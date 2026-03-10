@@ -1444,7 +1444,8 @@ async def get_or_create_rules_content(db: AsyncSession) -> RulesContent:
 async def set_lang(lang: str):
     # Сохраняем выбранный язык в cookie.
     response = RedirectResponse(url="/", status_code=302)
-    response.set_cookie("lang", "ru" if lang == "ru" else "en", max_age=60 * 60 * 24 * 365)
+    selected_lang = lang if lang in {"ru", "en", "zh"} else "en"
+    response.set_cookie("lang", selected_lang, max_age=60 * 60 * 24 * 365)
     return response
 
 
